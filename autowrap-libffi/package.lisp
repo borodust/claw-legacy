@@ -1,10 +1,10 @@
-(defpackage+-1:defpackage+ :autowrap
-  (:use #:plus-c)
-  (:import-except-conflicts #:autowrap.libffi))
+(defpackage+-1:defpackage+ :bodge-autowrap
+  (:use #:bodge-c)
+  (:import-except-conflicts #:bodge-autowrap.libffi))
 
  ;; Variables
 
-(in-package :autowrap)
+(in-package :bodge-autowrap)
 
 (defvar *libffi-cif* (make-hash-table)
   "Cache function CIFs")

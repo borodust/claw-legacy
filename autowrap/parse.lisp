@@ -1,4 +1,4 @@
-(in-package :autowrap)
+(in-package :bodge-autowrap)
 
 (defvar *foreign-type-symbol-function* 'default-foreign-type-symbol)
 (defvar *foreign-c-to-lisp-function* 'default-c-to-lisp)
@@ -140,7 +140,7 @@ Return the appropriate CFFI name."))
     (string
      (parse-type form (if (eq #\: (aref tag 0))
                           (make-keyword (substr* (string-upcase tag) 1))
-                          (intern (string-upcase tag) 'autowrap))))))
+                          (intern (string-upcase tag) 'bodge-autowrap))))))
 
 (defmethod parse-type (form (tag (eql :struct)))
   (make-record-ref form))
@@ -221,7 +221,7 @@ Return the appropriate CFFI name."))
     (string
      (apply #'parse-form form (if (eq #\: (aref tag 0))
                                   (make-keyword (substr* (string-upcase tag) 1))
-                                  (intern (string-upcase tag) 'autowrap))
+                                  (intern (string-upcase tag) 'bodge-autowrap))
             keys))))
 
 (defmethod parse-form (form tag &key &allow-other-keys)

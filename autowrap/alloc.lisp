@@ -1,4 +1,4 @@
-(in-package :autowrap)
+(in-package :bodge-autowrap)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (let (unsigned signed)

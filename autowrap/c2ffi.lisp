@@ -1,4 +1,4 @@
-(in-package :autowrap)
+(in-package :bodge-autowrap)
 
 ;;; Basic invocation for c2ffi with some architecture-related
 ;;; stuff.

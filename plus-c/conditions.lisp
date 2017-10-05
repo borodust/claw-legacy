@@ -1,4 +1,4 @@
-(in-package :plus-c)
+(in-package :bodge-plus-c)
 
 (define-condition c-unknown-function (error)
   ((name :initarg :name))

@@ -1,6 +1,6 @@
 (in-package :defpackage+-user-1)
 
-(defpackage+ :autowrap
+(defpackage+ :bodge-autowrap
   (:use #:cl #:alexandria)
   (:export
    ;; Conditions
@@ -106,11 +106,11 @@
    #:asdf-path
    #:string+))
 
-(defpackage :autowrap.minimal
+(defpackage :bodge-autowrap.minimal
   (:documentation "A minimal set of useful symbols for doing common things with autowrap.")
   (:use)
   (:import-from
-   :autowrap
+   :bodge-autowrap
 
    #:ptr #:invalidate #:enum-value #:enum-key #:mask #:mask-apply #:mask-keywords
    #:alloc-ptr #:alloc #:calloc-ptr #:calloc #:free #:with-alloc #:with-many-alloc #:with-calloc #:memcpy
@@ -124,5 +124,5 @@
            #:autocollect-cancel #:with-autocollect-cancel
            #:making-autocollect-instance))
 
-(defpackage+ :autowrap.libffi
+(defpackage+ :bodge-autowrap.libffi
   (:use))
