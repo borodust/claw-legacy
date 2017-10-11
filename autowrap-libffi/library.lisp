@@ -1,4 +1,4 @@
-(in-package :autowrap)
+(in-package :bodge-autowrap)
 
 (cffi:define-foreign-library libffi
   (:darwin (:or (:framework "libffi") (:default "libffi")))

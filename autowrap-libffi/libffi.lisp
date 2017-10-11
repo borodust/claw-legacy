@@ -1,4 +1,4 @@
-(in-package :autowrap)
+(in-package :bodge-autowrap)
 
 (setf *build-libffi-definition*
       (lambda (fun)

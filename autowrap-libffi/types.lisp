@@ -1,4 +1,4 @@
-(in-package :autowrap)
+(in-package :bodge-autowrap)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (unless (> (hash-table-count *libffi-type-map*) 0)
@@ -102,5 +102,3 @@
       (setf (type :type) autowrap.libffi:+ffi-type-struct+)
       (setf (type :elements) (elements &))
       (setf (elements 0) (ensure-libffi-type (foreign-type largest-field))))))
-
-

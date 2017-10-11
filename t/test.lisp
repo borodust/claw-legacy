@@ -1,7 +1,7 @@
-(defpackage :autowrap.test
-  (:use #:cl #:autowrap))
+(defpackage :bodge-autowrap.test
+  (:use #:cl #:bodge-autowrap))
 
-(in-package :autowrap.test)
+(in-package :bodge-autowrap.test)
 
 #+(or)
 (eval-when (:compile-toplevel :load-toplevel :execute)
