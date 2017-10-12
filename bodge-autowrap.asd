@@ -25,7 +25,8 @@
    (:file "errno")
    (:file "processing")
    (:file "parse")
-   (:file "bitmask")))
+   (:file "bitmask")
+   (:file "bodged")))
 
 (defsystem :bodge-autowrap/libffi
   :description "Optional libffi extension for call-by-value"

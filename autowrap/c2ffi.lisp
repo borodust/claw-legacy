@@ -45,6 +45,8 @@
     "x86_64-pc-windows-gnu"
     "i686-apple-darwin9"
     "x86_64-apple-darwin9"
+    "i686-apple-darwin-gnu"
+    "x86_64-apple-darwin-gnu"
     "i386-unknown-freebsd"
     "x86_64-unknown-freebsd"
     "i386-unknown-openbsd"
