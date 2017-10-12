@@ -1,4 +1,4 @@
-(in-package :autowrap)
+(in-package :bodge-autowrap)
 
 ;;; Simplified FFI layer, built on CFFI-SYS.
 
@@ -591,7 +591,7 @@ Create a type from `TYPESPEC` and return the `TYPE` structure representing it."
 
 (defmethod foreign-to-ffi ((type foreign-alias) names params fields body)
   (if (eq :pointer (basic-foreign-type type))
-      `(let ((,(car names) (autowrap:ptr ,(car params))))
+      `(let ((,(car names) (bodge-autowrap:ptr ,(car params))))
          (declare (ignorable ,(car names)))
          ,(next-ffi))
       (foreign-to-ffi (foreign-type type) names params fields body)))
@@ -1043,7 +1043,7 @@ since CFFI-SYS and thus SFFI use macros for ordinary calls."
             ,(foreign-to-ffi
               (and (car fields) (foreign-type (car fields)))
               names args fields
-              (autowrap::make-foreign-funcall
+              (bodge-autowrap::make-foreign-funcall
                fun maybe-cbv-return names
                (when (foreign-function-variadic-p fun)
                  (nthcdr (length fields) args))))))))

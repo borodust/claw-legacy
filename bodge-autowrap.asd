@@ -1,9 +1,9 @@
-(defpackage :cl-autowrap.asdf
+(defpackage :bodge-autowrap.asdf
   (:use #:cl #:asdf))
 
-(in-package :cl-autowrap.asdf)
+(in-package :bodge-autowrap.asdf)
 
-(defsystem :cl-autowrap
+(defsystem :bodge-autowrap
   :description "Import c2ffi specs and generate CFFI wrappers"
   :author "Ryan Pavlik"
   :license "BSD-2-Clause"
@@ -23,16 +23,18 @@
    (:file "sffi")
    (:file "alloc")
    (:file "errno")
+   (:file "processing")
    (:file "parse")
-   (:file "bitmask")))
+   (:file "bitmask")
+   (:file "bodged")))
 
-(defsystem :cl-autowrap/libffi
+(defsystem :bodge-autowrap/libffi
   :description "Optional libffi extension for call-by-value"
   :author "Ryan Pavlik"
   :license "BSD-2-Clause"
   :version "1.0"
 
-  :depends-on (:cl-autowrap :cl-plus-c)
+  :depends-on (:bodge-autowrap :cl-bodge-c)
   :pathname "autowrap-libffi"
   :serial t
 

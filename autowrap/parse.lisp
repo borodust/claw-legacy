@@ -1,4 +1,4 @@
-(in-package :autowrap)
+(in-package :bodge-autowrap)
 
 (defvar *foreign-type-symbol-function* 'default-foreign-type-symbol)
 (defvar *foreign-c-to-lisp-function* 'default-c-to-lisp)
@@ -12,6 +12,8 @@
 (defvar *foreign-other-exports-list* nil)
 (defvar *foreign-symbol-exceptions* nil)
 (defvar *foreign-symbol-regex* nil)
+
+(declaim (special *filter-spec-p*))
 
  ;; Collecting symbols
 
@@ -138,7 +140,7 @@ Return the appropriate CFFI name."))
     (string
      (parse-type form (if (eq #\: (aref tag 0))
                           (make-keyword (substr* (string-upcase tag) 1))
-                          (intern (string-upcase tag) 'autowrap))))))
+                          (intern (string-upcase tag) 'bodge-autowrap))))))
 
 (defmethod parse-type (form (tag (eql :struct)))
   (make-record-ref form))
@@ -219,7 +221,7 @@ Return the appropriate CFFI name."))
     (string
      (apply #'parse-form form (if (eq #\: (aref tag 0))
                                   (make-keyword (substr* (string-upcase tag) 1))
-                                  (intern (string-upcase tag) 'autowrap))
+                                  (intern (string-upcase tag) 'bodge-autowrap))
             keys))))
 
 (defmethod parse-form (form tag &key &allow-other-keys)
@@ -343,20 +345,14 @@ Return the appropriate CFFI name."))
                   (eval (caddr x))))
           list))
 
-(defun read-parse-forms (in-spec exclude-definitions exclude-sources
-                         include-definitions include-sources)
+(defun read-parse-forms (in-spec)
   (loop for form in (read-json in-spec)
         as name = (aval :name form)
         as location = (aval :location form)
-        unless
-        (and (or (included-p name exclude-definitions)
-                 (and (included-p location exclude-sources)
-                      (not (included-p name include-definitions))))
-             (not (or (included-p name include-definitions)
-                      (and (included-p location include-sources)
-                           (not (included-p name exclude-definitions))))))
+        when (or *filter-spec-p* (not (excluded-p name location)))
         collect (parse-form form (aval :tag form)) into forms
         finally (return (remove-if #'null forms))))
+
 
 (defun make-define-list (def-symbol list package)
  (loop for x in (reverse list)
@@ -388,10 +384,10 @@ Return the appropriate CFFI name."))
 
  ;; Exported API
 
-(defmacro c-include (h-file &key (spec-path *default-pathname-defaults*)
+(defmacro %c-include (h-file &key (spec-path *default-pathname-defaults*)
                      symbol-exceptions symbol-regex
                      exclude-definitions exclude-sources exclude-arch
-                     include-definitions include-sources
+                     include-definitions include-sources include-arch
                      sysincludes
                      (definition-package *package*)
                      (function-package definition-package)
@@ -401,8 +397,9 @@ Return the appropriate CFFI name."))
                      (extern-package accessor-package)
                      constant-accessor exclude-constants
                      (trace-c2ffi *trace-c2ffi*) no-accessors no-functions
-                     release-p version
-                     type-symbol-function c-to-lisp-function)
+                     release-p version filter-spec-p
+                     type-symbol-function c-to-lisp-function
+                     local-os)
   (let ((*foreign-symbol-exceptions* (alist-hash-table symbol-exceptions :test 'equal))
         (*foreign-symbol-regex* (make-scanners symbol-regex))
         (*foreign-constant-excludes* (mapcar #'ppcre:create-scanner exclude-constants))
@@ -413,12 +410,16 @@ Return the appropriate CFFI name."))
         (*foreign-c-to-lisp-function* (or (and c-to-lisp-function
                                                (eval c-to-lisp-function))
                                           *foreign-c-to-lisp-function*))
-        (exclude-definitions (mapcar #'ppcre:create-scanner exclude-definitions))
-        (exclude-sources (mapcar #'ppcre:create-scanner exclude-sources))
+        (*include-definitions* include-definitions)
+        (*include-sources* include-sources)
+        (*exclude-definitions* (mapcar #'ppcre:create-scanner exclude-definitions))
+        (*exclude-sources* (mapcar #'ppcre:create-scanner exclude-sources))
         (*package* (find-package definition-package))
+        (*filter-spec-p* filter-spec-p)
         (h-file (path-or-asdf (eval h-file)))
         (spec-path (path-or-asdf (eval spec-path)))
         (sysincludes (eval sysincludes))
+        (*local-os* (eval local-os))
         (definition-package (find-package definition-package))
         (function-package (find-package function-package))
         (wrapper-package (find-package wrapper-package))
@@ -432,8 +433,12 @@ Return the appropriate CFFI name."))
           (ensure-local-spec h-file
                              :spec-path spec-path
                              :arch-excludes exclude-arch
+                             :arch-includes include-arch
                              :sysincludes sysincludes
-                             :version version))
+                             :version version
+                             :spec-processor (if *filter-spec-p*
+                                                 #'squash-unrelated-definitions
+                                                 #'pass-through-processor)))
       (with-open-file (in-spec spec-name)
         (collecting-symbols
           `(progn
@@ -448,13 +453,11 @@ Return the appropriate CFFI name."))
                ;; being a toplevel form as of 1.1.9 and will crash.
                #-sbcl
                (with-anonymous-indexing
-                 ,@(read-parse-forms in-spec exclude-definitions exclude-sources
-                                     include-definitions include-sources))
+                 ,@(read-parse-forms in-spec))
                #+sbcl
                (progn
                  (setf *foreign-record-index* (make-hash-table))
-                 ,@(read-parse-forms in-spec exclude-definitions exclude-sources
-                                     include-definitions include-sources)
+                 ,@(read-parse-forms in-spec)
                  (setf *foreign-record-index* nil))
                ;; Map constants
                ,@(when constant-accessor

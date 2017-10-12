@@ -1,3 +1,10 @@
+# !!! WARNING !!!
+
+This is a fork of awesome [`cl-autowrap`](https://github.com/rpav/cl-autowrap)
+_*specifically*_ tailored for [`cl-bodge`](https://github.com/borodust/cl-bodge/) needs. Please,
+use upstream version, and never this fork. Neither backward nor forward compatibility is
+guaranteed. You have been warned.
+
 # Now with libffi!
 
 Using its own facilities, autowrap now includes `autowrap/libffi`.
@@ -103,8 +110,8 @@ loaded for a different access mechanism and **much quicker compile
 times**:
 
 ```lisp
-(asdf:load-system :cl-plus-c)
-(use-package :plus-c)
+(asdf:load-system :cl-bodge-c)
+(use-package :bodge-c)
 
 ;;; This allocates a FOO-T and frees it at the end:
 (c-let ((foo foo-t :free t))

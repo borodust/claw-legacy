@@ -1,4 +1,4 @@
-(in-package :autowrap)
+(in-package :bodge-autowrap)
 
 (defvar *definition-circles* nil
   "Detect circular type members")
@@ -80,7 +80,7 @@
 (defmacro making-autocollect-instance ((ptr-var type-name) pointer-form
                                        &body cleanup-body)
   `(autocollect (,ptr-var)
-       (autowrap:make-wrapper-instance ',type-name :ptr ,pointer-form)
+       (bodge-autowrap:make-wrapper-instance ',type-name :ptr ,pointer-form)
      ,@cleanup-body))
 
 (defmacro with-autocollect-cancel ((wrapper &key (invalidate-p t)) &body body)
@@ -99,4 +99,3 @@ will still invalidate `WRAPPER`."
     (if fun
         (apply fun args)
         (error "Type ~S is not a wrapped type" unqualified-record-name))))
-

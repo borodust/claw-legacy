@@ -1,15 +1,15 @@
-(defpackage :cl-autowrap.asdf
+(defpackage :bodge-autowrap.asdf
   (:use #:cl #:asdf))
 
-(in-package :cl-autowrap.asdf)
+(in-package :bodge-autowrap.asdf)
 
-(defsystem :cl-plus-c
+(defsystem :bodge-plus-c
   :description "Convenience and alternative mechanic for C/autowrap"
   :author "Ryan Pavlik"
   :license "BSD-2-Clause"
   :version "1.0"
 
-  :depends-on (:cl-autowrap)
+  :depends-on (:bodge-autowrap)
   :pathname "plus-c"
   :serial t
 
