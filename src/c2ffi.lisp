@@ -1,4 +1,4 @@
-(in-package :bodge-autowrap)
+(in-package :claw)
 
 ;;; Basic invocation for c2ffi with some architecture-related
 ;;; stuff.
@@ -8,7 +8,8 @@
 ;;; Note this is rather untested and not very extensive at the moment;
 ;;; it should probably work on linux/win/osx though.  Patches welcome.
 
-(declaim (special *local-os*))
+(declaim (special *local-os*)
+         (special *local-environment*))
 
 (defun local-cpu ()
   #+x86-64 "x86_64"
@@ -24,14 +25,17 @@
 (defun local-os ()
   (or (and *local-os* (format nil "-~A" *local-os*))
       #+linux "-linux"
-      #+windows "-windows-msvc"
+      #+windows "-windows"
       #+darwin "-darwin9"
       #+freebsd "-freebsd"
-      #+openbsd "-openbsd"))
+      #+openbsd "-openbsd"
+      #-(or linux windows darwin freebsd openbsd) (error "Unknown operating system")))
 
 (defun local-environment ()
-  #+linux "-gnu"
-  #-linux "")
+  (or (and *local-environment* (format nil "-~A" *local-os*))
+      #+linux "-gnu"
+      #+windows "-msvc"
+      #-(or linux windows) ""))
 
 (defun local-arch ()
   (string+ (local-cpu) (local-vendor) (local-os) (local-environment)))

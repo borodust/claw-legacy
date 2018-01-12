@@ -7,20 +7,20 @@
 
 (defmacro c-fun (name &rest args)
   (if-let (fun (find-function name))
-    (with-slots ((type bodge-autowrap::type)
-                 (c-symbol bodge-autowrap::c-symbol)
-                 (fields bodge-autowrap::fields)) fun
+    (with-slots ((type claw::type)
+                 (c-symbol claw::c-symbol)
+                 (fields claw::fields)) fun
       (let ((names (mapcar (lambda (x)
-                             (gensym (symbol-name (slot-value x 'bodge-autowrap::name))))
+                             (gensym (symbol-name (slot-value x 'claw::name))))
                            fields))
-            (return-value (when (bodge-autowrap::cbv-return-p fun)
+            (return-value (when (claw::cbv-return-p fun)
                             (pop args))))
-        (bodge-autowrap::foreign-to-ffi
+        (claw::foreign-to-ffi
          (and (car fields) (foreign-type (car fields)))
          names
          args
          fields
-         (bodge-autowrap::make-foreign-funcall
+         (claw::make-foreign-funcall
           fun return-value names
           (when (foreign-function-variadic-p fun)
             (nthcdr (length fields) args))))))
@@ -58,7 +58,7 @@
                   (error "Cannot find FFI type ~S in form ~S" type whole-form))))
     (once-only (wrapper)
       (let ((*topmost-parent* wrapper))
-        (build-ref (car fields) type `(bodge-autowrap:ptr ,wrapper) (cdr fields))))))
+        (build-ref (car fields) type `(claw:ptr ,wrapper) (cdr fields))))))
 
 ;;; FIXME: now that we have MEM-REF locally with (SETF MEM-REF),
 ;;; this could be cleaned back up
@@ -69,9 +69,9 @@
        nil nil
        `(,v)
        (let ((*final-value-set* v))
-         (build-ref (car fields) type `(bodge-autowrap:ptr ,wrapper)
+         (build-ref (car fields) type `(claw:ptr ,wrapper)
                     (cdr fields)))
-       (build-ref (car fields) type `(bodge-autowrap:ptr ,wrapper)
+       (build-ref (car fields) type `(claw:ptr ,wrapper)
                   (cdr fields))))))
 
 (defgeneric build-ref (ref type current-ref rest))
@@ -90,7 +90,7 @@
 (defmethod build-ref ((ref integer) (type foreign-alias) current-ref rest)
   (if (typep (foreign-type type) 'foreign-pointer)
       (build-ref (car rest) (foreign-type type)
-             (bodge-autowrap::make-array-ref type current-ref ref)
+             (claw::make-array-ref type current-ref ref)
              (cdr rest))
       (call-next-method)))
 
@@ -110,11 +110,11 @@
         (if (frf-bitfield-p field)
             (if *final-value-set*
                 (once-only (current-ref)
-                  `(cffi-sys:%mem-set ,(bodge-autowrap::make-bitfield-merge field current-ref *final-value-set*)
+                  `(cffi-sys:%mem-set ,(claw::make-bitfield-merge field current-ref *final-value-set*)
                                       ,current-ref ,(basic-foreign-type field)))
-                (bodge-autowrap::make-bitfield-deref field current-ref))
+                (claw::make-bitfield-deref field current-ref))
             (build-ref (car rest) (foreign-type field)
-                       (bodge-autowrap::make-field-ref field current-ref) (cdr rest)))
+                       (claw::make-field-ref field current-ref) (cdr rest)))
         (error 'c-unknown-field :type type :field ref))
       (build-ref (car rest) type
                  `(cffi-sys:inc-pointer ,current-ref
@@ -142,37 +142,37 @@
 
 (defmethod build-ref ((ref integer) (type foreign-pointer) current-ref rest)
   (build-ref (car rest) (foreign-type type)
-             (bodge-autowrap::make-array-ref type current-ref ref)
+             (claw::make-array-ref type current-ref ref)
              (cdr rest)))
 
 (defmethod build-ref ((ref symbol) (type foreign-pointer) current-ref rest)
   (if (keywordp ref)
       (call-next-method)
       (build-ref (car rest) type
-                 (bodge-autowrap::make-array-ref :pointer current-ref ref)
+                 (claw::make-array-ref :pointer current-ref ref)
                  (cdr rest))))
 
 (defmethod build-ref ((ref integer) (type symbol) current-ref rest)
   (if (keywordp type)
       (build-ref (car rest) type
-                 (bodge-autowrap::make-array-ref type current-ref ref)
+                 (claw::make-array-ref type current-ref ref)
                  (cdr rest))
       (call-next-method)))
 
 (defmethod build-ref ((ref symbol) (type symbol) current-ref rest)
   (if (keywordp type)
       (build-ref (car rest) type
-                 (bodge-autowrap::make-array-ref type current-ref ref)
+                 (claw::make-array-ref type current-ref ref)
                  (cdr rest))
       (call-next-method)))
 
 (defmethod build-ref ((ref symbol) (type foreign-array) current-ref rest)
   (if (keywordp ref)
       (build-ref ref (foreign-type type)
-                 (bodge-autowrap::make-array-ref type current-ref 0)
+                 (claw::make-array-ref type current-ref 0)
                  (cdr rest))
       (build-ref (car rest) (foreign-type type)
-                 (bodge-autowrap::make-array-ref type current-ref ref)
+                 (claw::make-array-ref type current-ref ref)
                  (cdr rest))))
 
 (defmethod build-ref ((ref null) (type symbol) current-ref rest)
@@ -193,9 +193,9 @@
                       (if (symbol-package name)
                           `(,(intern (string+ "MAKE-" name)
                                      (symbol-package name)))
-                          '(bodge-autowrap:make-anonymous-type)))))
-           (setf (bodge-autowrap::wrapper-ptr ,v) ,current-ref)
-           (setf (bodge-autowrap::wrapper-validity ,v) ,*topmost-parent*)
+                          '(claw:make-anonymous-type)))))
+           (setf (claw::wrapper-ptr ,v) ,current-ref)
+           (setf (claw::wrapper-validity ,v) ,*topmost-parent*)
            ,v))))
 
 (defmethod build-ref ((ref null) (type foreign-enum) current-ref rest)
@@ -218,7 +218,7 @@
            (cffi-sys:%mem-set (alloc-string ,*final-value-set*)
                               ,current-ref :pointer)
            ,(call-next-method))
-      `(if bodge-autowrap::*inhibit-string-conversion*
+      `(if claw::*inhibit-string-conversion*
            (values "" ,current-ref)
            (values
             (cffi:foreign-string-to-lisp (cffi-sys:%mem-ref ,current-ref :pointer))
@@ -243,7 +243,7 @@
                        (car bindings)
                      (let ((type (find-type c-type)))
                        (unless type
-                         (error 'bodge-autowrap:undefined-foreign-type :typespec c-type))
+                         (error 'claw:undefined-foreign-type :typespec c-type))
                        (if (or ptr from)
                            (if (foreign-scalar-p type)
                                `((let ((,tmp ,ptr))
@@ -252,8 +252,8 @@
                                          ,(if from
                                               from
                                               `(let ((,tmp (,(gethash (foreign-type-name type)
-                                                                      bodge-autowrap::*wrapper-constructors*))))
-                                                 (setf (bodge-autowrap::wrapper-ptr ,tmp) ,ptr)
+                                                                      claw::*wrapper-constructors*))))
+                                                 (setf (claw::wrapper-ptr ,tmp) ,ptr)
                                                  ,tmp))))
                                    ,@(maybe-make-macro bindings rest tmp v c-type nil))))
                            (if free

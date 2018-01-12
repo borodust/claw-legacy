@@ -1,4 +1,4 @@
-(in-package :bodge-autowrap)
+(in-package :claw)
 
 (defvar *foreign-type-symbol-function* 'default-foreign-type-symbol)
 (defvar *foreign-c-to-lisp-function* 'default-c-to-lisp)
@@ -140,7 +140,7 @@ Return the appropriate CFFI name."))
     (string
      (parse-type form (if (eq #\: (aref tag 0))
                           (make-keyword (substr* (string-upcase tag) 1))
-                          (intern (string-upcase tag) 'bodge-autowrap))))))
+                          (intern (string-upcase tag) 'claw))))))
 
 (defmethod parse-type (form (tag (eql :struct)))
   (make-record-ref form))
@@ -221,7 +221,7 @@ Return the appropriate CFFI name."))
     (string
      (apply #'parse-form form (if (eq #\: (aref tag 0))
                                   (make-keyword (substr* (string-upcase tag) 1))
-                                  (intern (string-upcase tag) 'bodge-autowrap))
+                                  (intern (string-upcase tag) 'claw))
             keys))))
 
 (defmethod parse-form (form tag &key &allow-other-keys)
@@ -399,7 +399,7 @@ Return the appropriate CFFI name."))
                      (trace-c2ffi *trace-c2ffi*) no-accessors no-functions
                      release-p version filter-spec-p
                      type-symbol-function c-to-lisp-function
-                     local-os)
+                     local-os local-environment)
   (let ((*foreign-symbol-exceptions* (alist-hash-table symbol-exceptions :test 'equal))
         (*foreign-symbol-regex* (make-scanners symbol-regex))
         (*foreign-constant-excludes* (mapcar #'ppcre:create-scanner exclude-constants))
@@ -420,6 +420,7 @@ Return the appropriate CFFI name."))
         (spec-path (path-or-asdf (eval spec-path)))
         (sysincludes (eval sysincludes))
         (*local-os* (eval local-os))
+        (*local-environment* (eval local-environment))
         (definition-package (find-package definition-package))
         (function-package (find-package function-package))
         (wrapper-package (find-package wrapper-package))

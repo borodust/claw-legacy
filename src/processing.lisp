@@ -1,4 +1,4 @@
-(in-package :bodge-autowrap)
+(in-package :claw)
 
 ;;;
 ;;; Dependency graph

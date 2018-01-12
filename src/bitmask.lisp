@@ -1,4 +1,4 @@
-(in-package :bodge-autowrap)
+(in-package :claw)
 
 (defvar *foreign-bitmasks* (make-hash-table))
 

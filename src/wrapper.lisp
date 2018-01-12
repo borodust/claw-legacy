@@ -1,4 +1,4 @@
-(in-package :bodge-autowrap)
+(in-package :claw)
 
 (defvar *definition-circles* nil
   "Detect circular type members")
@@ -80,7 +80,7 @@
 (defmacro making-autocollect-instance ((ptr-var type-name) pointer-form
                                        &body cleanup-body)
   `(autocollect (,ptr-var)
-       (bodge-autowrap:make-wrapper-instance ',type-name :ptr ,pointer-form)
+       (claw::make-wrapper-instance ',type-name :ptr ,pointer-form)
      ,@cleanup-body))
 
 (defmacro with-autocollect-cancel ((wrapper &key (invalidate-p t)) &body body)
