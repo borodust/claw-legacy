@@ -32,7 +32,7 @@
       #-(or linux windows darwin freebsd openbsd) (error "Unknown operating system")))
 
 (defun local-environment ()
-  (or (and *local-environment* (format nil "-~A" *local-os*))
+  (or (and *local-environment* (format nil "-~A" *local-environment*))
       #+linux "-gnu"
       #+windows "-msvc"
       #-(or linux windows) ""))

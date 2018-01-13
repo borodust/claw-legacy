@@ -59,7 +59,8 @@
   ((type :initform :char)))
 
 (defclass foreign-record (foreign-type)
-  ((bit-size :initarg :bit-size :initform nil :accessor foreign-record-bit-size)
+  ((id :initarg :id :initform nil :accessor foreign-record-id)
+   (bit-size :initarg :bit-size :initform nil :accessor foreign-record-bit-size)
    (bit-alignment :initarg :bit-alignment :initform nil :accessor foreign-record-bit-alignment)
    (fields :initarg :fields :initform nil :accessor foreign-record-fields)))
 
@@ -303,7 +304,7 @@ vs anything else (including enums)."
                                  :type (ensure-type type "extern ~S of type ~S" name type))))
       (setf (gethash name *foreign-externs*) extern))))
 
-(defun define-foreign-record (name type bit-size bit-alignment field-list)
+(defun define-foreign-record (name type id bit-size bit-alignment field-list)
   "Define a foreign record (struct or union) given `NAME`, a symbol,
 `TYPE`, either :struct or :union, and a list of fields.  The actual
 name for the type will be `(:struct NAME)` or `(:union NAME)`, as
@@ -313,6 +314,7 @@ appropriate."
     (let* ((record (gethash `(,type (,name)) *foreign-types*)))
       (unless record
         (setf record (make-instance 'foreign-record
+                                    :id id
                                     :name name
                                     :type type))
         (define-foreign-type `(,type (,name)) record))
@@ -486,10 +488,10 @@ Create a type from `TYPESPEC` and return the `TYPE` structure representing it."
          (define-foreign-enum name 0 (cddr typespec))))
       ((struct union)
        (let ((name (parse-record-name (cadr typespec))))
-         (destructuring-bind (_ &key bit-size bit-alignment &allow-other-keys)
+         (destructuring-bind (_ &key id bit-size bit-alignment &allow-other-keys)
              (cadr typespec)
            (declare (ignore _))
-           (define-foreign-record name (make-keyword type) bit-size bit-alignment (cddr typespec)))))
+           (define-foreign-record name (make-keyword type) id bit-size bit-alignment (cddr typespec)))))
       ((:enum :struct :union)
        (let ((name (list type (list (parse-record-name (cadr typespec))))))
          (find-type name)))
@@ -676,25 +678,34 @@ types."
 
 (defun transform-call-by-value-function (fun return-value param-names vargs)
   (with-slots (c-symbol name fields) fun
-    (flet ((ensure-reference (type)
-             (if (struct-or-union-p (foreign-type-name type))
-                 :pointer
-                 type)))
-      (let* ((return-type (basic-foreign-type (foreign-type fun)))
-             (return-struct-by-value-p (struct-or-union-p (foreign-type-name return-type))))
-        (foreign-wrap-up (foreign-type fun) fun
-                         `(cffi-sys:%foreign-funcall
-                           ,(string+ "__claw_" c-symbol)
-                           (,@(append
-                               (when return-struct-by-value-p
-                                 (list :pointer return-value))
-                               (loop for f in fields
-                                     for s in param-names
-                                     collect (ensure-reference (basic-foreign-type f))
-                                     collect s))
-                            ,@vargs
-                            ,(ensure-reference return-type))
-                           :convention :cdecl))))))
+    (let* ((return-type (basic-foreign-type (foreign-type fun)))
+           (return-struct-by-value-p (struct-or-union-p (foreign-type-name return-type))))
+      (foreign-wrap-up
+       (if return-struct-by-value-p :void (foreign-type fun)) fun
+       `(progn
+          ,@(append `((cffi-sys:%foreign-funcall
+                       ,(string+ "__claw_" c-symbol)
+                       (,@(append
+                           (when return-struct-by-value-p
+                             `(:pointer (ptr ,return-value)))
+                           (loop for f in fields
+                                 for s in param-names
+                                 as struct-or-union-p = (struct-or-union-p
+                                                         (foreign-type-name
+                                                          (basic-foreign-type f)))
+                                 collect (if struct-or-union-p
+                                             :pointer
+                                             (basic-foreign-type f))
+                                 collect (if struct-or-union-p
+                                             `(ptr ,s)
+                                             s)))
+                        ,@vargs
+                        ,(if return-struct-by-value-p
+                             :void
+                             return-type))
+                       :convention :cdecl))
+                    (when return-struct-by-value-p
+                      `(,return-value))))))))
 
 (defun make-foreign-funcall (fun return-value param-names vargs)
   (with-slots (c-symbol fields) fun
@@ -749,8 +760,7 @@ types."
                                 ,!fields
                                 (make-foreign-funcall ,!fun ,(and maybe-cbv-return 'return-value)
                                                       ',param-syms ,(when (foreign-function-variadic-p fun) rest)))))))))
-              `(progn
-                 ,form))))))))
+              form)))))))
 
 (defmacro define-cextern (name &optional (package *package*))
   (with-wrap-attempt ("extern ~S" name) name
