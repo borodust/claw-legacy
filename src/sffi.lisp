@@ -674,17 +674,32 @@ types."
     (or (not (foreign-scalar-p (foreign-type fun)))
         (some (lambda (p) (not (foreign-scalar-p (foreign-type p)))) fields))))
 
-(defvar *build-libffi-call*
-  (lambda (fun &rest r)
-    (declare (ignore r))
-    `(error "Call-by-value not implemented without loading cl-autowrap/libffi
-  (trying to call ~S)"
-            ',(foreign-type-name fun))))
+(defun transform-call-by-value-function (fun return-value param-names vargs)
+  (with-slots (c-symbol name fields) fun
+    (flet ((ensure-reference (type)
+             (if (struct-or-union-p (foreign-type-name type))
+                 :pointer
+                 type)))
+      (let* ((return-type (basic-foreign-type (foreign-type fun)))
+             (return-struct-by-value-p (struct-or-union-p (foreign-type-name return-type))))
+        (foreign-wrap-up (foreign-type fun) fun
+                         `(cffi-sys:%foreign-funcall
+                           ,(string+ "__claw_" c-symbol)
+                           (,@(append
+                               (when return-struct-by-value-p
+                                 (list :pointer return-value))
+                               (loop for f in fields
+                                     for s in param-names
+                                     collect (ensure-reference (basic-foreign-type f))
+                                     collect s))
+                            ,@vargs
+                            ,(ensure-reference return-type))
+                           :convention :cdecl))))))
 
 (defun make-foreign-funcall (fun return-value param-names vargs)
   (with-slots (c-symbol fields) fun
     (if (foreign-function-cbv-p fun)
-        (funcall *build-libffi-call* fun return-value param-names vargs)
+        (transform-call-by-value-function fun return-value param-names vargs)
         (foreign-wrap-up (foreign-type fun) fun
                          `(cffi-sys:%foreign-funcall ,c-symbol
                                                      (,@(loop for f in fields
@@ -695,10 +710,6 @@ types."
                                                       ,(basic-foreign-type
                                                         (foreign-type fun)))
                                                      :convention :cdecl)))))
-
-(defvar *build-libffi-definition*
-  (lambda (&rest r)
-    (declare (ignore r))))
 
 (defmacro define-cfun (name-or-function &optional (package *package*))
   (when-let ((fun (find-function name-or-function)))
@@ -739,8 +750,6 @@ types."
                                 (make-foreign-funcall ,!fun ,(and maybe-cbv-return 'return-value)
                                                       ',param-syms ,(when (foreign-function-variadic-p fun) rest)))))))))
               `(progn
-                 ,@(when (foreign-function-cbv-p fun)
-                     (list (funcall *build-libffi-definition* fun)))
                  ,form))))))))
 
 (defmacro define-cextern (name &optional (package *package*))
