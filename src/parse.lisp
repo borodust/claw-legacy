@@ -439,9 +439,8 @@ Return the appropriate CFFI name."))
                              :arch-includes include-arch
                              :sysincludes sysincludes
                              :version version
-                             :spec-processor (if *filter-spec-p*
-                                                 #'squash-unrelated-definitions
-                                                 #'pass-through-processor)))
+                             :spec-processor (pipeline-processors #'squash-unrelated-definitions
+                                                                  #'collect-cbv-wrappers)))
       (with-open-file (in-spec spec-name)
         (collecting-symbols
           `(progn

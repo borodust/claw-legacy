@@ -1,5 +1,42 @@
 (in-package :claw)
 
+(declaim (special *typedef-table*))
+
+(defun register-typedef (form)
+  (alist-bind (name type) form
+    (setf (gethash name *typedef-table*) (aval :tag type))))
+
+(defun find-basic-type (name)
+  (if-let ((result (gethash name *typedef-table*)))
+    (find-basic-type result)
+    name))
+
+(defun struct-or-union-entry-p (form)
+  (let ((tag (aval :tag form)))
+    (switch (tag :test #'equal)
+      ("struct" t)
+      ("union" t)
+      (t nil))))
+
+(defun collect-if-cbv (form)
+  (alist-bind (name parameters (result-type :resultType)) form
+    (log:info "parsing ~S: ~A" name (append parameters result-type))
+    (when (loop for def in (append parameters result-type)
+                  thereis (struct-or-union-entry-p def))
+      (log:info "~S found" name))))
+
+
+(defun collect-cbv-wrappers (input-spec-stream output-spec-stream)
+  (loop with raw-spec = (read-json input-spec-stream)
+        and *typedef-table* = (make-hash-table :test #'equal)
+        for form in raw-spec
+        as tag = (aval :tag form)
+        when (equal tag "function")
+          do (collect-if-cbv form)
+        when (equal tag "typedef")
+          do (register-typedef form)
+        finally (json:encode-json raw-spec output-spec-stream)))
+
 
 (defun make-cbv-wrapper (fun)
   (with-slots (c-symbol name fields) fun

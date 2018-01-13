@@ -77,6 +77,17 @@ doesn't exist, we will get a return code other than 0."
 (defun pass-through-processor (input output)
   (uiop:copy-stream-to-stream input output :element-type 'base-char))
 
+(defun pipeline-processors (&rest pipeline)
+  (lambda (input output)
+    (labels ((%call-next-processor (input rest-pipeline)
+               (if-let ((processor (first rest-pipeline)))
+                 (let ((result (with-output-to-string (out)
+                                 (funcall processor input out))))
+                   (with-input-from-string (res result)
+                     (%call-next-processor res (rest rest-pipeline))))
+                 (uiop:copy-stream-to-stream input output :element-type 'base-char))))
+      (%call-next-processor input pipeline))))
+
 
 ;;; UIOP:WITH-TEMPORARY-FILE does not seem to compile below as of asdf
 ;;; 3.1.5, and that's what SBCL is distributed with, so.
