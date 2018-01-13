@@ -287,6 +287,7 @@ Return the appropriate CFFI name."))
           (pushnew `(:struct (,sym)) *foreign-record-list*
                    :test #'equal))
         `(define-foreign-record ',sym :struct
+           ,name
            ,(aval :bit-size form)
            ,(aval :bit-alignment form)
            ',cstruct-fields)))))
@@ -299,6 +300,7 @@ Return the appropriate CFFI name."))
           (pushnew `(:union (,sym)) *foreign-record-list*
                    :test #'equal))
         `(define-foreign-record ',sym :union
+           ,name
            ,(aval :bit-size form)
            ,(aval :bit-alignment form)
            ',cunion-fields)))))

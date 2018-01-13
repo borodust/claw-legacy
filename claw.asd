@@ -17,4 +17,5 @@
                (:file "processing")
                (:file "parse")
                (:file "bitmask")
+               (:file "cbv")
                (:file "bodged")))
