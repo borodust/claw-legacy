@@ -31,7 +31,8 @@
  ;; Types
 
 (defclass foreign-type ()
-  ((name :initarg :name :initform nil :accessor foreign-type-name :type symbol)
+  ((id :initarg :id :initform nil :accessor foreign-type-id :type symbol)
+   (name :initarg :name :initform nil :accessor foreign-type-name :type symbol)
    (type :initarg :type :initform nil :accessor foreign-type :type (not null))))
 
 (defmethod foreign-type-name ((object symbol))
@@ -59,8 +60,7 @@
   ((type :initform :char)))
 
 (defclass foreign-record (foreign-type)
-  ((id :initarg :id :initform nil :accessor foreign-record-id)
-   (bit-size :initarg :bit-size :initform nil :accessor foreign-record-bit-size)
+  ((bit-size :initarg :bit-size :initform nil :accessor foreign-record-bit-size)
    (bit-alignment :initarg :bit-alignment :initform nil :accessor foreign-record-bit-alignment)
    (fields :initarg :fields :initform nil :accessor foreign-record-fields)))
 
@@ -304,7 +304,7 @@ vs anything else (including enums)."
                                  :type (ensure-type type "extern ~S of type ~S" name type))))
       (setf (gethash name *foreign-externs*) extern))))
 
-(defun define-foreign-record (name type id bit-size bit-alignment field-list)
+(defun define-foreign-record (name id type bit-size bit-alignment field-list)
   "Define a foreign record (struct or union) given `NAME`, a symbol,
 `TYPE`, either :struct or :union, and a list of fields.  The actual
 name for the type will be `(:struct NAME)` or `(:union NAME)`, as
@@ -339,7 +339,7 @@ by ID."
                  (integerp (cdr value)))))
   (when (and *foreign-record-index* (> id 0))
     (setf (foreign-anonymous id) name))
-  (let ((enum (make-instance 'foreign-enum :name name :type :int
+  (let ((enum (make-instance 'foreign-enum :id id :name name :type :int
                                            :values value-list)))
     (define-foreign-type `(:enum (,name)) enum)))
 
@@ -357,10 +357,11 @@ used exactly."
        (define-foreign-enum ',name 0 (list ,@symbol-values ,@just-alist))
        (define-foreign-alias ',name '(:enum (,name))))))
 
-(defun define-foreign-alias (name type)
+(defun define-foreign-alias (name id type)
   (with-wrap-attempt () name
     (define-foreign-type name
         (make-instance 'foreign-alias
+                       :id id
                        :name name
                        :type (ensure-type type "alias of type ~S to ~S" type name)))))
 
@@ -491,7 +492,7 @@ Create a type from `TYPESPEC` and return the `TYPE` structure representing it."
          (destructuring-bind (_ &key id bit-size bit-alignment &allow-other-keys)
              (cadr typespec)
            (declare (ignore _))
-           (define-foreign-record name (make-keyword type) id bit-size bit-alignment (cddr typespec)))))
+           (define-foreign-record name id (make-keyword type) bit-size bit-alignment (cddr typespec)))))
       ((:enum :struct :union)
        (let ((name (list type (list (parse-record-name (cadr typespec))))))
          (find-type name)))

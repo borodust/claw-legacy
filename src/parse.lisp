@@ -235,9 +235,9 @@ Return the appropriate CFFI name."))
           (if (pointer-alias-form-p type)
               (pushnew sym *foreign-alias-list* :test #'equal)
               (pushnew sym *foreign-other-exports-list*)))
-      `(define-foreign-alias
-           ',sym
-           ',@(parse-type type (aval :tag type))))))
+      `(define-foreign-alias ',sym
+         ,name
+         ',@(parse-type type (aval :tag type))))))
 
 (defun parse-fields (fields &optional (field-type :cfield))
   (loop for field in fields
@@ -286,8 +286,7 @@ Return the appropriate CFFI name."))
         (when (symbol-package sym)
           (pushnew `(:struct (,sym)) *foreign-record-list*
                    :test #'equal))
-        `(define-foreign-record ',sym :struct
-           ,name
+        `(define-foreign-record ',sym ,name :struct
            ,(aval :bit-size form)
            ,(aval :bit-alignment form)
            ',cstruct-fields)))))
@@ -299,8 +298,7 @@ Return the appropriate CFFI name."))
         (when (symbol-package sym)
           (pushnew `(:union (,sym)) *foreign-record-list*
                    :test #'equal))
-        `(define-foreign-record ',sym :union
-           ,name
+        `(define-foreign-record ',sym ,name :union
            ,(aval :bit-size form)
            ,(aval :bit-alignment form)
            ',cunion-fields)))))

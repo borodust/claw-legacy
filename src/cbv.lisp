@@ -10,6 +10,12 @@
                  (let ((current arg-counter))
                    (incf arg-counter)
                    (format nil "arg~A" current)))
+               (%pointer-type-name (type)
+                 (typecase type
+                   (foreign-field (%pointer-type-name (foreign-type type)))
+                   (foreign-pointer (string+ (%pointer-type-name (foreign-type type)) "*"))
+                   (foreign-alias (foreign-type-id type))
+                   (t "void*")))
                (%to-c-type-name (rich-type)
                  (let* ((type (basic-foreign-type rich-type))
                         (name (foreign-type-name type)))
@@ -18,14 +24,16 @@
                       (let ((kind (cond
                                     ((find-type `(:struct (,name))) "struct")
                                     ((find-type `(:union (,name))) "union"))))
-                        (format nil "~A ~A" kind (foreign-record-id type))))
-                     ((eq :pointer name) "void*")
+                        (format nil "~A ~A" kind (foreign-type-id type))))
+                     ((eq :pointer type)
+                      #++(break "~A:~A" rich-type
+                             (foreign-type-id (foreign-type rich-type)))
+                      (%pointer-type-name rich-type))
                      (t (substitute #\Space #\-  (string-downcase type))))))
                (%describe-type (rich-type)
-                 (let* ((type (basic-foreign-type rich-type))
-                        (arg-name (string-downcase (%next-arg-name)))
-                        (type-name (foreign-type-name type))
-                        (c-type-name (%to-c-type-name type)))
+                 (let* ((arg-name (string-downcase (%next-arg-name)))
+                        (type-name (foreign-type-name (basic-foreign-type rich-type)))
+                        (c-type-name (%to-c-type-name rich-type)))
                    (if (struct-or-union-p type-name)
                        (list (string+ c-type-name "*") arg-name t)
                        (list c-type-name arg-name nil))))
@@ -58,7 +66,7 @@
                     param-string)
             (if return-type
                 (format output "  ~A result = "
-                        (%to-c-type-name (basic-foreign-type fun-type)))
+                        (%to-c-type-name fun-type))
                 (format output "  "))
             (format output "~A" invocation)
             (when return-arg
