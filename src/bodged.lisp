@@ -35,6 +35,12 @@
                    (asdf:find-component (asdf:find-system system) include))))))
 
 
+(defun package-functions (package-name)
+  (loop for sym being the symbol in (find-package package-name)
+        as fu = (find-function sym)
+        when fu collect fu))
+
+
 (defmacro c-include (header system-name &body body
                      &key package include-sources include-definitions
                        exclude-sources exclude-definitions
@@ -43,11 +49,10 @@
   (declare (ignore body))
   (destructuring-bind (&optional package-name &rest args) (ensure-list package)
     `(progn
-       ,@(when package-name
-           `((cl:defpackage ,package-name
-               ,@(unless (find :use args :key #'car)
-                   `((:use)))
-               ,@args)))
+       (uiop:define-package ,package-name
+         ,@(unless (find :use args :key #'car)
+             `((:use)))
+         ,@args)
        (%c-include
         ',(list system-name header)
         :spec-path ',(list system-name :spec)
@@ -71,4 +76,10 @@
         :filter-spec-p t
         :symbol-exceptions ,(expand-symbol-exceptions symbol-exceptions)
         :symbol-regex ,(append (expand-symbol-prefix symbol-prefix)
-                               (expand-symbol-regex prefix-regex))))))
+                               (expand-symbol-regex prefix-regex)))
+       ,@(let ((dump-fu-name (format-symbol package-name 'dump-claw-c-wrapper)))
+           `((defun ,dump-fu-name (library-path)
+               (write-c-library-implementation library-path
+                                              ,header
+                                              (package-functions ,package-name)))
+             (export ',dump-fu-name ,package-name))))))

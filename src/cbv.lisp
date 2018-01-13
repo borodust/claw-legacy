@@ -20,7 +20,7 @@
                                     ((find-type `(:union (,name))) "union"))))
                         (format nil "~A ~A" kind (foreign-record-id type))))
                      ((eq :pointer name) "void*")
-                     (t (substitute #\- #\_ (string-downcase type))))))
+                     (t (substitute #\Space #\-  (string-downcase type))))))
                (%describe-type (rich-type)
                  (let* ((type (basic-foreign-type rich-type))
                         (arg-name (string-downcase (%next-arg-name)))
@@ -51,23 +51,35 @@
                (return-arg (when (third return-type)
                              (second return-type)))
                (void-p (or (null return-type) (third return-type))))
-          (apply #'string+
-                 (append (list (if void-p "void" (first return-type))
-                               " __claw_" c-symbol "(" param-string ") {")
-                         (when return-type
-                           (list (%to-c-type-name (basic-foreign-type fun-type)) " result = "))
-                         (list invocation)
-                         (when return-arg
-                           (list (format nil "(*~A) = result;" return-arg)))
-                         (unless void-p
-                           (list (format nil "return result;")))
-                         (list "}"))))))))
+          (with-output-to-string (output)
+            (format output "~A __claw_~A(~A) {~%"
+                    (if void-p "void" (first return-type))
+                    c-symbol
+                    param-string)
+            (if return-type
+                (format output "  ~A result = "
+                        (%to-c-type-name (basic-foreign-type fun-type)))
+                (format output "  "))
+            (format output "~A" invocation)
+            (when return-arg
+              (format output "~&  (*~A) = result;" return-arg))
+            (unless void-p
+              (format output "~&  return result;"))
+            (format output "~&}")))))))
 
 
-(defun write-c-library-implementaion (library-path h-path functions)
+(defun write-c-library-implementation (library-path h-path functions)
   (ensure-directories-exist library-path)
   (alexandria:with-output-to-file (out library-path :if-exists :supersede)
     (format out "#include \"~A\"" h-path)
+    (format out "
+#ifndef __CLAW_API
+  #ifdef __cplusplus
+    #define __CLAW_API extern \"C\"
+  #else
+    #define __CLAW_API
+  #endif
+#endif")
     (loop for fu in functions
           when (foreign-function-cbv-p fu)
-          do (format out "~%~A" (make-cbv-wrapper fu)))))
+          do (format out "~&~%__CLAW_API ~A" (make-cbv-wrapper fu)))))
