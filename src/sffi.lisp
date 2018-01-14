@@ -11,8 +11,6 @@
 (defvar *foreign-functions* (make-hash-table))
 (defvar *foreign-externs* (make-hash-table))
 
-(defvar *inhibit-string-conversion* nil)
-
  ;; Temporary record indexing
 
 (defvar *foreign-record-index* nil)
@@ -648,16 +646,7 @@ types."
   (declare (ignore type function))
   (with-gensyms (ptr)
     `(let ((,ptr ,body))
-       (if *inhibit-string-conversion*
-           (values "" ,ptr)
-           (values
-            ;; FOREIGN-STRING-TO-LISP will return NIL for a null pointer
-            (cffi:foreign-string-to-lisp ,ptr)
-            ,ptr)))))
-
-(defmacro inhibit-string-conversion (&body body)
-  `(let ((*inhibit-string-conversion* t))
-     ,@body))
+       ,ptr)))
 
 (defmethod foreign-wrap-up ((type foreign-pointer) function body)
   (let ((basic-type (basic-foreign-type (foreign-type type))))

@@ -228,11 +228,7 @@
            (cffi-sys:%mem-set (alloc-string ,*final-value-set*)
                               ,current-ref :pointer)
            ,(call-next-method))
-      `(if claw::*inhibit-string-conversion*
-           (values "" ,current-ref)
-           (values
-            (cffi:foreign-string-to-lisp (cffi-sys:%mem-ref ,current-ref :pointer))
-            ,current-ref))))
+      current-ref))
 
  ;; c-let
 
