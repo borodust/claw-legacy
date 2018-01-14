@@ -13,9 +13,13 @@
                (%pointer-type-name (type)
                  (typecase type
                    (foreign-field (%pointer-type-name (foreign-type type)))
+                   (foreign-record (string+ (ecase (foreign-type type)
+                                              (:struct "struct ")
+                                              (:union "union "))
+                                            (foreign-type-id type)))
                    (foreign-pointer (string+ (%pointer-type-name (foreign-type type)) "*"))
                    (foreign-alias (foreign-type-id type))
-                   (t "void*")))
+                   (t "void")))
                (%to-c-type-name (rich-type)
                  (let* ((type (basic-foreign-type rich-type))
                         (name (foreign-type-name type)))
@@ -26,8 +30,6 @@
                                     ((find-type `(:union (,name))) "union"))))
                         (format nil "~A ~A" kind (foreign-type-id type))))
                      ((eq :pointer type)
-                      #++(break "~A:~A" rich-type
-                             (foreign-type-id (foreign-type rich-type)))
                       (%pointer-type-name rich-type))
                      (t (substitute #\Space #\-  (string-downcase type))))))
                (%describe-type (rich-type)
