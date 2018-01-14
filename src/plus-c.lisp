@@ -1,4 +1,4 @@
-(in-package :bodge-plus-c)
+(in-package :claw)
 
 (defvar *topmost-parent* nil)
 (defvar *final-value-set* nil)
@@ -193,7 +193,7 @@
                       (if (symbol-package name)
                           `(,(intern (string+ "MAKE-" name)
                                      (symbol-package name)))
-                          '(claw:make-anonymous-type)))))
+                          '(claw::make-anonymous-type)))))
            (setf (claw::wrapper-ptr ,v) ,current-ref)
            (setf (claw::wrapper-validity ,v) ,*topmost-parent*)
            ,v))))
@@ -243,7 +243,7 @@
                        (car bindings)
                      (let ((type (find-type c-type)))
                        (unless type
-                         (error 'claw:undefined-foreign-type :typespec c-type))
+                         (error 'claw::undefined-foreign-type :typespec c-type))
                        (if (or ptr from)
                            (if (foreign-scalar-p type)
                                `((let ((,tmp ,ptr))

@@ -18,4 +18,5 @@
                (:file "parse")
                (:file "bitmask")
                (:file "cbv")
-               (:file "bodged")))
+               (:file "bodged")
+               (:file "plus-c")))
