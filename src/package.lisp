@@ -11,6 +11,7 @@
    #:memcpy
 
    #:define-enum-from-constants
+   #:enum-key #:enum-value
 
    #:bitfield-mask
 
