@@ -2,6 +2,9 @@
 
 ;;; Simplified FFI layer, built on CFFI-SYS.
 
+(define-constant +cbv-prefix+ "__claw_"
+  :test #'equal)
+
  ;; Global
 
 (defvar *foreign-types* (make-hash-table :test 'equal))
@@ -685,7 +688,7 @@ types."
        (if return-struct-by-value-p :void (foreign-type fun)) fun
        `(progn
           ,@(append `((cffi-sys:%foreign-funcall
-                       ,(string+ "__claw_" c-symbol)
+                       ,(string+ +cbv-prefix+ c-symbol)
                        (,@(append
                            (when return-struct-by-value-p
                              `(:pointer (ptr ,return-value)))

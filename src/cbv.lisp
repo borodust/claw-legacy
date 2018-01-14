@@ -60,8 +60,9 @@
                              (second return-type)))
                (void-p (or (null return-type) (third return-type))))
           (with-output-to-string (output)
-            (format output "~A __claw_~A(~A) {~%"
+            (format output "~A ~A~A(~A) {~%"
                     (if void-p "void" (first return-type))
+                    +cbv-prefix+
                     c-symbol
                     param-string)
             (if return-type
@@ -88,6 +89,6 @@
     #define __CLAW_API
   #endif
 #endif")
-    (loop for fu in functions
+    (loop for fu in (sort functions #'string< :key #'foreign-type-id)
           when (foreign-function-cbv-p fu)
-          do (format out "~&~%__CLAW_API ~A" (make-cbv-wrapper fu)))))
+            do (format out "~&~%__CLAW_API ~A" (make-cbv-wrapper fu)))))
