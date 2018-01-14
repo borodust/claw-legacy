@@ -47,39 +47,34 @@
                        symbol-exceptions symbol-prefix prefix-regex
                        sysincludes)
   (declare (ignore body))
-  (destructuring-bind (&optional package-name &rest args) (ensure-list package)
-    `(progn
-       (uiop:define-package ,package-name
-         ,@(unless (find :use args :key #'car)
-             `((:use)))
-         ,@args)
-       (%c-include
-        ',(list system-name header)
-        :spec-path ',(list system-name :spec)
-        :definition-package ,package-name
-        :local-environment "gnu"
-        :include-arch ("x86_64-pc-linux-gnu" "i686-pc-linux-gnu"
-                       "x86_64-pc-windows-gnu" "i686-pc-windows-gnu"
-                       "x86_64-apple-darwin-gnu" "i686-apple-darwin-gnu")
-        :sysincludes ',(append (parse-sysincludes system-name sysincludes)
-                               #+(and unix (not darwin))
-                               (list "/usr/include/x86_64-pc-linux-gnu/")
-                               #+windows
-                               (list "c:/msys64/mingw64/x86_64-w64-mingw32/include/"
-                                     "c:/msys64/mingw64/include/"
-                                     "c:/msys64/usr/local/include/"))
-        :include-sources ,include-sources
-        :include-definitions ,include-definitions
-        :exclude-sources ,exclude-sources
-        :exclude-definitions ,exclude-definitions
-        :no-accessors t
-        :filter-spec-p t
-        :symbol-exceptions ,(expand-symbol-exceptions symbol-exceptions)
-        :symbol-regex ,(append (expand-symbol-prefix symbol-prefix)
-                               (expand-symbol-regex prefix-regex)))
-       ,@(let ((dump-fu-name (format-symbol package-name 'dump-claw-c-wrapper)))
-           `((defun ,dump-fu-name (library-path)
-               (write-c-library-implementation library-path
-                                              ,header
-                                              (package-functions ,package-name)))
-             (export ',dump-fu-name ,package-name))))))
+  `(progn
+     (%c-include
+      ',(list system-name header)
+      :spec-path ',(list system-name :spec)
+      :definition-package ,package
+      :local-environment "gnu"
+      :include-arch ("x86_64-pc-linux-gnu" "i686-pc-linux-gnu"
+                                           "x86_64-pc-windows-gnu" "i686-pc-windows-gnu"
+                                           "x86_64-apple-darwin-gnu" "i686-apple-darwin-gnu")
+      :sysincludes ',(append (parse-sysincludes system-name sysincludes)
+                             #+(and unix (not darwin))
+                             (list "/usr/include/x86_64-pc-linux-gnu/")
+                             #+windows
+                             (list "c:/msys64/mingw64/x86_64-w64-mingw32/include/"
+                                   "c:/msys64/mingw64/include/"
+                                   "c:/msys64/usr/local/include/"))
+      :include-sources ,include-sources
+      :include-definitions ,include-definitions
+      :exclude-sources ,exclude-sources
+      :exclude-definitions ,exclude-definitions
+      :no-accessors t
+      :filter-spec-p t
+      :symbol-exceptions ,(expand-symbol-exceptions symbol-exceptions)
+      :symbol-regex ,(append (expand-symbol-prefix symbol-prefix)
+                             (expand-symbol-regex prefix-regex)))
+     ,@(let ((dump-fu-name (format-symbol package 'dump-claw-c-wrapper)))
+         `((defun ,dump-fu-name (library-path)
+             (write-c-library-implementation library-path
+                                             ,header
+                                             (package-functions ,package)))
+           (export ',dump-fu-name ,package)))))
