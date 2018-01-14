@@ -378,6 +378,7 @@ call it.  "
     (with-wrap-attempt () name
       (let* ((return-type (ensure-type return-type "function ~S (nee ~S) with return type ~S" name c-symbol return-type))
              (fun (make-instance 'foreign-function
+                                 :id c-symbol
                                  :name name
                                  :c-symbol c-symbol
                                  :type return-type
