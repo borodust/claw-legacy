@@ -36,6 +36,13 @@
 (defun (setf mem-ref) (value ptr type)
   (cffi-sys:%mem-set value ptr type))
 
+
+(defun %ensure-*&-keywords (symbol)
+  (switch (symbol :test #'string=)
+    ('& :&)
+    ('* :*)
+    (t symbol)))
+
 ;;;
 ;;; (c:ref TYPE wrapper-or-pointer [FIELD ...] FINAL-FIELD)
 ;;;
@@ -54,7 +61,8 @@
 ;;; & (the symbol, &) - as FINAL-FIELD only, returns the address of
 ;;; the last field
 (defmacro c-ref (&whole whole-form wrapper type &rest fields)
-  (let ((type (or (find-type type)
+  (let ((fields (mapcar #'%ensure-*&-keywords fields))
+        (type (or (find-type type)
                   (error "Cannot find FFI type ~S in form ~S" type whole-form))))
     (once-only (wrapper)
       (let ((*topmost-parent* wrapper))
@@ -63,16 +71,17 @@
 ;;; FIXME: now that we have MEM-REF locally with (SETF MEM-REF),
 ;;; this could be cleaned back up
 (define-setf-expander c-ref (wrapper type &rest fields)
-  (when-let (type (find-type type))
-    (with-gensyms (v)
-      (values
-       nil nil
-       `(,v)
-       (let ((*final-value-set* v))
+  (let ((fields (mapcar #'%ensure-*&-keywords fields)))
+    (when-let (type (find-type type))
+      (with-gensyms (v)
+        (values
+         nil nil
+         `(,v)
+         (let ((*final-value-set* v))
+           (build-ref (car fields) type `(claw:ptr ,wrapper)
+                      (cdr fields)))
          (build-ref (car fields) type `(claw:ptr ,wrapper)
-                    (cdr fields)))
-       (build-ref (car fields) type `(claw:ptr ,wrapper)
-                  (cdr fields))))))
+                    (cdr fields)))))))
 
 (defgeneric build-ref (ref type current-ref rest))
 
@@ -110,7 +119,8 @@
         (if (frf-bitfield-p field)
             (if *final-value-set*
                 (once-only (current-ref)
-                  `(cffi-sys:%mem-set ,(claw::make-bitfield-merge field current-ref *final-value-set*)
+                  `(cffi-sys:%mem-set ,(claw::make-bitfield-merge field current-ref
+                                                                  *final-value-set*)
                                       ,current-ref ,(basic-foreign-type field)))
                 (claw::make-bitfield-deref field current-ref))
             (build-ref (car rest) (foreign-type field)
@@ -121,13 +131,13 @@
                                         (* ,(foreign-type-size type) ,ref))
                  (cdr rest))))
 
-(defmethod build-ref ((ref (eql '*)) (type foreign-pointer)
+(defmethod build-ref ((ref (eql :*)) (type foreign-pointer)
                       current-ref rest)
   (let ((child-type (foreign-type type)))
     (build-ref (car rest) child-type
                `(cffi-sys:%mem-ref ,current-ref :pointer) (cdr rest))))
 
-(defmethod build-ref ((ref (eql '&)) type current-ref rest)
+(defmethod build-ref ((ref (eql :&)) type current-ref rest)
   (when rest
     (error "& may only be used at the end of a ref"))
   (when (and (typep type 'foreign-record-field)
