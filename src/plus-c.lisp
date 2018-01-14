@@ -37,11 +37,14 @@
   (cffi-sys:%mem-set value ptr type))
 
 
-(defun %ensure-*&-keywords (symbol)
-  (switch (symbol :test #'string=)
-    ('& :&)
-    ('* :*)
-    (t symbol)))
+(defun %ensure-*&-keywords (value)
+  (typecase value
+    (symbol
+     (switch (value :test #'string=)
+       ('& :&)
+       ('* :*)
+       (t value)))
+    (t value)))
 
 ;;;
 ;;; (c:ref TYPE wrapper-or-pointer [FIELD ...] FINAL-FIELD)
