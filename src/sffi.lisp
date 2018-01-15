@@ -1080,3 +1080,12 @@ aliases to be specified."
 
 (defmacro callback (name)
   `(cffi-sys:%callback ,name))
+
+
+(defun foreign-function-pointer (symbol)
+  (when-let* ((fn (find-function symbol))
+              (fn-name (foreign-symbol-c-symbol fn)))
+    (let ((c-name (if (foreign-function-cbv-p fn)
+                      fn-name
+                      (string+ +cbv-prefix+ fn-name))))
+      (cffi-sys:%foreign-symbol-pointer c-name :default))))

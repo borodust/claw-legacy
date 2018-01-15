@@ -21,6 +21,7 @@
    #:define-bitmask-from-constants #:define-bitmask-from-enum
 
    #:defcallback #:callback
+   #:foreign-function-pointer
 
    #:get-errno-pointer #:errno
 
