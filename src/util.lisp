@@ -156,3 +156,12 @@ Whether or not the error signaller will require and pass the
 object is specified by OBJECT-INITARG being non-NIL."
   `(define-simple-condition-for ,base-type :object-initarg ,object-initarg :simple-condition-type simple-error :signaler error
                                 ,@(when name `(:name ,name))))
+
+
+(defun by-removing-prefix (prefix)
+  (list (format nil "^~A\\w+$" prefix)
+        (lambda (name)
+          (subseq name (length prefix)))))
+
+(defun by-removing-prefixes (&rest prefixes)
+  (mapcar #'by-removing-prefix prefixes))

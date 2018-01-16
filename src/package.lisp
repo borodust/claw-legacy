@@ -2,6 +2,7 @@
   (:use #:cl #:alexandria)
   (:export
 
+   #:by-removing-prefixes
    ;; Wrapper
    #:ptr #:valid-p #:invalidate
    #:wrap-pointer #:wrapper-null-p

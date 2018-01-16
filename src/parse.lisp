@@ -26,15 +26,9 @@
  ;; Types and symbols
 
 (defun apply-regexps (string regex-list)
-  (loop for r in regex-list do
-    (cond
-      ((functionp (cdr r))
-       (multiple-value-bind (match matches)
-           (ppcre:scan-to-strings (car r) string)
-         (when match
-           (setf string (funcall (cdr r) string matches (car r))))))
-      ((stringp (cdr r))
-       (setf string (ppcre:regex-replace-all (car r) string (cdr r))))))
+  (loop for r in regex-list
+        when (ppcre:scan-to-strings (car r) string)
+          do (setf string (funcall (cdr r) string)))
   string)
 
 (defun default-c-to-lisp (string)
@@ -341,8 +335,8 @@ Return the appropriate CFFI name."))
 
 (defun make-scanners (list)
   (mapcar (lambda (x)
-            (cons (apply #'ppcre:create-scanner (car x) (cadr x))
-                  (eval (caddr x))))
+            (cons (ppcre:create-scanner (first x))
+                  (second x)))
           list))
 
 (defun read-parse-forms (in-spec)
@@ -401,7 +395,7 @@ Return the appropriate CFFI name."))
                      type-symbol-function c-to-lisp-function
                      local-os local-environment)
   (let ((*foreign-symbol-exceptions* (alist-hash-table symbol-exceptions :test 'equal))
-        (*foreign-symbol-regex* (make-scanners symbol-regex))
+        (*foreign-symbol-regex* (make-scanners (eval symbol-regex)))
         (*foreign-constant-excludes* (mapcar #'ppcre:create-scanner exclude-constants))
         (*foreign-raw-constant-list*)
         (*foreign-type-symbol-function* (or (and type-symbol-function
