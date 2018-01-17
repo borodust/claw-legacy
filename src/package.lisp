@@ -3,6 +3,9 @@
   (:export
 
    #:by-removing-prefixes
+   #:by-changing
+   #:in-pipeline
+
    ;; Wrapper
    #:ptr #:valid-p #:invalidate
    #:wrap-pointer #:wrapper-null-p

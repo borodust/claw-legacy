@@ -163,5 +163,18 @@ object is specified by OBJECT-INITARG being non-NIL."
         (lambda (name)
           (subseq name (length prefix)))))
 
+
 (defun by-removing-prefixes (&rest prefixes)
-  (mapcar #'by-removing-prefix prefixes))
+  (flet ((by-prefix-length (this-prefix that-prefix)
+           (> (length this-prefix)
+              (length that-prefix))))
+    (mapcar #'by-removing-prefix (stable-sort prefixes #'by-prefix-length))))
+
+
+(defun by-changing (from to)
+  (list (list (format nil "^~A$" from)
+              (lambda (name) (declare (ignore name)) (string to)))))
+
+
+(defun in-pipeline (&rest processors)
+  (reduce #'append processors))
