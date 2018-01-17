@@ -178,3 +178,7 @@ object is specified by OBJECT-INITARG being non-NIL."
 
 (defun in-pipeline (&rest processors)
   (reduce #'append processors))
+
+
+(defun by-removing-complex-prefix (regex symbols-to-cut)
+  (list (list regex (lambda (name) (subseq name symbols-to-cut)))))

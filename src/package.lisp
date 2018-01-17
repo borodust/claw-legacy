@@ -3,6 +3,7 @@
   (:export
 
    #:by-removing-prefixes
+   #:by-removing-complex-prefix
    #:by-changing
    #:in-pipeline
 
