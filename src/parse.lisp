@@ -304,7 +304,7 @@ Return the appropriate CFFI name."))
         (pushnew sym *foreign-other-exports-list*))
       `(progn
          ,@(parse-enum-to-const fields)
-         (define-foreign-enum ',sym ,id ',(parse-enum-fields fields))))))
+         (define-foreign-enum ',sym ,id ,name ',(parse-enum-fields fields))))))
 
 (defmethod parse-form (form (tag (eql 'function)) &key &allow-other-keys)
   (alist-bind (name inline parameters return-type variadic) form

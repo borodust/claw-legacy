@@ -328,7 +328,7 @@ appropriate."
               (parse-record-fields type name field-list)))
       record)))
 
-(defun define-foreign-enum (name id value-list)
+(defun define-foreign-enum (name id c-name value-list)
   "Define a foreign enum given `NAME`, a symbol, and a list of
 symbol-to-integer mappings, `VALUE-LIST`.  ID should be 0 unless
 anonymous-indexing is enabled and this will be later typedef'd
@@ -340,7 +340,7 @@ by ID."
                  (integerp (cdr value)))))
   (when (and *foreign-record-index* (> id 0))
     (setf (foreign-anonymous id) name))
-  (let ((enum (make-instance 'foreign-enum :id id :name name :type :int
+  (let ((enum (make-instance 'foreign-enum :id c-name :name name :type :int
                                            :values value-list)))
     (define-foreign-type `(:enum (,name)) enum)))
 
