@@ -116,13 +116,24 @@ its contents initialized to zero.  Freeing is up to you!"
      (unwind-protect (progn ,@body)
        (free ,name))))
 
+(defmacro with-free ((name value) &body body)
+  `(let ((,name ,value))
+     (unwind-protect (progn ,@body)
+       (free ,name))))
+
 (defmacro with-calloc ((name type &optional (count 1)) &body body)
   `(let ((,name (calloc ,type ,count)))
      (unwind-protect (progn ,@body)
        (free ,name))))
 
 (defmacro with-many-alloc ((&rest bindings) &body body)
-  `(let ,(mapcar #'(lambda (bind) `(,(car bind) (alloc ,@(cdr bind))))
+  `(let* ,(mapcar #'(lambda (bind) `(,(car bind) (alloc ,@(cdr bind))))
+          bindings)
+     (unwind-protect (progn ,@body)
+       ,@(mapcar #'(lambda (bind) `(free ,(car bind))) bindings))))
+
+(defmacro with-many-free ((&rest bindings) &body body)
+  `(let* ,(mapcar #'(lambda (bind) `(,(car bind) ,@(cdr bind)))
           bindings)
      (unwind-protect (progn ,@body)
        ,@(mapcar #'(lambda (bind) `(free ,(car bind))) bindings))))

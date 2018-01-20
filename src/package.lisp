@@ -12,8 +12,10 @@
    #:wrap-pointer #:wrapper-null-p
 
    #:alloc #:calloc #:realloc #:free
-   #:with-alloc #:with-many-alloc #:with-calloc
+   #:with-alloc #:with-free #:with-many-alloc #:with-many-free #:with-calloc
    #:memcpy
+
+   #:with-float-traps-masked
 
    #:define-enum-from-constants
    #:enum-key #:enum-value

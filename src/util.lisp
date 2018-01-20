@@ -182,3 +182,15 @@ object is specified by OBJECT-INITARG being non-NIL."
 
 (defun by-removing-complex-prefix (regex symbols-to-cut)
   (list (list regex (lambda (name) (subseq name symbols-to-cut)))))
+
+
+(defmacro with-float-traps-masked ((&rest masks) &body body)
+  (let ((masking #+sbcl `(sb-int:with-float-traps-masked ,(or masks
+                                                              '(:overflow
+                                                                :underflow
+                                                                :inexact
+                                                                :invalid
+                                                                :divide-by-zero)))
+                 #-sbcl '(progn)))
+    `(,@masking
+      ,@body)))
