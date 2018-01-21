@@ -79,6 +79,8 @@
 #ifndef __CLAW_API
   #if defined(_WIN32)
     #define __CLAW_API __declspec(dllexport)
+  #elif defined(__GNUC__)
+    #define __CLAW_API __attribute__((visibility(\"default\")))
   #else
     #define __CLAW_API
   #endif
