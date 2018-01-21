@@ -77,13 +77,20 @@
     (format out "#include \"~A\"" h-path)
     (format out "
 #ifndef __CLAW_API
-  #ifdef __cplusplus
-    #define __CLAW_API extern \"C\"
+  #if defined(_WIN32)
+    #define __CLAW_API __declspec(dllexport)
   #else
     #define __CLAW_API
   #endif
+#endif
+#if defined(__cplusplus)
+extern \"C\" {
 #endif")
     (loop for fu in (sort functions #'string< :key #'foreign-type-id)
           when (foreign-function-cbv-p fu)
             do (format out "~&~%__CLAW_API ~A" (make-cbv-wrapper fu)))
-    (format out  "~%")))
+    (format out "
+#if defined(__cplusplus)
+}
+#endif
+")))
