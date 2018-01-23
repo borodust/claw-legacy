@@ -19,17 +19,21 @@
 (defmacro c-include (header system-name &body body
                      &key in-package include-sources include-definitions
                        exclude-sources exclude-definitions
-                       rename-symbols sysincludes)
+                       rename-symbols sysincludes (windows-environment "gnu"))
   (declare (ignore body))
   `(progn
      (%c-include
       ',(list system-name header)
       :spec-path ',(list system-name :spec)
       :definition-package ,in-package
-      :local-environment "gnu"
-      :include-arch ("x86_64-pc-linux-gnu" "i686-pc-linux-gnu"
-                                           "x86_64-pc-windows-gnu" "i686-pc-windows-gnu"
-                                           "x86_64-apple-darwin-gnu" "i686-apple-darwin-gnu")
+      :local-environment #+windows ,windows-environment
+                         #-windows "gnu"
+      :include-arch ("x86_64-pc-linux-gnu"
+                     "i686-pc-linux-gnu"
+                     ,(string+ "x86_64-pc-windows-" windows-environment)
+                     ,(string+ "i686-pc-windows-" windows-environment)
+                     "x86_64-apple-darwin-gnu"
+                     "i686-apple-darwin-gnu")
       :sysincludes ',(append (parse-sysincludes system-name sysincludes)
                              #+(and unix (not darwin))
                              (let* ((gcc-ver (dump-gcc-version))
