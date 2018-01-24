@@ -26,7 +26,7 @@
   (or (and *local-os* (format nil "-~A" *local-os*))
       #+linux "-linux"
       #+windows "-windows"
-      #+darwin "-darwin9"
+      #+darwin "-darwin"
       #+freebsd "-freebsd"
       #+openbsd "-openbsd"
       #-(or linux windows darwin freebsd openbsd) (error "Unknown operating system")))
