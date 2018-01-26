@@ -120,7 +120,8 @@ doesn't exist, we will get a return code other than 0."
                        :ignore-error-status ignore-error-status)
             (with-open-file (raw-input tmp-raw-output)
               (with-open-file (final-output output-spec :direction :output :if-exists :supersede)
-                (funcall spec-processor raw-input final-output)))))))))
+                (funcall spec-processor raw-input final-output)
+                t))))))))
  ;; Specs and Loading
 
 (defun find-local-spec (name &optional (spec-path *default-pathname-defaults*))
