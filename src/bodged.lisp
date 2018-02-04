@@ -46,7 +46,8 @@
                                (append (when (uiop:directory-exists-p x86-64-includes)
                                          (list x86-64-includes))
                                        (when (uiop:directory-exists-p x86-includes)
-                                         (list x86-includes))))
+                                         (list x86-includes))
+                                       (list "/usr/include/linux/")))
                              #+windows
                              (list "c:/msys64/mingw64/x86_64-w64-mingw32/include/"
                                    "c:/msys64/mingw64/include/"
