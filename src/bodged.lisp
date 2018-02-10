@@ -51,6 +51,8 @@
                              #+windows
                              (list "c:/msys64/mingw64/x86_64-w64-mingw32/include/"
                                    "c:/msys64/mingw64/include/"
+                                   "c:/msys64/mingw32/i686-w64-mingw32/include/"
+                                   "c:/msys64/mingw32/include/"
                                    "c:/msys64/usr/local/include/"))
       :include-sources ,include-sources
       :include-definitions ,include-definitions
