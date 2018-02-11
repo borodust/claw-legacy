@@ -13,7 +13,7 @@
 
    #:alloc #:calloc #:realloc #:free
    #:with-alloc #:with-free #:with-many-alloc #:with-many-free #:with-calloc
-   #:memcpy
+   #:memcpy #:sizeof
 
    #:with-float-traps-masked
 
