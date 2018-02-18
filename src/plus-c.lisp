@@ -88,11 +88,6 @@
 
 (defgeneric build-ref (ref type current-ref rest))
 
-#++
-(defmethod build-ref :before (ref type current-ref rest)
-  (:say ref type
-        :br "   " current-ref rest))
-
 (defmethod build-ref (ref type current-ref rest)
   (error "Error parsing ref: ~S on type ~S" ref type))
 
@@ -133,6 +128,12 @@
                  `(cffi-sys:inc-pointer ,current-ref
                                         (* ,(foreign-type-size type) ,ref))
                  (cdr rest))))
+
+(defmethod build-ref ((ref integer) (type foreign-record) current-ref rest)
+  (build-ref (car rest) type
+             `(cffi-sys:inc-pointer ,current-ref
+                                    (* ,(foreign-type-size type) ,ref))
+             (cdr rest)))
 
 (defmethod build-ref ((ref (eql :*)) (type foreign-pointer)
                       current-ref rest)

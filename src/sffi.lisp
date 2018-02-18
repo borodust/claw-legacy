@@ -814,7 +814,7 @@ types."
 
 #+big-endian
 (defun bitfield-mask (bit-offset bit-size bit-alignment field-width)
-  (let* ((field-offset (truncate (- bit-offset (mod bit-offset bit-alignment)) 8))
+  (let* ((field-offset (truncate (- bit-offset (mod bit-offset bit-alignment)) +byte-size+))
          (right-offset (- bit-size (mod bit-offset bit-alignment) field-width))
          (mask (ash (1- (ash 1 field-width)) right-offset)))
     (values
@@ -828,7 +828,7 @@ types."
 #+little-endian
 (defun bitfield-mask (bit-offset bit-size bit-alignment field-width)
   (declare (ignore bit-size))
-  (let* ((field-offset (truncate (- bit-offset (mod bit-offset bit-alignment)) 8))
+  (let* ((field-offset (truncate (- bit-offset (mod bit-offset bit-alignment)) +byte-size+))
          (right-offset (mod bit-offset bit-alignment))
          (mask (ash (1- (ash 1 field-width)) right-offset)))
     (values
@@ -856,7 +856,7 @@ types."
   (reverse *accessor-params*))
 
 (defun make-field-ref (field ref &optional index)
-  (let* ((offset (truncate (frf-bit-offset field) 8)))
+  (let* ((offset (truncate (frf-bit-offset field) +byte-size+)))
     (if (and (= 0 offset) (not index))
         ref
         `(cffi-sys:inc-pointer ,ref ,offset))))
