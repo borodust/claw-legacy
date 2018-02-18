@@ -227,34 +227,65 @@
 (defgeneric foreign-type-size (type)
   (:documentation "The size for type `TYPE`, in bytes."))
 
+(defgeneric foreign-type-alignment (type)
+  (:documentation "The alignment for type `TYPE`, in bytes."))
+
 (defmethod foreign-type-size (type)
   (cffi-sys:%foreign-type-size type))
 
+(defmethod foreign-type-alignment (type)
+  (cffi-sys:%foreign-type-alignment type))
+
 (defmethod foreign-type-size ((type foreign-record))
   (if-let ((bit-size (foreign-record-bit-size type)))
-    (truncate bit-size 8)
+    (values (truncate bit-size +byte-size+))
+    (error 'incomplete-type :type type)))
+
+(defmethod foreign-type-alignment ((type foreign-record))
+  (if-let ((bit-alignment (foreign-record-bit-alignment type)))
+    (values (truncate bit-alignment +byte-size+))
     (error 'incomplete-type :type type)))
 
 (defmethod foreign-type-size ((type foreign-enum))
   (foreign-type-size (foreign-type type)))
 
+(defmethod foreign-type-alignment ((type foreign-enum))
+  (foreign-type-alignment (foreign-type type)))
+
 (defmethod foreign-type-size ((type foreign-function))
   (foreign-type-size :pointer))
 
+(defmethod foreign-type-alignment ((type foreign-function))
+  (foreign-type-alignment :pointer))
+
 (defmethod foreign-type-size ((type foreign-alias))
   (foreign-type-size (foreign-type type)))
+
+(defmethod foreign-type-alignment ((type foreign-alias))
+  (foreign-type-alignment (foreign-type type)))
 
 (defmethod foreign-type-size ((type foreign-array))
   (* (foreign-type-size (foreign-type type))
      (foreign-array-size type)))
 
+(defmethod foreign-type-alignment ((type foreign-array))
+  (foreign-type-alignment (foreign-type type)))
+
 (defmethod foreign-type-size ((type foreign-pointer))
   (foreign-type-size :pointer))
+
+(defmethod foreign-type-alignment ((type foreign-pointer))
+  (foreign-type-alignment :pointer))
 
 (defmethod foreign-type-size ((type symbol))
   (if (keywordp type)
       (call-next-method)
       (foreign-type-size (require-type type "determine the size of foreign type ~S" type))))
+
+(defmethod foreign-type-alignment ((type symbol))
+  (if (keywordp type)
+      (call-next-method)
+      (foreign-type-alignment (require-type type "determine the size of foreign type ~S" type))))
 
 (defgeneric unaliased-type (type)
   (:documentation "Find the unaliased type for TYPE"))

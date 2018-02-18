@@ -107,9 +107,22 @@ its contents initialized to zero.  Freeing is up to you!"
     (invalidate object))
   (values))
 
+(declaim (inline alignof))
+(defun alignof (type)
+  (foreign-type-alignment (find-type type)))
+
 (declaim (inline sizeof))
 (defun sizeof (type)
   (foreign-type-size (find-type type)))
+
+(defun offsetof (struct field)
+  (if-let ((type (basic-foreign-type (find-type struct))))
+    (progn
+      (check-type type foreign-record)
+      (if-let ((record-field (find-record-field type field)))
+        (values (truncate (frf-bit-offset record-field) +byte-size+))
+        (error 'c-unknown-field :type type :field field)))
+    (error 'undefined-foreign-type :typespec struct)))
 
 (defmacro with-alloc ((name type &optional (count 1)) &body body)
   `(let ((,name (alloc ,type ,count)))

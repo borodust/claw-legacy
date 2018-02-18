@@ -7,6 +7,8 @@
                   *include-sources*
                   *exclude-sources*))
 
+(define-constant +byte-size+ 8)
+
 (defun substr* (str start &optional end)
   "Make a shared substring of STR using MAKE-ARRAY :displaced-to"
   (let* ((end (or end (length str)))
