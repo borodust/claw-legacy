@@ -1028,9 +1028,9 @@ types."
                  (foreign-type type)
                  ((or symbol cons) (require-type-no-context type))))
          (name (foreign-type-name type)))
-    `(define-wrapper* ,type ,name)))
+    `(define-wrapper* ,type ,name ,(package-name package))))
 
-(defmacro define-wrapper* (type wrapper-name &key constructor conc-name)
+(defmacro define-wrapper* (type wrapper-name package-name)
   (with-wrap-attempt ("lisp structure for foreign structure ~S" type) type
     (let* ((type (etypecase type
                    (foreign-type type)
@@ -1046,26 +1046,22 @@ types."
            (star-p (and existing (typep type 'foreign-pointer)))
            ;; FIXME: These should be given a separate name, but this has
            ;; to be deduced _everywhere_.
-           (constructor-name
-             (or constructor
-                 (intern (string+ "MAKE-" wrapper-name)
-                         (symbol-package wrapper-name))))
-           (conc-name
-             (or conc-name
-                 (string+ wrapper-name "-"))))
+           (constructor-name (alexandria:format-symbol package-name "~A~A" 'make- wrapper-name))
+           (conc-name (alexandria:format-symbol package-name "~A-" wrapper-name)))
       (when (or (not existing) star-p)
         `(progn
            (setf (gethash ',(foreign-type-name type) *wrapper-constructors*)
                  ',constructor-name)
-           (defstruct (,wrapper-name
-                       (:constructor ,constructor-name)
-                       (:conc-name ,conc-name)
-                       (:copier nil)
-                       (:include ,(if (or (keywordp (foreign-type type))
-                                          (anonymous-p (foreign-type type))
-                                          (null (foreign-type-name (foreign-type type))))
-                                      'wrapper
-                                      (foreign-type-name (foreign-type type)))))))))))
+           (cl:defstruct (,wrapper-name
+                          (:constructor ,constructor-name)
+                          (:conc-name ,conc-name)
+                          (:copier nil)
+                          (:predicate nil)
+                          (:include ,(if (or (keywordp (foreign-type type))
+                                             (anonymous-p (foreign-type type))
+                                             (null (foreign-type-name (foreign-type type))))
+                                         'wrapper
+                                         (foreign-type-name (foreign-type type)))))))))))
 
 
  ;; Functions

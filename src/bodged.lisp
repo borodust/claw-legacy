@@ -21,49 +21,56 @@
                        exclude-sources exclude-definitions
                        rename-symbols sysincludes (windows-environment "gnu"))
   (declare (ignore body))
-  `(progn
-     (%c-include
-      ',(list system-name header)
-      :spec-path ',(list system-name :spec)
-      :definition-package ,in-package
-      :local-environment #+windows ,windows-environment
-                         #-windows "gnu"
-      :include-arch ("x86_64-pc-linux-gnu"
-                     "i686-pc-linux-gnu"
-                     ,(string+ "x86_64-pc-windows-" windows-environment)
-                     ,(string+ "i686-pc-windows-" windows-environment)
-                     "x86_64-apple-darwin-gnu"
-                     "i686-apple-darwin-gnu")
-      :sysincludes ',(append (parse-sysincludes system-name sysincludes)
-                             #+(and unix (not darwin))
-                             (let* ((gcc-ver (dump-gcc-version))
-                                    (x86-64-includes (string+ "/usr/lib/gcc/x86_64-pc-linux-gnu/"
-                                                              gcc-ver
-                                                              "/include/"))
-                                    (x86-includes (string+ "/usr/lib/gcc/i686-pc-linux-gnu/"
-                                                           gcc-ver
-                                                           "/include/")))
-                               (append (when (uiop:directory-exists-p x86-64-includes)
-                                         (list x86-64-includes))
-                                       (when (uiop:directory-exists-p x86-includes)
-                                         (list x86-includes))
-                                       (list "/usr/include/linux/")))
-                             #+windows
-                             (list "c:/msys64/mingw64/x86_64-w64-mingw32/include/"
-                                   "c:/msys64/mingw64/include/"
-                                   "c:/msys64/mingw32/i686-w64-mingw32/include/"
-                                   "c:/msys64/mingw32/include/"
-                                   "c:/msys64/usr/local/include/"))
-      :include-sources ,include-sources
-      :include-definitions ,include-definitions
-      :exclude-sources ,exclude-sources
-      :exclude-definitions ,exclude-definitions
-      :no-accessors t
-      :filter-spec-p t
-      :symbol-regex ,rename-symbols)
-     ,@(let ((dump-fu-name (format-symbol in-package 'dump-claw-c-wrapper)))
-         `((defun ,dump-fu-name (library-path)
-             (write-c-library-implementation library-path
-                                             ,header
-                                             (package-functions ,in-package)))
-           (export ',dump-fu-name ,in-package)))))
+  (let ((current-package *package*))
+    `(progn
+       ,@(when in-package
+           (let ((private-package (alexandria:format-symbol :keyword "~A.~A" in-package '%private)))
+             (append (unless (find-package private-package)
+                       `((defpackage ,private-package (:use))))
+                     `((in-package ,private-package)))))
+       (%c-include
+        ',(list system-name header)
+        :spec-path ',(list system-name :spec)
+        :definition-package ,in-package
+        :local-environment #+windows ,windows-environment
+                           #-windows "gnu"
+        :include-arch ("x86_64-pc-linux-gnu"
+                       "i686-pc-linux-gnu"
+                       ,(string+ "x86_64-pc-windows-" windows-environment)
+                       ,(string+ "i686-pc-windows-" windows-environment)
+                       "x86_64-apple-darwin-gnu"
+                       "i686-apple-darwin-gnu")
+        :sysincludes ',(append (parse-sysincludes system-name sysincludes)
+                               #+(and unix (not darwin))
+                               (let* ((gcc-ver (dump-gcc-version))
+                                      (x86-64-includes (string+ "/usr/lib/gcc/x86_64-pc-linux-gnu/"
+                                                                gcc-ver
+                                                                "/include/"))
+                                      (x86-includes (string+ "/usr/lib/gcc/i686-pc-linux-gnu/"
+                                                             gcc-ver
+                                                             "/include/")))
+                                 (append (when (uiop:directory-exists-p x86-64-includes)
+                                           (list x86-64-includes))
+                                         (when (uiop:directory-exists-p x86-includes)
+                                           (list x86-includes))
+                                         (list "/usr/include/linux/")))
+                               #+windows
+                               (list "c:/msys64/mingw64/x86_64-w64-mingw32/include/"
+                                     "c:/msys64/mingw64/include/"
+                                     "c:/msys64/mingw32/i686-w64-mingw32/include/"
+                                     "c:/msys64/mingw32/include/"
+                                     "c:/msys64/usr/local/include/"))
+        :include-sources ,include-sources
+        :include-definitions ,include-definitions
+        :exclude-sources ,exclude-sources
+        :exclude-definitions ,exclude-definitions
+        :no-accessors t
+        :filter-spec-p t
+        :symbol-regex ,rename-symbols)
+       ,@(let ((dump-fu-name (format-symbol in-package 'dump-claw-c-wrapper)))
+           `((defun ,dump-fu-name (library-path)
+               (write-c-library-implementation library-path
+                                               ,header
+                                               (package-functions ,in-package)))
+             (export ',dump-fu-name ,in-package)))
+       (in-package ,(package-name current-package)))))
