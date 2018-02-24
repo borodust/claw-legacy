@@ -1060,6 +1060,7 @@ types."
            (defstruct (,wrapper-name
                        (:constructor ,constructor-name)
                        (:conc-name ,conc-name)
+                       (:copier nil)
                        (:include ,(if (or (keywordp (foreign-type type))
                                           (anonymous-p (foreign-type type))
                                           (null (foreign-type-name (foreign-type type))))
