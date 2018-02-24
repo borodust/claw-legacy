@@ -1,4 +1,4 @@
-(in-package :claw)
+(cl:in-package :claw)
 
 ;;; Basic invocation for c2ffi with some architecture-related
 ;;; stuff.

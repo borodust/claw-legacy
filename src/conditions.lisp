@@ -1,4 +1,4 @@
-(in-package :claw)
+(cl:in-package :claw)
 
  ;; Condition classes
 

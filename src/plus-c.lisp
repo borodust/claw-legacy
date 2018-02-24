@@ -1,4 +1,4 @@
-(in-package :claw)
+(cl:in-package :claw)
 
 (defvar *topmost-parent* nil)
 (defvar *final-value-set* nil)

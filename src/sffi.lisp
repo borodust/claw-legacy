@@ -1,4 +1,4 @@
-(in-package :claw)
+(cl:in-package :claw)
 
 ;;; Simplified FFI layer, built on CFFI-SYS.
 

@@ -1,4 +1,4 @@
-(in-package :claw)
+(cl:in-package :claw)
 
 (defvar *definition-circles* nil
   "Detect circular type members")

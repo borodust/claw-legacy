@@ -1,4 +1,4 @@
-(in-package :claw)
+(cl:in-package :claw)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (let (unsigned signed)

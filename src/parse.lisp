@@ -1,4 +1,4 @@
-(in-package :claw)
+(cl:in-package :claw)
 
 (defvar *foreign-type-symbol-function* 'default-foreign-type-symbol)
 (defvar *foreign-c-to-lisp-function* 'default-c-to-lisp)
