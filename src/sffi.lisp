@@ -32,7 +32,7 @@
  ;; Types
 
 (defclass foreign-type ()
-  ((id :initarg :id :initform nil :accessor foreign-type-id :type symbol)
+  ((id :initarg :id :initform nil :accessor foreign-type-id :type (or symbol string number))
    (name :initarg :name :initform nil :accessor foreign-type-name :type symbol)
    (type :initarg :type :initform nil :accessor foreign-type :type (not null))))
 
