@@ -186,14 +186,33 @@ object is specified by OBJECT-INITARG being non-NIL."
   (list (list regex (lambda (name) (subseq name symbols-to-cut)))))
 
 
+#+ccl
+(defmacro with-float-traps-masked-on-ccl ((&rest masks) &body body)
+  (flet ((expand-mask (mask)
+           (list (case mask
+                   (:divide-by-zero :division-by-zero)
+                   (t mask))
+                 nil)))
+    (let ((args (reduce #'nconc (mapcar #'expand-mask masks))))
+      (with-gensyms (current-mode)
+        `(let ((,current-mode (ccl:get-fpu-mode)))
+           (unwind-protect
+                (progn
+                  (ccl:set-fpu-mode ,@args)
+                  ,@body)
+             (apply #'ccl:set-fpu-mode ,current-mode)))))))
+
+
 (defmacro with-float-traps-masked ((&rest masks) &body body)
-  (let ((masking #+sbcl `(sb-int:with-float-traps-masked ,(or masks
-                                                              '(:overflow
-                                                                :underflow
-                                                                :inexact
-                                                                :invalid
-                                                                :divide-by-zero)))
-                 #-sbcl '(progn)))
+  (let* ((masks (or masks
+                    '(:overflow
+                      :underflow
+                      :inexact
+                      :invalid
+                      :divide-by-zero)))
+         (masking #+sbcl `(sb-int:with-float-traps-masked ,masks)
+                  #+ccl `(with-float-traps-masked-on-ccl ,masks)
+                  #-(or sbcl ccl) '(progn)))
     `(,@masking
       ,@body)))
 
