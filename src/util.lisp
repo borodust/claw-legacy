@@ -203,6 +203,18 @@ object is specified by OBJECT-INITARG being non-NIL."
              (apply #'ccl:set-fpu-mode ,current-mode)))))))
 
 
+#+ecl
+(defmacro with-float-traps-masked-on-ecl ((&rest masks) &body body)
+  (declare (ignore masks))
+  `(let ((masked-bits (si::trap-fpe 'cl:last t)))
+     (unwind-protect
+          (progn
+            (si::trap-fpe masked-bits nil)
+            ,@body)
+       (si::trap-fpe masked-bits t))))
+
+
+
 (defmacro with-float-traps-masked ((&rest masks) &body body)
   (let* ((masks (or masks
                     '(:overflow
@@ -212,7 +224,8 @@ object is specified by OBJECT-INITARG being non-NIL."
                       :divide-by-zero)))
          (masking #+sbcl `(sb-int:with-float-traps-masked ,masks)
                   #+ccl `(with-float-traps-masked-on-ccl ,masks)
-                  #-(or sbcl ccl) '(progn)))
+                  #+ecl `(with-float-traps-masked-on-ecl ,masks)
+                  #-(or sbcl ccl ecl) '(progn)))
     `(,@masking
       ,@body)))
 
