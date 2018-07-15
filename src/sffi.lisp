@@ -675,11 +675,9 @@ types."
   body)
 
 (defmethod foreign-wrap-up ((type foreign-string) function body)
-  "For strings, return both a lisp string and the pointer"
+  "For strings, return only the pointer"
   (declare (ignore type function))
-  (with-gensyms (ptr)
-    `(let ((,ptr ,body))
-       ,ptr)))
+  body)
 
 (defmethod foreign-wrap-up ((type foreign-pointer) function body)
   (let ((basic-type (basic-foreign-type (foreign-type type))))
@@ -687,14 +685,19 @@ types."
       (foreign-record
        (let ((*package* (symbol-package
                          (foreign-type-name (foreign-type type)))))
-         `(,(symbolicate "MAKE-" (foreign-type-name (foreign-type type)))
-           :ptr ,body)))
+         (with-gensyms (ptr)
+           `(let ((,ptr ,body))
+              (unless (cffi-sys:null-pointer-p ,ptr)
+                (,(symbolicate 'make- (foreign-type-name (foreign-type type))) :ptr ,ptr))))))
       (otherwise body))))
 
 (defmethod foreign-wrap-up ((type foreign-alias) function body)
   (if (find-class (foreign-type-name type) nil)
       (let ((*package* (symbol-package (foreign-type-name type))))
-        `(,(symbolicate "MAKE-" (foreign-type-name type)) :ptr ,body))
+        (with-gensyms (ptr)
+          `(let ((,ptr ,body))
+             (unless (cffi-sys:null-pointer-p ,ptr)
+               (,(symbolicate 'make- (foreign-type-name type)) :ptr ,ptr)))))
       (foreign-wrap-up (foreign-type type) function body)))
 
 (defun foreign-function-cbv-p (fun)

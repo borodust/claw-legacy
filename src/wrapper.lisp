@@ -53,7 +53,7 @@
     child))
 
 (defun wrapper-null-p (wrapper)
-  (cffi-sys:null-pointer-p (ptr wrapper)))
+  (or (null wrapper) (cffi-sys:null-pointer-p (ptr wrapper))))
 
 (defmacro autocollect ((&optional (ptr (intern "PTR")))
                        wrapper-form &body body)
