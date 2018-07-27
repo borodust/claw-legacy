@@ -33,6 +33,7 @@
      (if (wrapper-valid-p wrapper)
          (wrapper-ptr wrapper)
          (error 'invalid-wrapper :object wrapper)))
+    (integer (cffi:make-pointer wrapper))
     (null (cffi:null-pointer))))
 
 (defun valid-p (wrapper)
