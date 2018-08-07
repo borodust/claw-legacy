@@ -56,6 +56,14 @@
 (defun wrapper-null-p (wrapper)
   (or (null wrapper) (cffi-sys:null-pointer-p (ptr wrapper))))
 
+
+(defun null-pointer-p (value)
+  (etypecase value
+    (cffi:foreign-pointer (cffi-sys:null-pointer-p value))
+    (wrapper (wrapper-null-p value))
+    (null t)))
+
+
 (defmacro autocollect ((&optional (ptr (intern "PTR")))
                        wrapper-form &body body)
   (let* ((tg (find-package "TRIVIAL-GARBAGE"))
