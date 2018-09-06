@@ -379,21 +379,22 @@ Return the appropriate CFFI name."))
  ;; Exported API
 
 (defmacro %c-include (h-file &key (spec-path *default-pathname-defaults*)
-                     symbol-exceptions symbol-regex
-                     exclude-definitions exclude-sources exclude-arch
-                     include-definitions include-sources include-arch
-                     sysincludes
-                     (definition-package *package*)
-                     (function-package definition-package)
-                     (wrapper-package definition-package)
-                     (accessor-package wrapper-package)
-                     (constant-package definition-package)
-                     (extern-package accessor-package)
-                     constant-accessor exclude-constants
-                     (trace-c2ffi *trace-c2ffi*) no-accessors no-functions
-                     release-p version filter-spec-p
-                     type-symbol-function c-to-lisp-function
-                     local-os local-environment)
+                               symbol-exceptions symbol-regex
+                               exclude-definitions exclude-sources exclude-arch
+                               include-definitions include-sources include-arch
+                               sysincludes
+                               (definition-package *package*)
+                               (function-package definition-package)
+                               (wrapper-package definition-package)
+                               (accessor-package wrapper-package)
+                               (constant-package definition-package)
+                               (extern-package accessor-package)
+                               constant-accessor exclude-constants
+                               (trace-c2ffi *trace-c2ffi*) no-accessors no-functions
+                               release-p version filter-spec-p
+                               type-symbol-function c-to-lisp-function
+                               local-os local-environment
+                               local-only)
   (let ((*foreign-symbol-exceptions* (alist-hash-table symbol-exceptions :test 'equal))
         (*foreign-symbol-regex* (make-scanners (eval symbol-regex)))
         (*foreign-constant-excludes* (mapcar #'ppcre:create-scanner exclude-constants))
@@ -428,7 +429,9 @@ Return the appropriate CFFI name."))
           (ensure-local-spec h-file
                              :spec-path spec-path
                              :arch-excludes exclude-arch
-                             :arch-includes include-arch
+                             :arch-includes (if local-only
+                                                (list (local-arch))
+                                                include-arch)
                              :sysincludes sysincludes
                              :version version
                              :spec-processor (if *filter-spec-p*

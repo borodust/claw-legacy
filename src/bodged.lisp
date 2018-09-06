@@ -19,7 +19,8 @@
 (defmacro c-include (header system-name &body body
                      &key in-package include-sources include-definitions
                        exclude-sources exclude-definitions
-                       rename-symbols sysincludes (windows-environment "gnu"))
+                       rename-symbols sysincludes (windows-environment "gnu")
+                       (local-only nil))
   (declare (ignore body))
   (let ((current-package *package*))
     `(progn
@@ -34,6 +35,7 @@
         :definition-package ,in-package
         :local-environment #+windows ,windows-environment
                            #-windows "gnu"
+        :local-only ,local-only
         :include-arch ("x86_64-pc-linux-gnu"
                        "i686-pc-linux-gnu"
                        ,(string+ "x86_64-pc-windows-" windows-environment)
