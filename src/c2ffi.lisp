@@ -59,7 +59,7 @@
 
  ;; c2ffi
 
-(defvar *c2ffi-program* "c2ffi")
+(defvar *c2ffi-program* #-windows "c2ffi" #+windows "c2ffi.exe")
 
 (defvar *trace-c2ffi* nil)
 
