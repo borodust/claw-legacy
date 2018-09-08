@@ -19,7 +19,7 @@
 (defmacro c-include (header system-name &body body
                      &key in-package include-sources include-definitions
                        exclude-sources exclude-definitions
-                       rename-symbols sysincludes (windows-environment "gnu")
+                       (spec-module :spec) rename-symbols sysincludes (windows-environment "gnu")
                        (local-only nil))
   (declare (ignore body))
   (let ((current-package *package*))
@@ -31,7 +31,7 @@
                      `((in-package ,private-package)))))
        (%c-include
         ',(list system-name header)
-        :spec-path ',(list system-name :spec)
+        :spec-path ',(list system-name spec-module)
         :definition-package ,in-package
         :local-environment #+windows ,windows-environment
                            #-windows "gnu"
