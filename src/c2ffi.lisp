@@ -9,13 +9,15 @@
 ;;; it should probably work on linux/win/osx though.  Patches welcome.
 
 (declaim (special *local-os*)
-         (special *local-environment*))
+         (special *local-environment*)
+         (special *local-cpu*))
 
 (defun local-cpu ()
-  #+x86-64 "x86_64"
-  #+(and (not (or x86-64 freebsd)) x86) "i686"
-  #+(and (not x86-64) x86 freebsd) "i386"
-  #+arm "arm")
+  (or *local-cpu*
+      #+x86-64 "x86_64"
+      #+(and (not (or x86-64 freebsd)) x86) "i686"
+      #+(and (not x86-64) x86 freebsd) "i386"
+      #+arm "arm"))
 
 (defun local-vendor ()
   #+(or linux windows) "-pc"
