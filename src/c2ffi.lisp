@@ -99,6 +99,7 @@ doesn't exist, we will get a return code other than 0."
            (arch (when arch (list "-A" arch)))
            (sysincludes (loop for dir in sysincludes
                               append (list "-I" dir))))
+      (ensure-directories-exist output-spec)
       ;; Invoke c2ffi to emit macros into TMP-MACRO-FILE
       (when (run-check *c2ffi-program* (list* (namestring input-file)
                                               "-D" "null"
