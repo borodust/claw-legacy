@@ -97,14 +97,18 @@ doesn't exist, we will get a return code other than 0."
                         :keep *trace-c2ffi*)
     (let* ((output-spec (string+ output-basename ".spec"))
            (arch (when arch (list "-A" arch)))
-           (sysincludes (loop for dir in sysincludes
-                              append (list "-I" dir))))
+           (includes (loop for dir in sysincludes
+                           if (uiop:directory-exists-p dir)
+                             append (list "-I" dir)
+                           else
+                             do (when *trace-c2ffi*
+                                  (format *debug-io* "~&; c2ffi include ignored: ~A not found" dir)))))
       (ensure-directories-exist output-spec)
       ;; Invoke c2ffi to emit macros into TMP-MACRO-FILE
       (when (run-check *c2ffi-program* (list* (namestring input-file)
                                               "-D" "null"
                                               "-M" (namestring tmp-macro-file)
-                                              (append arch sysincludes))
+                                              (append arch includes))
                        :output *standard-output*
                        :ignore-error-status ignore-error-status)
         ;; Write a tmp header file that #include's the input file and the macros file.
@@ -118,7 +122,7 @@ doesn't exist, we will get a return code other than 0."
           (with-temporary-file (:pathname tmp-raw-output)
             (run-check *c2ffi-program* (list* (namestring tmp-include-file)
                                               "-o" (namestring tmp-raw-output)
-                                              (append arch sysincludes))
+                                              (append arch includes))
                        :output *standard-output*
                        :ignore-error-status ignore-error-status)
             (with-open-file (raw-input tmp-raw-output)

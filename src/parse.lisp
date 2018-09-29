@@ -413,7 +413,6 @@ Return the appropriate CFFI name."))
         (*filter-spec-p* filter-spec-p)
         (h-file (path-or-asdf (eval h-file)))
         (spec-path (path-or-asdf (eval spec-path)))
-        (sysincludes (remove-if (complement #'uiop:directory-exists-p) (eval sysincludes)))
         (*local-cpu* (when (boundp '*local-cpu*)
                        *local-cpu*))
         (*local-os* (eval local-os))
@@ -434,7 +433,7 @@ Return the appropriate CFFI name."))
                              :arch-includes (if local-only
                                                 (list (local-arch))
                                                 include-arch)
-                             :sysincludes sysincludes
+                             :sysincludes (eval sysincludes)
                              :version version
                              :spec-processor (if *filter-spec-p*
                                                  #'squash-unrelated-definitions
