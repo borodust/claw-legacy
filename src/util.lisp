@@ -232,6 +232,7 @@ object is specified by OBJECT-INITARG being non-NIL."
 
 (defun dump-gcc-version ()
   (handler-case
-      (remove #\Newline (with-output-to-string (out)
-                          (uiop:run-program "gcc -dumpversion" :output out)))
+      (string-trim '(#\Tab #\Space #\Newline)
+                   (with-output-to-string (out)
+                     (uiop:run-program "gcc -dumpversion" :output out)))
     (t () "")))
