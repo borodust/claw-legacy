@@ -12,6 +12,8 @@
          (special *local-environment*)
          (special *local-cpu*))
 
+(defvar *rebuild-spec* nil)
+
 (defun local-cpu ()
   (or *local-cpu*
       #+x86-64 "x86_64"
@@ -155,7 +157,7 @@ if the file does not exist."
                                         "")
                                     "." arch)))
     (multiple-value-bind (h-name m-name) (find-local-spec name spec-path)
-      (if h-name
+      (if (and h-name (not *rebuild-spec*))
           (values h-name m-name)
           (progn
             (unless (c2ffi-p)
