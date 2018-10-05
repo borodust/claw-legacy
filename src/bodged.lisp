@@ -38,7 +38,7 @@
                      &key in-package include-sources include-definitions
                        exclude-sources exclude-definitions
                        (spec-module :spec) rename-symbols sysincludes (windows-environment "gnu")
-                       (local-only nil))
+                       (local-only nil) language)
   (declare (ignore body))
   (let ((current-package *package*))
     `(progn
@@ -75,6 +75,7 @@
         :exclude-definitions ,exclude-definitions
         :no-accessors t
         :filter-spec-p t
+        :language ,language
         :symbol-regex ,rename-symbols)
        ,@(let ((dump-fu-name (format-symbol in-package 'dump-claw-c-wrapper)))
            `((defun ,dump-fu-name (library-path)

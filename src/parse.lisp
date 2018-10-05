@@ -394,7 +394,8 @@ Return the appropriate CFFI name."))
                                release-p version filter-spec-p
                                type-symbol-function c-to-lisp-function
                                local-os local-environment
-                               local-only)
+                               local-only
+                               language)
   (let ((*foreign-symbol-exceptions* (alist-hash-table symbol-exceptions :test 'equal))
         (*foreign-symbol-regex* (make-scanners (eval symbol-regex)))
         (*foreign-constant-excludes* (mapcar #'ppcre:create-scanner exclude-constants))
@@ -435,6 +436,7 @@ Return the appropriate CFFI name."))
                                                 include-arch)
                              :sysincludes (eval sysincludes)
                              :version version
+                             :language language
                              :spec-processor (if *filter-spec-p*
                                                  #'squash-unrelated-definitions
                                                  #'pass-through-processor)))
