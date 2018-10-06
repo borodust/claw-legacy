@@ -43,11 +43,7 @@
   (declare (ignore body))
   (let ((current-package *package*))
     `(progn
-       ,@(when in-package
-           (let ((private-package (alexandria:format-symbol :keyword "~A.~A" in-package '%private)))
-             (append (unless (find-package private-package)
-                       `((defpackage ,private-package (:use))))
-                     `((in-package ,private-package)))))
+       (cl:in-package ,in-package)
        (%c-include
         ',(list system-name header)
         :spec-path ',(list system-name spec-module)
@@ -74,7 +70,6 @@
         :include-definitions ,include-definitions
         :exclude-sources ,exclude-sources
         :exclude-definitions ,exclude-definitions
-        :no-accessors t
         :filter-spec-p t
         :language ,language
         :symbol-regex ,rename-symbols)

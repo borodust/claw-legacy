@@ -385,12 +385,10 @@ Return the appropriate CFFI name."))
                                sysincludes
                                (definition-package *package*)
                                (function-package definition-package)
-                               (wrapper-package definition-package)
-                               (accessor-package wrapper-package)
                                (constant-package definition-package)
-                               (extern-package accessor-package)
+                               (extern-package definition-package)
                                constant-accessor exclude-constants
-                               (trace-c2ffi *trace-c2ffi*) no-accessors no-functions
+                               (trace-c2ffi *trace-c2ffi*) no-functions
                                release-p version filter-spec-p
                                type-symbol-function c-to-lisp-function
                                local-os local-environment
@@ -420,8 +418,6 @@ Return the appropriate CFFI name."))
         (*local-environment* (eval local-environment))
         (definition-package (find-package definition-package))
         (function-package (find-package function-package))
-        (wrapper-package (find-package wrapper-package))
-        (accessor-package (find-package accessor-package))
         (constant-package (find-package constant-package))
         (extern-package (find-package extern-package))
         (constant-name-value-map (gensym "CONSTANT-NAME-VALUE-MAP-"))
@@ -467,10 +463,6 @@ Return the appropriate CFFI name."))
                      (loop for (name . value) in ',*foreign-raw-constant-list*
                            do (setf (gethash name ,constant-name-value-map) value))))
                ;; Definitions
-               ,@(make-define-list 'define-wrapper *foreign-record-list* wrapper-package)
-               ,@(make-define-list 'define-wrapper *foreign-alias-list* wrapper-package)
-               ,@(unless no-accessors
-                   (make-define-list 'define-accessors *foreign-record-list* accessor-package))
                ,@(unless no-functions
                    (make-define-list 'define-cfun *foreign-function-list* function-package))
                ,@(make-define-list 'define-cextern *foreign-extern-list* extern-package)

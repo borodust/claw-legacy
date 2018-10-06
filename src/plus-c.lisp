@@ -202,15 +202,7 @@
 (defmethod build-ref ((ref null) (type foreign-record) current-ref rest)
   (if *final-value-set*
       (error "You may not set the value of a record (~S)" type)
-      (with-gensyms (v)
-        `(let ((,v ,(let ((name (foreign-type-name type)))
-                      (if (symbol-package name)
-                          `(,(intern (string+ "MAKE-" name)
-                                     (symbol-package name)))
-                          '(claw::make-anonymous-type)))))
-           (setf (claw::wrapper-ptr ,v) ,current-ref)
-           (setf (claw::wrapper-validity ,v) ,*topmost-parent*)
-           ,v))))
+      `(progn ,current-ref)))
 
 (defmethod build-ref ((ref null) (type foreign-enum) current-ref rest)
   (if *final-value-set*
@@ -249,23 +241,17 @@
            (rec (bindings rest)
              (if bindings
                  (with-gensyms (tmp)
-                   (destructuring-bind (v c-type &key (count 1) (free free-default) ptr from value calloc)
+                   (destructuring-bind (v c-type &key (count 1)
+                                                   (free free-default)
+                                                   ptr from value calloc)
                        (car bindings)
-                     (let ((type (find-type c-type)))
+                     (let ((type (find-type c-type))
+                           (ptr (or ptr from)))
                        (unless type
                          (error 'claw::undefined-foreign-type :typespec c-type))
-                       (if (or ptr from)
-                           (if (foreign-scalar-p type)
-                               `((let ((,tmp ,ptr))
-                                   ,@(maybe-make-macro bindings rest tmp v c-type nil)))
-                               `((let ((,tmp
-                                         ,(if from
-                                              from
-                                              `(let ((,tmp (,(gethash (foreign-type-name type)
-                                                                      claw::*wrapper-constructors*))))
-                                                 (setf (claw::wrapper-ptr ,tmp) ,ptr)
-                                                 ,tmp))))
-                                   ,@(maybe-make-macro bindings rest tmp v c-type nil))))
+                       (if ptr
+                           `((let ((,tmp ,ptr))
+                               ,@(maybe-make-macro bindings rest tmp v c-type nil)))
                            (if free
                                `((,(if calloc 'with-calloc 'with-alloc) (,tmp ',c-type ,count)
                                   ,@(maybe-make-macro bindings rest tmp v c-type value)))

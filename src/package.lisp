@@ -7,9 +7,7 @@
    #:by-changing
    #:in-pipeline
 
-   ;; Wrapper
-   #:ptr #:valid-p #:invalidate
-   #:wrap-pointer
+   #:ptr
 
    #:alloc #:calloc #:realloc #:free
    #:with-alloc #:with-free #:with-many-alloc #:with-many-free #:with-calloc
@@ -37,10 +35,4 @@
    #:c-include #:*c2ffi-program*
 
    #:c-let #:c-with #:c-val
-   #:c-fun #:c-ref
-
-   ;; Debug
-   #:*trace-c2ffi*
-
-   ;; Deprecated
-   #:wrapper-null-p))
+   #:c-fun #:c-ref))

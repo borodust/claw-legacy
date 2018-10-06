@@ -236,3 +236,18 @@ object is specified by OBJECT-INITARG being non-NIL."
                    (with-output-to-string (out)
                      (uiop:run-program "gcc -dumpversion" :output out)))
     (t () "")))
+
+
+(declaim (inline ptr))
+(defun ptr (wrapper)
+  (etypecase wrapper
+    (cffi:foreign-pointer wrapper)
+    (integer (cffi:make-pointer wrapper))
+    (null (cffi:null-pointer))))
+
+
+(declaim (inline null-pointer-p))
+(defun null-pointer-p (value)
+  (etypecase value
+    (cffi:foreign-pointer (cffi-sys:null-pointer-p value))
+    (null t)))

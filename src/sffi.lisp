@@ -41,9 +41,6 @@
       object
       (error "Invalid type: ~S" object)))
 
-(defmethod foreign-type-name ((object wrapper))
-  (foreign-type-name (find-type (class-name (class-of object)))))
-
 (defmethod print-object ((o foreign-type) s)
   (print-unreadable-object (o s :type t :identity t)
     (format s "~A" (foreign-type-name o))))
@@ -99,7 +96,6 @@
 (defun find-type (typespec)
   (etypecase typespec
     ((or keyword foreign-type) typespec)
-    (wrapper (find-type (type-of typespec)))
     (t (if (or (keywordp typespec)
                (typep typespec 'foreign-type))
            typespec
@@ -572,7 +568,7 @@ Create a type from `TYPESPEC` and return the `TYPE` structure representing it."
            (foreign-type-name type)
            'cffi:foreign-pointer))
       ((typep basic-type 'foreign-record)
-       'wrapper)
+       'cffi:foreign-pointer)
       ((member type *signed-types*) `(signed-byte ,type-size))
       ((eq :float type) 'single-float)
       ((eq :double type) 'double-float)
@@ -674,31 +670,8 @@ types."
   (declare (ignore type function))
   body)
 
-(defmethod foreign-wrap-up ((type foreign-string) function body)
-  "For strings, return only the pointer"
-  (declare (ignore type function))
-  body)
-
-(defmethod foreign-wrap-up ((type foreign-pointer) function body)
-  (let ((basic-type (basic-foreign-type (foreign-type type))))
-    (typecase basic-type
-      (foreign-record
-       (let ((*package* (symbol-package
-                         (foreign-type-name (foreign-type type)))))
-         (with-gensyms (ptr)
-           `(let ((,ptr ,body))
-              (unless (cffi-sys:null-pointer-p ,ptr)
-                (,(symbolicate 'make- (foreign-type-name (foreign-type type))) :ptr ,ptr))))))
-      (otherwise body))))
-
 (defmethod foreign-wrap-up ((type foreign-alias) function body)
-  (if (find-class (foreign-type-name type) nil)
-      (let ((*package* (symbol-package (foreign-type-name type))))
-        (with-gensyms (ptr)
-          `(let ((,ptr ,body))
-             (unless (cffi-sys:null-pointer-p ,ptr)
-               (,(symbolicate 'make- (foreign-type-name type)) :ptr ,ptr)))))
-      (foreign-wrap-up (foreign-type type) function body)))
+  (foreign-wrap-up (foreign-type type) function body))
 
 (defun foreign-function-cbv-p (fun)
   (with-slots (fields) fun
@@ -907,165 +880,6 @@ types."
              (logand ,(make-field-deref field ref)
                      (logand (lognot ,mask)
                              (1- (ash 1 ,(frf-bit-size field))))))))
-
-(defun make-accessor-name (field prefix)
-  (let ((name (foreign-type-name field)))
-    (setf name (if prefix (symbolicate prefix "." name) name))
-    (if (typep (foreign-type field) 'foreign-array)
-        (symbolicate name "[]")
-        name)))
-
-(defun make-bitfield-accessor (field accessor ref)
-  (push `(defun ,accessor (,@(accessor-params))
-           ,*accessor-declare* ,(make-bitfield-deref field ref))
-        *accessor-forms*)
-  (push `(defun (setf ,accessor) (,(intern "V") ,@(accessor-params))
-           ,*accessor-declare*
-           (cffi-sys:%mem-set ,(make-bitfield-merge field ref (intern "V")) ,ref
-                              ,(basic-foreign-type field)))
-        *accessor-forms*)
-  (push `(export ',accessor ,*package*) *accessor-forms*))
-
-(defun make-array-accessor (field type accessor ref)
-  (let* ((index (symbolicate "I" (princ-to-string *accessor-index*)))
-         (ref (make-array-ref field ref index))
-         (*accessor-index* (1+ *accessor-index*))
-         (*accessor-params* (list* index *accessor-params*)))
-    (if (or (typep (basic-foreign-type type) 'foreign-record)
-            (eq (basic-foreign-type type) :pointer))
-        (make-normal-type-accessor field (foreign-type type)
-                                   accessor ref)
-        (progn
-          (push `(defun ,accessor (,@(accessor-params))
-                   ,*accessor-declare* ,(make-field-deref field ref))
-                *accessor-forms*)
-          (push `(defun (setf ,accessor) (,(intern "V") ,@(accessor-params))
-                   ,*accessor-declare* ,(make-field-setter field ref (intern "V")))
-                *accessor-forms*)
-          (push `(export ',accessor ,*package*) *accessor-forms*)))))
-
-(defun make-simple-accessor (field accessor ref)
-  (push `(defun ,accessor (,@(accessor-params)) ,*accessor-declare* ,(make-field-deref field ref))
-        *accessor-forms*)
-  (push `(defun (setf ,accessor) (,(intern "V") ,@(accessor-params)) ,*accessor-declare*
-           ,(make-field-setter field ref (intern "V")))
-        *accessor-forms*)
-  (push `(export ',accessor ,*package*) *accessor-forms*))
-
-(defun make-child-accessor (accessor type parent ref)
-  (with-gensyms (v)
-    (push `(defun ,accessor (,@(accessor-params))
-             ,*accessor-declare*
-             (let ((,v (make-instance ',(foreign-type-name type))))
-               (setf (wrapper-ptr ,v) ,ref)
-               (setf (wrapper-validity ,v) ,parent)
-               ,v))
-          *accessor-forms*))
-  (push `(export ',accessor ,*package*) *accessor-forms*))
-
-(defun make-normal-type-accessor (field type accessor ref)
-  (cond
-    ((typep type 'foreign-array)
-     (make-array-accessor field type accessor ref))
-    ((typep type 'foreign-pointer)
-     (make-simple-accessor field accessor ref)
-     (cond
-       ((not (eq :void (foreign-type type)))
-        (make-normal-type-accessor field (foreign-type type)
-                                   (symbolicate accessor "*")
-                                   (make-field-deref field ref)))
-       ((typep (foreign-type type) 'foreign-record)
-        (%make-accessors (foreign-type type)
-                         :prefix accessor
-                         :ref (make-field-deref field ref)))))
-    ((typep (basic-foreign-type type) 'foreign-record)
-     (make-child-accessor accessor type *accessor-record-name* ref)
-     (%make-accessors (basic-foreign-type type) :prefix accessor :ref ref))
-    (t (make-simple-accessor field accessor ref))))
-
-(defun make-normal-accessor (field accessor ref)
-  (let ((accessor-ptr (symbolicate accessor "&")))
-    (make-normal-type-accessor field (foreign-type field) accessor ref)
-    (push `(defun ,accessor-ptr (,@(accessor-params)) ,*accessor-declare* ,ref)
-          *accessor-forms*)
-    (push `(export ',accessor-ptr ,*package*) *accessor-forms*)))
-
-(defun %make-accessors (foreign-record &key prefix ref)
-  (unless (or (member (foreign-type-name foreign-record)
-                      *accessor-seen-types*)
-              (= 0 *accessor-recursive-max-depth*))
-    (let* ((*accessor-seen-types* (list* (foreign-type-name foreign-record)
-                                         *accessor-seen-types*))
-           (*accessor-recursive-max-depth* (1- *accessor-recursive-max-depth*))
-           (*accessor-declare* `(declare (type ,*accessor-record-name*
-                                               ,*accessor-record-name*)))
-           (ref (or ref `(ptr ,*accessor-record-name*))))
-      (loop for field in (foreign-record-fields foreign-record)
-            as accessor = (make-accessor-name field prefix)
-            as field-ref = (make-field-ref field ref)
-            as bitfield-p = (frf-bitfield-p field) do
-              (if bitfield-p
-                  (make-bitfield-accessor field accessor field-ref)
-                  (make-normal-accessor field accessor field-ref))))))
-
-(defmacro define-accessors (foreign-record &optional (package *package*))
-  (with-wrap-attempt ("accessors for structure ~S" foreign-record) foreign-record
-    (let ((*package* (find-package package))
-          (foreign-record (etypecase foreign-record
-                            (foreign-record foreign-record)
-                            ((or symbol cons) (require-type-no-context foreign-record)))))
-      (unless (and (typep foreign-record 'foreign-alias)
-                   (struct-or-union-p (foreign-type-name foreign-record)))
-        (let* ((*accessor-forms*)
-               (*accessor-seen-types*)
-               (*accessor-params* (list (foreign-type-name foreign-record)))
-               (*accessor-record-name* (foreign-type-name foreign-record))
-               (actual-foreign-record (basic-foreign-type foreign-record)))
-          (when (typep actual-foreign-record 'foreign-record)
-            (%make-accessors actual-foreign-record :prefix *accessor-record-name*)
-            `(progn ,@(nreverse *accessor-forms*))))))))
-
-(defmacro define-wrapper (type &optional (package *package*))
-  (let* ((*package* package)
-         (type (etypecase type
-                 (foreign-type type)
-                 ((or symbol cons) (require-type-no-context type))))
-         (name (foreign-type-name type)))
-    `(define-wrapper* ,type ,name ,(package-name package))))
-
-(defmacro define-wrapper* (type wrapper-name package-name)
-  (with-wrap-attempt ("lisp structure for foreign structure ~S" type) type
-    (let* ((type (etypecase type
-                   (foreign-type type)
-                   ((or symbol cons) (require-type-no-context type))))
-           ;; Note this is a bit of a hack because the following is valid
-           ;; in C:
-           ;;
-           ;;     typedef struct x { ... } *x;
-           ;;
-           ;; Thus in this case we make an exception and define x* for
-           ;; the alias
-           (existing (find-class (foreign-type-name type) nil))
-           (star-p (and existing (typep type 'foreign-pointer)))
-           ;; FIXME: These should be given a separate name, but this has
-           ;; to be deduced _everywhere_.
-           (constructor-name (alexandria:format-symbol package-name "~A~A" 'make- wrapper-name))
-           (conc-name (alexandria:format-symbol package-name "~A-" wrapper-name)))
-      (when (or (not existing) star-p)
-        `(progn
-           (setf (gethash ',(foreign-type-name type) *wrapper-constructors*)
-                 ',constructor-name)
-           (cl:defstruct (,wrapper-name
-                          (:constructor ,constructor-name)
-                          (:conc-name ,conc-name)
-                          (:copier nil)
-                          (:predicate nil)
-                          (:include ,(if (or (keywordp (foreign-type type))
-                                             (anonymous-p (foreign-type type))
-                                             (null (foreign-type-name (foreign-type type))))
-                                         'wrapper
-                                         (foreign-type-name (foreign-type type)))))))))))
-
 
  ;; Functions
 

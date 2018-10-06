@@ -35,12 +35,6 @@
                (format s "FOREIGN-TYPE-SIZE for incomplete type ~S is undefined."
                        (foreign-type-name type))))))
 
-(define-condition invalid-wrapper (sffi-error)
-  ((object :initarg :object :initform nil :accessor invalid-pointer-object))
-  (:report (lambda (c s)
-             (with-slots (object) c
-               (format s "Error: Invalid/Destroyed Foreign Object: ~A" object)))))
-
  ;; Tooling
 
 (defvar *failed-wraps* nil

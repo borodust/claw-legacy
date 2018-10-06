@@ -10,7 +10,6 @@
                (:file "util")
                (:file "conditions")
                (:file "c2ffi")
-               (:file "wrapper")
                (:file "sffi")
                (:file "alloc")
                (:file "errno")

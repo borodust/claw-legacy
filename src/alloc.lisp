@@ -74,37 +74,20 @@
     (require-type type "allocate an instance of foreign type ~S" type))))
 
 (defun alloc (type &optional (count 1))
-  "Return a foreign wrapper for `TYPE` with its pointer allocated.
-Freeing is up to you!"
-  (if (foreign-scalar-p type)
-      (alloc-ptr type count)
-      (let ((wrapper (make-wrapper-instance (foreign-type-name (require-type type "allocate a wrapper for an instance of foreign type ~S" type)))))
-        (setf (wrapper-ptr wrapper)
-              (alloc-ptr type count))
-        wrapper)))
+  "Return a pointer allocated to the size of `TYPE`"
+  (alloc-ptr type count))
 
 (defun calloc (type &optional (count 1))
-  "Return a foreign wrapper for `TYPE` with its pointer allocated, and
-its contents initialized to zero.  Freeing is up to you!"
-  (if (foreign-scalar-p type)
-      (calloc-ptr type count)
-      (let ((wrapper (make-wrapper-instance (foreign-type-name (require-type type "allocate a wrapper for an instance of foreign type ~S" type)))))
-        (setf (wrapper-ptr wrapper)
-              (calloc-ptr type count))
-        wrapper)))
+  "Return a pointer allocated to the size of `TYPE`, initialized to zero"
+  (calloc-ptr type count))
 
 (defun realloc (ptr type count)
   (let ((size (foreign-type-size type)))
-    (if (cffi:pointerp ptr)
-        (c-realloc ptr (* count size))
-        (setf (wrapper-ptr ptr)
-              (c-realloc (ptr ptr) (* count size))))))
+    (c-realloc ptr (* count size))))
 
 (defun free (object)
-  "Free WRAPPER via FOREIGN-FREE and invalidate."
+  "Free memory allocated at pointer"
   (c-free (ptr object))
-  (when (wrapper-p object)
-    (invalidate object))
   (values))
 
 (declaim (inline alignof))
@@ -150,48 +133,6 @@ its contents initialized to zero.  Freeing is up to you!"
           bindings)
      (unwind-protect (progn ,@body)
        ,@(mapcar #'(lambda (bind) `(free ,(car bind))) bindings))))
-
-(defun c-aptr (wrapper index &optional (type (foreign-type-name wrapper)))
-  (let ((size (foreign-type-size (require-type type "index into array of elements of type ~S" type))))
-    (cffi-sys:inc-pointer (ptr wrapper) (* index size))))
-
-(define-compiler-macro c-aptr (&whole whole wrapper index
-                                      &optional type)
-  (if (constantp type)
-      (let ((size (foreign-type-size (require-type (eval type) "index into array of elements of type ~S" type))))
-        `(cffi-sys:inc-pointer (ptr ,wrapper) (* ,index ,size)))
-      whole))
-
-(defun c-aref (wrapper index &optional (type (foreign-type-name wrapper)))
-  (etypecase type
-    (keyword
-     (cffi-sys:%mem-ref (c-aptr wrapper index type) type))
-    (t (wrap-pointer (c-aptr wrapper index type) type wrapper))))
-
-(define-compiler-macro c-aref (&whole whole wrapper index
-                                      &optional type)
-  (if (constantp type)
-      (etypecase (eval type)
-        (keyword
-         `(cffi-sys:%mem-ref (c-aptr ,wrapper ,index ,type) ,type))
-        (t (once-only (wrapper)
-             `(wrap-pointer (c-aptr ,wrapper ,index ,type) ,type ,wrapper))))
-      whole))
-
-(defun (setf c-aref) (v ptr index type)
-  (etypecase type
-    (keyword
-     (cffi-sys:%mem-set v (c-aptr ptr index type) type)
-     v)))
-
-(define-compiler-macro (setf c-aref) (&whole whole v ptr index type)
-  (if (constantp type)
-      (etypecase (eval type)
-        (keyword (once-only (v)
-                   `(progn
-                      (cffi-sys:%mem-set ,v (c-aptr ,ptr ,index ,type) ,type)
-                      ,v))))
-      whole))
 
 (defun memcpy (dest src &key (n 1) type)
   (let ((size (* n (if type
