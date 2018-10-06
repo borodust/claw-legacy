@@ -109,18 +109,18 @@ doesn't exist, we will get a return code other than 0."
     (let* ((output-spec (string+ output-basename ".spec"))
            (arch (when arch (list "-A" arch)))
            (includes (prepare-includes includes "-I"))
-           (sysincludes (prepare-includes sysincludes "-i")))
+           (sysincludes (prepare-includes sysincludes "-i"))
+           (common-arg-list (append (when language
+                                      (list "--lang" language))
+                                    (when standard
+                                      (list "--std" standard))
+                                    arch includes sysincludes)))
       (ensure-directories-exist output-spec)
       ;; Invoke c2ffi to emit macros into TMP-MACRO-FILE
-      (when (run-check *c2ffi-program* (append
-                                        (when language
-                                          (list "--lang" language))
-                                        (when standard
-                                          (list "--std" standard))
-                                        (list* (namestring input-file)
-                                               "-D" "null"
-                                               "-M" (namestring tmp-macro-file)
-                                               (append arch includes sysincludes)))
+      (when (run-check *c2ffi-program* (list* (namestring input-file)
+                                              "-D" "null"
+                                              "-M" (namestring tmp-macro-file)
+                                              common-arg-list)
                        :output *standard-output*
                        :ignore-error-status ignore-error-status)
         ;; Write a tmp header file that #include's the input file and the macros file.
@@ -132,12 +132,9 @@ doesn't exist, we will get a return code other than 0."
           (close tmp-include-file-stream)
           ;; Invoke c2ffi again to generate the raw output.
           (with-temporary-file (:pathname tmp-raw-output)
-            (run-check *c2ffi-program* (append
-                                        (when language
-                                          (list "-x" language))
-                                        (list* (namestring tmp-include-file)
-                                               "-o" (namestring tmp-raw-output)
-                                               (append arch includes)))
+            (run-check *c2ffi-program* (list* (namestring tmp-include-file)
+                                              "-o" (namestring tmp-raw-output)
+                                              common-arg-list)
                        :output *standard-output*
                        :ignore-error-status ignore-error-status)
             (with-open-file (raw-input tmp-raw-output)

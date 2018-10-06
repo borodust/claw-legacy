@@ -35,6 +35,10 @@
           when (uiop:directory-exists-p path)
             collect path)))
 
+
+(defgeneric dump-c-wrapper (package-name wrapper-path))
+
+
 (defmacro c-include (header system-name &body body
                      &key in-package include-sources include-definitions
                        exclude-sources exclude-definitions
@@ -44,44 +48,40 @@
                        (windows-environment "gnu")
                        (local-only nil) language standard)
   (declare (ignore body))
-  (let ((current-package *package*))
-    `(progn
-       (cl:in-package ,in-package)
-       (%c-include
-        ',(list system-name header)
-        :spec-path ',(list system-name spec-module)
-        :definition-package ,in-package
-        :local-environment #+windows ,windows-environment
-        #-windows "gnu"
-        :local-only ,(or *local-only* local-only)
-        :include-arch ("x86_64-pc-linux-gnu"
-                       "i686-pc-linux-gnu"
-                       ,(string+ "x86_64-pc-windows-" windows-environment)
-                       ,(string+ "i686-pc-windows-" windows-environment)
-                       "x86_64-apple-darwin-gnu"
-                       "i686-apple-darwin-gnu")
-        :sysincludes ',(append (parse-sysincludes system-name sysincludes)
-                               #+(and unix (not darwin))
-                               (collect-unix-system-includes)
-                               #+windows
-                               (list "c:/msys64/mingw64/x86_64-w64-mingw32/include/"
-                                     "c:/msys64/mingw64/include/"
-                                     "c:/msys64/mingw32/i686-w64-mingw32/include/"
-                                     "c:/msys64/mingw32/include/"
-                                     "c:/msys64/usr/local/include/"))
-        :includes ',(parse-sysincludes system-name includes)
-        :include-sources ,include-sources
-        :include-definitions ,include-definitions
-        :exclude-sources ,exclude-sources
-        :exclude-definitions ,exclude-definitions
-        :filter-spec-p t
-        :language ,language
-        :standard ,standard
-        :symbol-regex ,rename-symbols)
-       ,@(let ((dump-fu-name (format-symbol in-package 'dump-claw-c-wrapper)))
-           `((defun ,dump-fu-name (library-path)
-               (write-c-library-implementation library-path
-                                               ,header
-                                               (package-functions ,in-package)))
-             (export ',dump-fu-name ,in-package)))
-       (in-package ,(package-name current-package)))))
+  `(progn
+     (%c-include
+      ',(list system-name header)
+      :spec-path ',(list system-name spec-module)
+      :definition-package ,in-package
+      :local-environment #+windows ,windows-environment
+      #-windows "gnu"
+      :local-only ,(or *local-only* local-only)
+      :include-arch ("x86_64-pc-linux-gnu"
+                     "i686-pc-linux-gnu"
+                     ,(string+ "x86_64-pc-windows-" windows-environment)
+                     ,(string+ "i686-pc-windows-" windows-environment)
+                     "x86_64-apple-darwin-gnu"
+                     "i686-apple-darwin-gnu")
+      :sysincludes ',(append (parse-sysincludes system-name sysincludes)
+                             #+(and unix (not darwin))
+                             (collect-unix-system-includes)
+                             #+windows
+                             (list "c:/msys64/mingw64/x86_64-w64-mingw32/include/"
+                                   "c:/msys64/mingw64/include/"
+                                   "c:/msys64/mingw32/i686-w64-mingw32/include/"
+                                   "c:/msys64/mingw32/include/"
+                                   "c:/msys64/usr/local/include/"))
+      :includes ',(parse-sysincludes system-name includes)
+      :include-sources ,include-sources
+      :include-definitions ,include-definitions
+      :exclude-sources ,exclude-sources
+      :exclude-definitions ,exclude-definitions
+      :filter-spec-p t
+      :language ,language
+      :standard ,standard
+      :symbol-regex ,rename-symbols)
+     (defmethod dump-c-wrapper ((package-name (eql ,in-package)) wrapper-path)
+       (declare (ignore package-name))
+       (write-c-library-implementation wrapper-path
+                                       ,header
+                                       (package-functions ,in-package)))))

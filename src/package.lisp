@@ -1,4 +1,4 @@
-(cl:defpackage :claw
+(uiop:define-package :claw
   (:use #:cl #:alexandria)
   (:export
 
@@ -35,4 +35,6 @@
    #:c-include #:*c2ffi-program*
 
    #:c-let #:c-with #:c-val
-   #:c-fun #:c-ref))
+   #:c-fun #:c-ref
+
+   #:dump-c-wrapper))
