@@ -93,7 +93,7 @@ doesn't exist, we will get a return code other than 0."
 
 (defun run-c2ffi (input-file output-basename &key arch sysincludes ignore-error-status
                                                (spec-processor #'pass-through-processor)
-                                               language)
+                                               language standard)
   "Run c2ffi on `INPUT-FILE`, outputting to `OUTPUT-FILE` and
 `MACRO-OUTPUT-FILE`, optionally specifying a target triple `ARCH`."
   (with-temporary-file (:pathname tmp-macro-file
@@ -110,7 +110,9 @@ doesn't exist, we will get a return code other than 0."
       ;; Invoke c2ffi to emit macros into TMP-MACRO-FILE
       (when (run-check *c2ffi-program* (append
                                         (when language
-                                          (list "-x" language))
+                                          (list "--lang" language))
+                                        (when standard
+                                          (list "--std" standard))
                                         (list* (namestring input-file)
                                                "-D" "null"
                                                "-M" (namestring tmp-macro-file)
@@ -157,7 +159,8 @@ if the file does not exist."
                                  sysincludes
                                  version
                                  spec-processor
-                                 language)
+                                 language
+                                 standard)
   (flet ((spec-path (arch) (string+ (namestring spec-path)
                                     (pathname-name name)
                                     (if version
@@ -176,7 +179,8 @@ if the file does not exist."
                          :arch arch
                          :sysincludes sysincludes
                          :spec-processor spec-processor
-                         :language language))
+                         :language language
+                         :standard standard))
             (loop with local-arch = (local-arch)
                   for arch in *known-arches* do
                     (unless (or (string= local-arch arch)
@@ -188,7 +192,8 @@ if the file does not exist."
                                          :sysincludes sysincludes
                                          :ignore-error-status t
                                          :spec-processor spec-processor
-                                         :language language)
+                                         :language language
+                                         :standard standard)
                         (warn "Error generating spec for other arch: ~S" arch))))
             (if-let (h-name (find-local-spec name spec-path))
               h-name
