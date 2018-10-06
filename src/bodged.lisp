@@ -1,5 +1,6 @@
 (cl:in-package :claw)
 
+(defvar *local-only* nil)
 
 (defun parse-sysincludes (system includes)
   (loop for include in includes
@@ -53,7 +54,7 @@
         :definition-package ,in-package
         :local-environment #+windows ,windows-environment
         #-windows "gnu"
-        :local-only ,local-only
+        :local-only ,(or *local-only* local-only)
         :include-arch ("x86_64-pc-linux-gnu"
                        "i686-pc-linux-gnu"
                        ,(string+ "x86_64-pc-windows-" windows-environment)
