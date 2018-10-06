@@ -310,11 +310,17 @@ vs anything else (including enums)."
 (defmethod foreign-qualified-name ((type foreign-record))
   `(,(foreign-type type) (,(foreign-type-name type))))
 
+(defmethod foreign-qualified-name ((type foreign-function))
+  `(:function (,(foreign-type-name type))))
+
 (defmethod foreign-qualified-name ((type foreign-enum))
   `(:enum (,(foreign-type-name type))))
 
 (defmethod foreign-qualified-name ((type foreign-pointer))
   `(:pointer ,(foreign-qualified-name (foreign-type type))))
+
+(defmethod foreign-qualified-name ((type foreign-field))
+  (foreign-qualified-name (foreign-type type)))
 
  ;; defining things
 
@@ -724,6 +730,40 @@ types."
                                                         (foreign-type fun)))
                                                      :convention :cdecl)))))
 
+(defun %primitive-to-c (type)
+  (substitute #\Space #\- (string-downcase type)))
+
+
+(defun %to-c-type-name (type)
+  (typecase type
+    (foreign-field (%to-c-type-name (foreign-type type)))
+    (foreign-record (string+ (ecase (foreign-type type)
+                               (:struct "struct ")
+                               (:union "union "))
+                             (foreign-type-id type)))
+    (foreign-pointer (string+ (%to-c-type-name (foreign-type type)) "*"))
+    (foreign-alias (foreign-type-id type))
+    (foreign-enum (string+ "enum " (foreign-type-id type)))
+    (keyword (%primitive-to-c type))
+    (t "void")))
+
+
+(defun format-function-doc (function)
+  (with-slots (name type c-symbol fields) function
+    (format nil "Foreign name: ~A
+Uses struct-by-value: ~A
+
+Arguments: ~{~&  ~A~16T ~A~}
+
+Returns:
+  ~A
+" (foreign-symbol-c-symbol function)
+  (foreign-function-cbv-p function)
+  (loop for field in fields
+        append (list (foreign-type-name field) (%to-c-type-name field)))
+  (%to-c-type-name (foreign-type function)))))
+
+
 (defmacro define-cfun (name-or-function &optional (package *package*))
   (when-let ((fun (find-function name-or-function)))
     (with-wrap-attempt ("function ~S" name-or-function) name-or-function
@@ -740,6 +780,7 @@ types."
                     (if make-function-p
                         `(defun ,fun-name (,@maybe-cbv-return
                                            ,@param-names ,@(when (foreign-function-variadic-p fun) `(&rest ,rest)))
+                           ,(format-function-doc fun)
                            ,@(when maybe-cbv-return `((declare (ignorable ,@maybe-cbv-return))))
                            ,(let ((!fun (find-function name-or-function)))
                               (with-slots ((!fields fields)) !fun
@@ -763,6 +804,7 @@ types."
                                 (make-foreign-funcall ,!fun ,(and maybe-cbv-return 'return-value)
                                                       ',param-syms ,(when (foreign-function-variadic-p fun) rest)))))))))
               form)))))))
+
 
 (defmacro define-cextern (name &optional (package *package*))
   (with-wrap-attempt ("extern ~S" name) name
