@@ -13,6 +13,7 @@
          (special *local-cpu*))
 
 (defvar *rebuild-spec* nil)
+(defvar *spit-c2ffi-errors* nil)
 
 (defun local-cpu ()
   (or *local-cpu*
@@ -67,10 +68,13 @@
 
 (defvar *trace-c2ffi* nil)
 
-(defun run-check (program args &key output ignore-error-status)
+(defun run-check (program args &key output error-output ignore-error-status)
   (when *trace-c2ffi*
     (format *debug-io* "~&; Invoking: ~A~{ ~A~}~%" program args))
-  (zerop (nth-value 2 (uiop:run-program (list* program args) :output output :ignore-error-status ignore-error-status))))
+  (zerop (nth-value 2 (uiop:run-program (list* program args)
+                                        :output output
+                                        :error-output error-output
+                                        :ignore-error-status ignore-error-status))))
 
 (defun c2ffi-p ()
   "This is a hack to determine if c2ffi exists; it assumes if it
@@ -136,6 +140,7 @@ doesn't exist, we will get a return code other than 0."
                                               "-o" (namestring tmp-raw-output)
                                               common-arg-list)
                        :output *standard-output*
+                       :error-output (when *spit-c2ffi-errors* *error-output*)
                        :ignore-error-status ignore-error-status)
             (with-open-file (raw-input tmp-raw-output)
               (with-open-file (final-output output-spec :direction :output :if-exists :supersede)
