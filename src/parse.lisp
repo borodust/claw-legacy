@@ -383,6 +383,7 @@ Return the appropriate CFFI name."))
                                exclude-definitions exclude-sources exclude-arch
                                include-definitions include-sources include-arch
                                sysincludes
+                               includes
                                (definition-package *package*)
                                (function-package definition-package)
                                (constant-package definition-package)
@@ -430,6 +431,7 @@ Return the appropriate CFFI name."))
                                                 (list (local-arch))
                                                 include-arch)
                              :sysincludes (eval sysincludes)
+                             :includes (eval includes)
                              :version version
                              :language language
                              :standard standard

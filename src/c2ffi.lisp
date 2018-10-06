@@ -91,7 +91,15 @@ doesn't exist, we will get a return code other than 0."
       ,@body)
     :keep ,keep))
 
-(defun run-c2ffi (input-file output-basename &key arch sysincludes ignore-error-status
+(defun prepare-includes (includes option)
+  (loop for dir in includes
+        if (uiop:directory-exists-p dir)
+          append (list option dir)
+        else
+          do (when *trace-c2ffi*
+               (format *debug-io* "~&; c2ffi include ignored: ~A not found" dir))))
+
+(defun run-c2ffi (input-file output-basename &key arch sysincludes includes ignore-error-status
                                                (spec-processor #'pass-through-processor)
                                                language standard)
   "Run c2ffi on `INPUT-FILE`, outputting to `OUTPUT-FILE` and
@@ -100,12 +108,8 @@ doesn't exist, we will get a return code other than 0."
                         :keep *trace-c2ffi*)
     (let* ((output-spec (string+ output-basename ".spec"))
            (arch (when arch (list "-A" arch)))
-           (includes (loop for dir in sysincludes
-                           if (uiop:directory-exists-p dir)
-                             append (list "-I" dir)
-                           else
-                             do (when *trace-c2ffi*
-                                  (format *debug-io* "~&; c2ffi include ignored: ~A not found" dir)))))
+           (includes (prepare-includes includes "-I"))
+           (sysincludes (prepare-includes sysincludes "-i")))
       (ensure-directories-exist output-spec)
       ;; Invoke c2ffi to emit macros into TMP-MACRO-FILE
       (when (run-check *c2ffi-program* (append
@@ -116,7 +120,7 @@ doesn't exist, we will get a return code other than 0."
                                         (list* (namestring input-file)
                                                "-D" "null"
                                                "-M" (namestring tmp-macro-file)
-                                               (append arch includes)))
+                                               (append arch includes sysincludes)))
                        :output *standard-output*
                        :ignore-error-status ignore-error-status)
         ;; Write a tmp header file that #include's the input file and the macros file.
@@ -157,6 +161,7 @@ if the file does not exist."
                                  arch-excludes
                                  arch-includes
                                  sysincludes
+                                 includes
                                  version
                                  spec-processor
                                  language
@@ -178,6 +183,7 @@ if the file does not exist."
               (run-c2ffi name (spec-path arch)
                          :arch arch
                          :sysincludes sysincludes
+                         :includes includes
                          :spec-processor spec-processor
                          :language language
                          :standard standard))
@@ -190,6 +196,7 @@ if the file does not exist."
                       (unless (run-c2ffi name (spec-path arch)
                                          :arch arch
                                          :sysincludes sysincludes
+                                         :includes includes
                                          :ignore-error-status t
                                          :spec-processor spec-processor
                                          :language language

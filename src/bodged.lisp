@@ -38,7 +38,10 @@
 (defmacro c-include (header system-name &body body
                      &key in-package include-sources include-definitions
                        exclude-sources exclude-definitions
-                       (spec-module :spec) rename-symbols sysincludes (windows-environment "gnu")
+                       (spec-module :spec) rename-symbols
+                       sysincludes
+                       includes
+                       (windows-environment "gnu")
                        (local-only nil) language standard)
   (declare (ignore body))
   (let ((current-package *package*))
@@ -66,6 +69,7 @@
                                      "c:/msys64/mingw32/i686-w64-mingw32/include/"
                                      "c:/msys64/mingw32/include/"
                                      "c:/msys64/usr/local/include/"))
+        :includes ',(parse-sysincludes system-name includes)
         :include-sources ,include-sources
         :include-definitions ,include-definitions
         :exclude-sources ,exclude-sources
