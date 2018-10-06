@@ -126,6 +126,7 @@ doesn't exist, we will get a return code other than 0."
                                               "-M" (namestring tmp-macro-file)
                                               common-arg-list)
                        :output *standard-output*
+                       :error-output (when *spit-c2ffi-errors* *error-output*)
                        :ignore-error-status ignore-error-status)
         ;; Write a tmp header file that #include's the input file and the macros file.
         (with-temporary-file (:stream tmp-include-file-stream
@@ -140,7 +141,6 @@ doesn't exist, we will get a return code other than 0."
                                               "-o" (namestring tmp-raw-output)
                                               common-arg-list)
                        :output *standard-output*
-                       :error-output (when *spit-c2ffi-errors* *error-output*)
                        :ignore-error-status ignore-error-status)
             (with-open-file (raw-input tmp-raw-output)
               (with-open-file (final-output output-spec :direction :output :if-exists :supersede)
