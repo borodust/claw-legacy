@@ -16,26 +16,6 @@
         as fu = (find-function sym)
         when fu collect fu))
 
-(defun collect-unix-system-includes ()
-  (let ((gcc-ver (dump-gcc-version)))
-    (loop for path in (list "/usr/include/"
-                            "/usr/local/include/"
-                            "/usr/lib/gcc/x86_64-linux-gnu/"
-                            "/usr/lib/gcc/i686-linux-gnu/"
-                            (string+ "/usr/include/c++/" gcc-ver "/")
-                            ;; archlinux
-                            (string+ "/usr/lib/gcc/x86_64-pc-linux-gnu/" gcc-ver "/include/")
-                            (string+ "/usr/lib/gcc/i686-pc-linux-gnu/" gcc-ver "/include/")
-                            (string+ "/usr/include/c++/" gcc-ver "/x86_64-pc-linux-gnu/")
-                            (string+ "/usr/include/c++/" gcc-ver "/i686-pc-linux-gnu/")
-                            ;; ubuntu
-                            (string+ "/usr/include/x86_64-linux-gnu/c++/" gcc-ver "/")
-                            (string+ "/usr/include/i686-linux-gnu/c++/" gcc-ver "/")
-                            (string+ "/usr/lib/gcc/x86_64-linux-gnu/" gcc-ver "/include/")
-                            (string+ "/usr/lib/gcc/i686-linux-gnu/" gcc-ver "/include/"))
-          when (uiop:directory-exists-p path)
-            collect path)))
-
 
 (defgeneric dump-c-wrapper (package-name wrapper-path))
 
@@ -64,17 +44,7 @@
                      "x86_64-apple-darwin-gnu"
                      "i686-apple-darwin-gnu")
       :sysincludes ',(append (parse-sysincludes system-name sysincludes)
-                             #+unix
-                             (collect-unix-system-includes)
-                             #+windows
-                             (list "c:/msys64/mingw64/x86_64-w64-mingw32/include/"
-                                   "c:/msys64/mingw64/include/"
-                                   "c:/msys64/mingw32/i686-w64-mingw32/include/"
-                                   "c:/msys64/mingw32/include/"
-                                   "c:/msys64/usr/local/include/")
-                             #+darwin
-                             (list "/System/Library/Frameworks/"
-                                   "/Library/Frameworks/"))
+                             (dump-all-gcc-include-paths))
       :includes ',(parse-sysincludes system-name includes)
       :include-sources ,include-sources
       :include-definitions ,include-definitions

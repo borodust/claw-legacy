@@ -8,6 +8,9 @@
                   *exclude-sources*))
 
 (define-constant +byte-size+ 8)
+(define-constant +path-search-regex+
+  "\\> search starts here:\\s*((.|\\s)*)?\\s*End of search list"
+  :test #'equalp)
 
 (defun substr* (str start &optional end)
   "Make a shared substring of STR using MAKE-ARRAY :displaced-to"
@@ -228,6 +231,26 @@ object is specified by OBJECT-INITARG being non-NIL."
                   #-(or sbcl ccl ecl) '(progn)))
     `(,@masking
       ,@body)))
+
+
+(defun dump-gcc-include-paths (lang)
+  (handler-case
+      (let* ((command (format nil "echo | gcc -x~A -E -v -" lang))
+             (paths (with-output-to-string (out)
+                      (uiop:run-program command
+                                        :output out :error-output out)))
+             (bounds (third (multiple-value-list (ppcre:scan +path-search-regex+ paths)))))
+        (when bounds
+          (ppcre:split "(\\r|\\n)+\\s*" (subseq paths (aref bounds 0) (aref bounds 1)))))
+    (t ()
+      (warn "Failed to obtain GCC search paths for language ~A" lang)
+      nil)))
+
+
+(defun dump-all-gcc-include-paths ()
+  (remove-duplicates (append (dump-gcc-include-paths "c")
+                             (dump-gcc-include-paths "c++"))
+                     :test #'equal))
 
 
 (defun dump-gcc-version ()
