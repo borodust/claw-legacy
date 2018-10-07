@@ -64,14 +64,17 @@
                      "x86_64-apple-darwin-gnu"
                      "i686-apple-darwin-gnu")
       :sysincludes ',(append (parse-sysincludes system-name sysincludes)
-                             #+(and unix (not darwin))
+                             #+unix
                              (collect-unix-system-includes)
                              #+windows
                              (list "c:/msys64/mingw64/x86_64-w64-mingw32/include/"
                                    "c:/msys64/mingw64/include/"
                                    "c:/msys64/mingw32/i686-w64-mingw32/include/"
                                    "c:/msys64/mingw32/include/"
-                                   "c:/msys64/usr/local/include/"))
+                                   "c:/msys64/usr/local/include/")
+                             #+darwin
+                             (list "/System/Library/Frameworks/"
+                                   "/Library/Frameworks/"))
       :includes ',(parse-sysincludes system-name includes)
       :include-sources ,include-sources
       :include-definitions ,include-definitions
