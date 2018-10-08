@@ -27,7 +27,7 @@
                        sysincludes
                        includes
                        (windows-environment "gnu")
-                       (local-only nil) language standard)
+                       language standard)
   (declare (ignore body))
   (destructuring-bind (in-package &rest nicknames) (ensure-list in-package)
     (unless in-package
@@ -42,7 +42,7 @@
         :definition-package ,in-package
         :local-environment #+windows ,windows-environment
         #-windows "gnu"
-        :local-only ,(or *local-only* local-only)
+        :local-only *local-only*
         :include-arch ("x86_64-pc-linux-gnu"
                        "i686-pc-linux-gnu"
                        ,(string+ "x86_64-pc-windows-" windows-environment)
