@@ -17,7 +17,7 @@
         when fu collect fu))
 
 
-(defgeneric dump-c-wrapper (package-name wrapper-path))
+(defgeneric dump-c-wrapper (package-name wrapper-path &optional loader-function))
 
 
 (defmacro c-include (header system-name &body body
@@ -60,8 +60,9 @@
         :language ,language
         :standard ,standard
         :symbol-regex ,rename-symbols)
-       (defmethod dump-c-wrapper ((package-name (eql ,in-package)) wrapper-path)
+       (defmethod dump-c-wrapper ((package-name (eql ,in-package)) wrapper-path &optional loader)
          (declare (ignore package-name))
          (write-c-library-implementation wrapper-path
                                          ,header
-                                         (package-functions ,in-package))))))
+                                         (package-functions ,in-package)
+                                         loader)))))

@@ -1,7 +1,44 @@
 (cl:in-package :claw)
 
+(define-constant +variable-cbv-prefix+ "__v_claw_"
+  :test #'equal)
 
-(defun make-cbv-wrapper (fun)
+(defparameter *source-template* (alexandria:read-file-into-string
+                                 (asdf:system-relative-pathname :claw
+                                                                "src/template/source.c")))
+
+(defparameter *dynamic-wrapping-template* (alexandria:read-file-into-string
+                                           (asdf:system-relative-pathname :claw
+                                                                          "src/template/dynamic.c")))
+
+
+(defun make-cbv-function-variable (fun)
+  (with-slots (c-symbol name fields) fun
+    (unless (foreign-function-cbv-p fun)
+      (error "Function '~S' doesn't pass structures by value" c-symbol))
+    (let* ((fun-type (foreign-type fun))
+           (parameters (loop for f in fields collect (%to-c-type-name f)))
+           (void-p (eq :void fun-type))
+           (return-type (if void-p "void" (%to-c-type-name fun-type)))
+           (param-string (format nil "~{~A~^, ~}" parameters)))
+      (format nil "static ~A (*~A~A)(~A);"
+              return-type
+              +variable-cbv-prefix+
+              c-symbol
+              param-string))))
+
+
+(defun make-cbv-function-variable-init (fun)
+  (with-slots (c-symbol) fun
+    (unless (foreign-function-cbv-p fun)
+      (error "Function '~S' doesn't pass structures by value" c-symbol))
+    (format nil "    ~A~A = claw_get_proc_addr(\"~A\");"
+            +variable-cbv-prefix+
+            c-symbol
+            c-symbol)))
+
+
+(defun make-cbv-wrapper (fun &optional (c-prefix ""))
   (with-slots (c-symbol name fields) fun
     (unless (foreign-function-cbv-p fun)
       (error "Function '~S' doesn't pass structures by value" c-symbol))
@@ -35,7 +72,7 @@
                                                                         (list return-type))
                                                                       parameters))))
                (arg-string (format nil "~{~A~^, ~}" (mapcar #'%to-arg-string parameters)))
-               (invocation (string+ c-symbol "(" arg-string ");"))
+               (invocation (string+ c-prefix c-symbol "(" arg-string ");"))
                (return-arg (when (third return-type)
                              (second return-type)))
                (void-p (or (null return-type) (third return-type))))
@@ -57,28 +94,54 @@
             (format output "~&}")))))))
 
 
-(defun write-c-library-implementation (library-path h-path functions)
+(defun preprocess-template (source &rest args)
+  (labels ((%replace (name value source)
+             (ppcre:regex-replace-all (format nil "{{\\s*~A\\s*}}" name) source value))
+           (%to-source (result arg)
+             (destructuring-bind (name . value) arg
+               (%replace name value result))))
+    (reduce #'%to-source (alexandria:plist-alist args) :initial-value source)))
+
+
+(defun %preprocess-wrapper-source (header-file function-definitions)
+  (preprocess-template *source-template*
+                       "header-file" header-file
+                       "function-definitions" function-definitions))
+
+(defun prepare-wrapper-source (header-file functions)
+  (let ((function-defs (with-output-to-string (out)
+                         (loop for fu in functions
+                               do (format out "~&~%__CLAW_API ~A" (make-cbv-wrapper fu))))))
+    (%preprocess-wrapper-source header-file function-defs)))
+
+
+(defun prepare-dynamic-source (header-file loader-name functions)
+  (let* ((function-ptrs (with-output-to-string (out)
+                          (loop for fu in functions
+                                do (format out "~&~A"
+                                           (make-cbv-function-variable fu)))))
+         (function-ptrs-init (with-output-to-string (out)
+                               (loop for fu in functions
+                                     do (format out "~&~A"
+                                                (make-cbv-function-variable-init fu)))))
+         (function-defs (with-output-to-string (out)
+                          (loop for fu in functions
+                                do (format out "~&~%__CLAW_API ~A"
+                                           (make-cbv-wrapper fu +variable-cbv-prefix+)))))
+         (dynamic-defs (preprocess-template *dynamic-wrapping-template*
+                                            "loader-name" loader-name
+                                            "function-pointers" function-ptrs
+                                            "function-pointers-init" function-ptrs-init
+                                            "function-definitions" function-defs)))
+    (%preprocess-wrapper-source header-file dynamic-defs)))
+
+
+(defun write-c-library-implementation (library-path h-path functions &optional loader-name)
   (ensure-directories-exist library-path)
-  (alexandria:with-output-to-file (out library-path :if-exists :supersede)
-    (format out "#include \"~A\"" h-path)
-    (format out "
-#ifndef __CLAW_API
-#  if defined(_WIN32)
-#    define __CLAW_API __declspec(dllexport)
-#  elif defined(__GNUC__)
-#    define __CLAW_API __attribute__((visibility(\"default\")))
-#  else
-#    define __CLAW_API
-#  endif
-#endif
-#if defined(__cplusplus)
-extern \"C\" {
-#endif")
-    (loop for fu in (sort functions #'string< :key #'foreign-type-id)
-          when (foreign-function-cbv-p fu)
-            do (format out "~&~%__CLAW_API ~A" (make-cbv-wrapper fu)))
-    (format out "
-#if defined(__cplusplus)
-}
-#endif
-")))
+  (let ((cbv-functions (sort (remove-if (complement #'foreign-function-cbv-p) functions)
+                             #'string< :key #'foreign-type-id)))
+    (alexandria:with-output-to-file (out library-path :if-exists :supersede)
+      (if loader-name
+          (format out (prepare-dynamic-source h-path loader-name cbv-functions))
+          (format out (prepare-wrapper-source h-path cbv-functions)))))
+  (values))

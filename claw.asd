@@ -3,7 +3,7 @@
   :author "Ryan Pavlik, Pavel Korolev"
   :license "BSD-2-Clause"
   :version "1.0"
-  :depends-on (:alexandria :cffi :cl-json :cl-ppcre :uiop :trivial-features)
+  :depends-on (:uiop :alexandria :cffi :cl-json :cl-ppcre :trivial-features)
   :pathname "src"
   :serial t
   :components ((:file "package")
