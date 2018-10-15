@@ -679,6 +679,16 @@ types."
 (defmethod foreign-wrap-up ((type foreign-alias) function body)
   (foreign-wrap-up (foreign-type type) function body))
 
+
+(declaim (inline ensure-nil))
+(defun ensure-nil (value)
+  (unless (null-pointer-p value) value))
+
+
+(defmethod foreign-wrap-up ((type foreign-pointer) function body)
+  `(ensure-nil ,body))
+
+
 (defun foreign-function-cbv-p (fun)
   (with-slots (fields) fun
     (or (not (foreign-scalar-p (foreign-type fun)))
