@@ -134,11 +134,8 @@
      (unwind-protect (progn ,@body)
        ,@(mapcar #'(lambda (bind) `(free ,(car bind))) bindings))))
 
-(defun memcpy (dest src &key (n 1) type)
-  (let ((size (* n (if type
-                       (sizeof type)
-                       (sizeof src)))))
-    (c-memcpy (ptr dest) (ptr src) size)))
+(defun memcpy (dest src &optional (count 1) (type 'int8))
+  (c-memcpy (ptr dest) (ptr src) (* count (sizeof type))))
 
 (defun alloc-string (string)
   (let ((ptr (calloc :char (1+ (length string)))))

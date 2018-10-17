@@ -224,7 +224,7 @@
            (cffi-sys:%mem-set (alloc-string ,*final-value-set*)
                               ,current-ref :pointer)
            ,(call-next-method))
-      current-ref))
+      (build-ref nil :pointer current-ref rest)))
 
  ;; c-let
 
