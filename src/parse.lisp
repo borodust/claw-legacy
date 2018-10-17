@@ -1,29 +1,34 @@
 (cl:in-package :claw)
 
+(defvar *local-only* nil)
+
 (defvar *foreign-type-symbol-function* 'default-foreign-type-symbol)
 (defvar *foreign-c-to-lisp-function* 'default-c-to-lisp)
-(defvar *foreign-record-list* nil)
-(defvar *foreign-alias-list* nil)
-(defvar *foreign-function-list* nil)
-(defvar *foreign-extern-list* nil)
-(defvar *foreign-constant-list* nil)
-(defvar *foreign-raw-constant-list* nil)
+
 (defvar *foreign-constant-excludes* nil)
-(defvar *foreign-other-exports-list* nil)
 (defvar *foreign-symbol-exceptions* nil)
 (defvar *foreign-symbol-regex* nil)
 
-(declaim (special *filter-spec-p*))
-
- ;; Collecting symbols
+(declaim (special *exported-foreign-record-list*
+                  *exported-foreign-function-list*
+                  *exported-foreign-extern-list*
+                  *exported-foreign-constant-list*
+                  *foreign-other-exports-list*
+                  *foreign-alias-list*
+                  *foreign-raw-constant-list*))
+;; Collecting symbols
 
 (defmacro collecting-symbols (&body body)
-  `(let (*foreign-record-list* *foreign-function-list* *foreign-extern-list*
-         *foreign-constant-list* *foreign-other-exports-list* *foreign-alias-list*
+  `(let (*exported-foreign-record-list*
+         *exported-foreign-function-list*
+         *exported-foreign-extern-list*
+         *exported-foreign-constant-list*
+         *foreign-other-exports-list*
+         *foreign-alias-list*
          *foreign-raw-constant-list*)
      ,@body))
 
- ;; Types and symbols
+;; Types and symbols
 
 (defun apply-regexps (string regex-list)
   (loop for r in regex-list
@@ -112,14 +117,15 @@ of pointer-to-record"
       ((string= tag ":pointer") t)
       (t nil))))
 
-(defun maybe-add-constant (name value)
+(defun maybe-add-constant (name value form)
   (push (cons name value) *foreign-raw-constant-list*)
   (unless (included-p name *foreign-constant-excludes*)
     (let ((sym (foreign-type-symbol name :cconst *package*)))
-      (pushnew sym *foreign-constant-list*)
+      (when (form-finally-included-p form)
+        (pushnew sym *exported-foreign-constant-list*))
       `(defparameter ,sym ,value))))
 
- ;; Parsing
+;; Parsing
 
 (defgeneric parse-type (form tag)
   (:documentation "Parse FORM describing a type, tagged by TAG.
@@ -185,8 +191,10 @@ Return the appropriate CFFI name."))
           (symbol-type (ecase type (:struct :cstruct) (:union :cunion))))
       (if (anonymous-p form)
           (list* nil :id id size)
-          (let ((sym (foreign-type-symbol name symbol-type *package*)))
-            (pushnew `(,type (,sym)) *foreign-record-list* :test #'equal)
+          (let* ((sym (foreign-type-symbol name symbol-type *package*))
+                 (descriptor `(,type (,sym))))
+            (when (form-finally-included-p form)
+              (pushnew descriptor *exported-foreign-record-list*))
             (list* sym size))))))
 
 (defmethod parse-type (form (tag (eql 'struct)))
@@ -224,11 +232,12 @@ Return the appropriate CFFI name."))
 (defmethod parse-form (form (tag (eql 'typedef)) &key &allow-other-keys)
   (alist-bind (name type) form
     (let ((sym (foreign-type-symbol name :ctype *package*)))
-      (if (pointer*-to-record-form-p type)
-          (pushnew sym *foreign-record-list* :test #'equal)
-          (if (pointer-alias-form-p type)
-              (pushnew sym *foreign-alias-list* :test #'equal)
-              (pushnew sym *foreign-other-exports-list*)))
+      (when (form-finally-included-p form)
+        (if (pointer*-to-record-form-p type)
+            (pushnew sym *exported-foreign-record-list* :test #'equal)
+            (if (pointer-alias-form-p type)
+                (pushnew sym *foreign-alias-list* :test #'equal)
+                (pushnew sym *foreign-other-exports-list*))))
       `(define-foreign-alias ',sym
          ,name
          ',@(parse-type type (aval :tag type))))))
@@ -269,7 +278,7 @@ Return the appropriate CFFI name."))
 (defun parse-enum-to-const (fields)
   (loop for field in fields
         as name = (aval :name field)
-        collect (maybe-add-constant name (aval :value field))
+        collect (maybe-add-constant name (aval :value field) field)
           into constants
         finally (return (remove-if #'null constants))))
 
@@ -277,8 +286,8 @@ Return the appropriate CFFI name."))
   (alist-bind (name fields) form
     (let ((sym (foreign-type-symbol name :cstruct *package*)))
       (let ((cstruct-fields (parse-fields fields)))
-        (when (symbol-package sym)
-          (pushnew `(:struct (,sym)) *foreign-record-list*
+        (when (and (symbol-package sym) (form-finally-included-p form))
+          (pushnew `(:struct (,sym)) *exported-foreign-record-list*
                    :test #'equal))
         `(define-foreign-record ',sym ,name :struct
            ,(aval :bit-size form)
@@ -289,8 +298,8 @@ Return the appropriate CFFI name."))
   (alist-bind (name fields) form
     (let ((sym (foreign-type-symbol name :cunion *package*)))
       (let ((cunion-fields (parse-fields fields)))
-        (when (symbol-package sym)
-          (pushnew `(:union (,sym)) *foreign-record-list*
+        (when (and (symbol-package sym) (form-finally-included-p form))
+          (pushnew `(:union (,sym)) *exported-foreign-record-list*
                    :test #'equal))
         `(define-foreign-record ',sym ,name :union
            ,(aval :bit-size form)
@@ -300,18 +309,20 @@ Return the appropriate CFFI name."))
 (defmethod parse-form (form (tag (eql 'enum)) &key &allow-other-keys)
   (alist-bind (name id fields) form
     (let ((sym (foreign-type-symbol name :cenum *package*)))
-      (when (symbol-package sym)
+      (when (and (symbol-package sym) (form-finally-included-p form))
         (pushnew sym *foreign-other-exports-list*))
       `(progn
          ,@(parse-enum-to-const fields)
          (define-foreign-enum ',sym ,id ,name ',(parse-enum-fields fields))))))
+
 
 (defmethod parse-form (form (tag (eql 'function)) &key &allow-other-keys)
   (alist-bind (name inline parameters return-type variadic) form
     (unless inline
       (let ((sym (foreign-type-symbol name :cfun *package*)))
         (let ((cfun-fields (parse-fields parameters :cparam)))
-          (push sym *foreign-function-list*)
+          (when (form-finally-included-p form)
+            (pushnew sym *exported-foreign-function-list*))
           `(define-foreign-function '(,sym ,name
                                       ,@(when variadic '(:variadic-p t)))
                ',@(parse-type return-type (aval :tag return-type))
@@ -319,19 +330,20 @@ Return the appropriate CFFI name."))
 
 (defmethod parse-form (form (tag (eql 'const)) &key &allow-other-keys)
   (alist-bind (name value) form
-    (maybe-add-constant name value)))
+    (maybe-add-constant name value form)))
 
 (defmethod parse-form (form (tag (eql 'extern)) &key &allow-other-keys)
   (alist-bind (name type) form
     (let ((sym (foreign-type-symbol name :cextern *package*)))
-      (push sym *foreign-extern-list*)
+      (when (form-finally-included-p form)
+        (pushnew sym *exported-foreign-extern-list*))
       `(define-foreign-extern ',sym ,name ',@(parse-type type (aval :tag type))))))
 
 (defun read-json (file)
   (let ((*read-default-float-format* 'double-float))
     (json:decode-json file)))
 
- ;; c-include utility
+;; c-include utility
 
 (defun make-scanners (list)
   (mapcar (lambda (x)
@@ -343,10 +355,8 @@ Return the appropriate CFFI name."))
   (loop for form in (read-json in-spec)
         as name = (aval :name form)
         as location = (aval :location form)
-        when (or *filter-spec-p* (not (excluded-p name location)))
         collect (parse-form form (aval :tag form)) into forms
         finally (return (remove-if #'null forms))))
-
 
 (defun make-define-list (def-symbol list package)
  (loop for x in (reverse list)
@@ -358,25 +368,25 @@ Return the appropriate CFFI name."))
                 list))
            ,package))
 
-(defun make-constant-accessor (name value-map-name)
-  (with-gensyms (internal-name)
-    `((defvar ,value-map-name)
-      (defun ,internal-name (name)
-        (declare (string name))
-        (multiple-value-bind (value presentp) (gethash name ,value-map-name)
-          (if presentp
-              value
-              (error "~@<Unknown constant: ~S~%~:@>" name))))
-      (defun ,name (name)
-        (,internal-name name))
-      ;; I wonder if we really must break this loop..
-      (define-compiler-macro ,name (&whole whole name)
-        (if (stringp name)
-            (,internal-name name)
-            whole))
-      (export '(,name)))))
+;; Exported API
 
- ;; Exported API
+(defun parse-sysincludes (system includes)
+  (loop for include in includes
+     collect (if (stringp include)
+                 include
+                 (namestring
+                  (asdf:component-pathname
+                   (asdf:find-component (asdf:find-system system) include))))))
+
+
+(defun package-functions (package-name)
+  (loop for sym being the symbol in (find-package package-name)
+        as fu = (find-function sym)
+        when fu collect fu))
+
+
+(defgeneric dump-c-wrapper (package-name wrapper-path &optional loader-function))
+
 
 (defmacro %c-include (h-file &key (spec-path *default-pathname-defaults*)
                                symbol-exceptions symbol-regex
@@ -385,12 +395,8 @@ Return the appropriate CFFI name."))
                                sysincludes
                                includes
                                (definition-package *package*)
-                               (function-package definition-package)
-                               (constant-package definition-package)
-                               (extern-package definition-package)
-                               constant-accessor exclude-constants
-                               (trace-c2ffi *trace-c2ffi*) no-functions
-                               release-p version filter-spec-p
+                               exclude-constants
+                               (trace-c2ffi *trace-c2ffi*)
                                type-symbol-function c-to-lisp-function
                                local-os local-environment
                                local-only language standard)
@@ -409,19 +415,13 @@ Return the appropriate CFFI name."))
         (*exclude-definitions* (mapcar #'ppcre:create-scanner exclude-definitions))
         (*exclude-sources* (mapcar #'ppcre:create-scanner exclude-sources))
         (*package* (find-package definition-package))
-        (*filter-spec-p* filter-spec-p)
         (h-file (path-or-asdf (eval h-file)))
         (spec-path (path-or-asdf (eval spec-path)))
         (*local-cpu* (when (boundp '*local-cpu*)
                        *local-cpu*))
         (*local-os* (eval local-os))
         (*local-environment* (eval local-environment))
-        (definition-package (find-package definition-package))
-        (function-package (find-package function-package))
-        (constant-package (find-package constant-package))
-        (extern-package (find-package extern-package))
-        (constant-name-value-map (gensym "CONSTANT-NAME-VALUE-MAP-"))
-        (old-mute-reporting *mute-reporting-p*))
+        (definition-package (find-package definition-package)))
     (multiple-value-bind (spec-name)
         (let ((*trace-c2ffi* trace-c2ffi))
           (ensure-local-spec h-file
@@ -432,58 +432,79 @@ Return the appropriate CFFI name."))
                                                 include-arch)
                              :sysincludes (eval sysincludes)
                              :includes (eval includes)
-                             :version version
                              :language language
                              :standard standard
-                             :spec-processor (if *filter-spec-p*
-                                                 #'squash-unrelated-definitions
-                                                 #'pass-through-processor)))
+                             :spec-processor #'squash-unrelated-definitions))
       (with-open-file (in-spec spec-name)
         (collecting-symbols
           `(progn
              (eval-when (:compile-toplevel :load-toplevel :execute)
                (setf *failed-wraps* nil)
-               (setf *mute-reporting-p* ,release-p)
-               ,@(when constant-accessor
-                   (make-constant-accessor constant-accessor constant-name-value-map))
-               ;; Read and parse the JSON
-               ;;
-               ;; Note that SBCL seems to have issues with this not
-               ;; being a toplevel form as of 1.1.9 and will crash.
-               #-sbcl
                (with-anonymous-indexing
                  ,@(read-parse-forms in-spec))
-               #+sbcl
-               (progn
-                 (setf *foreign-record-index* (make-hash-table))
-                 ,@(read-parse-forms in-spec)
-                 (setf *foreign-record-index* nil))
-               ;; Map constants
-               ,@(when constant-accessor
-                   `((setf ,constant-name-value-map
-                           (make-hash-table :test 'equal :size ,(length *foreign-constant-list*)))
-                     (loop for (name . value) in ',*foreign-raw-constant-list*
-                           do (setf (gethash name ,constant-name-value-map) value))))
                ;; Definitions
-               ,@(unless no-functions
-                   (make-define-list 'define-cfun *foreign-function-list* function-package))
-               ,@(make-define-list 'define-cextern *foreign-extern-list* extern-package)
+               ,@(make-define-list 'define-cfun *exported-foreign-function-list* definition-package)
+               ,@(make-define-list 'define-cextern *exported-foreign-extern-list* definition-package)
                ;; Report on anything missing
                (compile-time-report-wrap-failures)
                ;; Exports
-               ,(when *foreign-record-list*
-                  (make-export-list *foreign-record-list* *package*
+               ,(when *exported-foreign-record-list*
+                  (make-export-list *exported-foreign-record-list* *package*
                                     (lambda (x) (etypecase x (symbol x) (cons (caadr x))))))
-               ,(when *foreign-function-list*
-                  (make-export-list *foreign-function-list* function-package))
-               ,(when *foreign-extern-list*
-                  (make-export-list *foreign-extern-list* extern-package))
-               ,(when *foreign-constant-list*
-                  (make-export-list *foreign-constant-list* constant-package))
+               ,(when *exported-foreign-function-list*
+                  (make-export-list *exported-foreign-function-list* definition-package))
+               ,(when *exported-foreign-extern-list*
+                  (make-export-list *exported-foreign-extern-list* definition-package))
+               ,(when *exported-foreign-constant-list*
+                  (make-export-list *exported-foreign-constant-list* definition-package))
                ,(when *foreign-other-exports-list*
-                  `(export ',*foreign-other-exports-list* ,definition-package))
-               (setf *mute-reporting-p* ,old-mute-reporting))
-             (let ((*mute-reporting-p* ,release-p))
-               (eval-when (:load-toplevel :execute)
-                 (report-wrap-failures 'load-time *standard-output*)
-                 (clear-wrap-failures)))))))))
+                  `(export ',*foreign-other-exports-list* ,definition-package)))
+             (eval-when (:load-toplevel :execute)
+               (report-wrap-failures 'load-time *standard-output*)
+               (clear-wrap-failures))))))))
+
+
+(defmacro c-include (header system-name &body body
+                     &key in-package include-sources include-definitions
+                       exclude-sources exclude-definitions
+                       (spec-module :spec) rename-symbols
+                       sysincludes
+                       includes
+                       (windows-environment "gnu")
+                       language standard)
+  (declare (ignore body))
+  (destructuring-bind (in-package &rest nicknames) (ensure-list in-package)
+    (unless in-package
+      (error ":in-package must be supplied"))
+    `(progn
+       (uiop:define-package ,in-package
+           (:nicknames ,@nicknames)
+         (:use))
+       (%c-include
+        ',(list system-name header)
+        :spec-path ',(list system-name spec-module)
+        :definition-package ,in-package
+        :local-environment #+windows ,windows-environment #-windows "gnu"
+        :local-only ,*local-only*
+        :include-arch ("x86_64-pc-linux-gnu"
+                       "i686-pc-linux-gnu"
+                       ,(string+ "x86_64-pc-windows-" windows-environment)
+                       ,(string+ "i686-pc-windows-" windows-environment)
+                       "x86_64-apple-darwin-gnu"
+                       "i686-apple-darwin-gnu")
+        :sysincludes ',(append (parse-sysincludes system-name sysincludes)
+                               (dump-all-gcc-include-paths))
+        :includes ',(parse-sysincludes system-name includes)
+        :include-sources ,include-sources
+        :include-definitions ,include-definitions
+        :exclude-sources ,exclude-sources
+        :exclude-definitions ,exclude-definitions
+        :language ,language
+        :standard ,standard
+        :symbol-regex ,rename-symbols)
+       (defmethod dump-c-wrapper ((package-name (eql ,in-package)) wrapper-path &optional loader)
+         (declare (ignore package-name))
+         (write-c-library-implementation wrapper-path
+                                         ,header
+                                         (package-functions ,in-package)
+                                         loader)))))

@@ -82,10 +82,6 @@ doesn't exist, we will get a return code other than 0."
   (zerop (nth-value 2 (uiop:run-program `(,*c2ffi-program* "-h") :ignore-error-status t))))
 
 
-(defun pass-through-processor (input output)
-  (uiop:copy-stream-to-stream input output :element-type 'base-char))
-
-
 ;;; UIOP:WITH-TEMPORARY-FILE does not seem to compile below as of asdf
 ;;; 3.1.5, and that's what SBCL is distributed with, so.
 (defmacro with-temporary-file ((&key pathname keep (stream (gensym "STREAM") streamp)) &body body)
@@ -164,15 +160,11 @@ if the file does not exist."
                                  arch-includes
                                  sysincludes
                                  includes
-                                 version
                                  spec-processor
                                  language
                                  standard)
   (flet ((spec-path (arch) (string+ (namestring spec-path)
                                     (pathname-name name)
-                                    (if version
-                                        (string+ "-" version)
-                                        "")
                                     "." arch)))
     (multiple-value-bind (h-name m-name) (find-local-spec name spec-path)
       (if (and h-name (not *rebuild-spec*))

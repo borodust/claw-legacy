@@ -274,3 +274,27 @@ object is specified by OBJECT-INITARG being non-NIL."
   (etypecase value
     (cffi:foreign-pointer (cffi-sys:null-pointer-p value))
     (null t)))
+
+
+;;;
+;;; Inclusion rules
+;;;
+(defun explicitly-included-p (name location)
+  (or (included-p name *include-definitions*)
+      (and (included-p location *include-sources*)
+           (not (included-p name *exclude-definitions*)))))
+
+(defun explicitly-excluded-p (name location)
+  (or (included-p name *exclude-definitions*)
+      (and (included-p location *exclude-sources*)
+           (not (included-p name *include-definitions*)))))
+
+(defun finally-included-p (name location)
+  (and (explicitly-included-p name location)
+       (not (explicitly-excluded-p name location))))
+
+(defun form-finally-included-p (form)
+  (let ((name (aval :name form))
+        (location (aval :location form)))
+    (and (explicitly-included-p name location)
+         (not (explicitly-excluded-p name location)))))
