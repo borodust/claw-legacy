@@ -473,38 +473,40 @@ Return the appropriate CFFI name."))
                        (windows-environment "gnu")
                        language standard)
   (declare (ignore body))
-  (destructuring-bind (in-package &rest nicknames) (ensure-list in-package)
-    (unless in-package
-      (error ":in-package must be supplied"))
-    `(progn
-       (uiop:define-package ,in-package
+  (let ((header-path (append (list system-name) (ensure-list header)))
+        (spec-path (append (list system-name) (ensure-list spec-module))))
+    (destructuring-bind (in-package &rest nicknames) (ensure-list in-package)
+      (unless in-package
+        (error ":in-package must be supplied"))
+      `(progn
+         (uiop:define-package ,in-package
            (:nicknames ,@nicknames)
-         (:use))
-       (%c-include
-        ',(list system-name header)
-        :spec-path ',(list system-name spec-module)
-        :definition-package ,in-package
-        :local-environment #+windows ,windows-environment #-windows "gnu"
-        :local-only ,*local-only*
-        :include-arch ("x86_64-pc-linux-gnu"
-                       "i686-pc-linux-gnu"
-                       ,(string+ "x86_64-pc-windows-" windows-environment)
-                       ,(string+ "i686-pc-windows-" windows-environment)
-                       "x86_64-apple-darwin-gnu"
-                       "i686-apple-darwin-gnu")
-        :sysincludes ',(append (parse-sysincludes system-name sysincludes)
-                               (dump-all-gcc-include-paths))
-        :includes ',(parse-sysincludes system-name includes)
-        :include-sources ,include-sources
-        :include-definitions ,include-definitions
-        :exclude-sources ,exclude-sources
-        :exclude-definitions ,exclude-definitions
-        :language ,language
-        :standard ,standard
-        :symbol-regex ,rename-symbols)
-       (defmethod dump-c-wrapper ((package-name (eql ,in-package)) wrapper-path &optional loader)
-         (declare (ignore package-name))
-         (write-c-library-implementation wrapper-path
-                                         ,header
-                                         (package-functions ,in-package)
-                                         loader)))))
+           (:use))
+         (%c-include
+          ',header-path
+          :spec-path ',spec-path
+          :definition-package ,in-package
+          :local-environment #+windows ,windows-environment #-windows "gnu"
+          :local-only ,*local-only*
+          :include-arch ("x86_64-pc-linux-gnu"
+                         "i686-pc-linux-gnu"
+                         ,(string+ "x86_64-pc-windows-" windows-environment)
+                         ,(string+ "i686-pc-windows-" windows-environment)
+                         "x86_64-apple-darwin-gnu"
+                         "i686-apple-darwin-gnu")
+          :sysincludes ',(append (parse-sysincludes system-name sysincludes)
+                                 (dump-all-gcc-include-paths))
+          :includes ',(parse-sysincludes system-name includes)
+          :include-sources ,include-sources
+          :include-definitions ,include-definitions
+          :exclude-sources ,exclude-sources
+          :exclude-definitions ,exclude-definitions
+          :language ,language
+          :standard ,standard
+          :symbol-regex ,rename-symbols)
+         (defmethod dump-c-wrapper ((package-name (eql ,in-package)) wrapper-path &optional loader)
+           (declare (ignore package-name))
+           (write-c-library-implementation wrapper-path
+                                           (path-or-asdf ',header)
+                                           (package-functions ,in-package)
+                                           loader))))))
