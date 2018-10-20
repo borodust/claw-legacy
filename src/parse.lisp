@@ -117,11 +117,11 @@ of pointer-to-record"
       ((string= tag ":pointer") t)
       (t nil))))
 
-(defun maybe-add-constant (name value form)
+(defun maybe-add-constant (name location value)
   (push (cons name value) *foreign-raw-constant-list*)
   (unless (included-p name *foreign-constant-excludes*)
     (let ((sym (foreign-type-symbol name :cconst *package*)))
-      (when (form-finally-included-p form)
+      (when (finally-included-p name location)
         (pushnew sym *exported-foreign-constant-list*))
       `(defparameter ,sym ,value))))
 
@@ -275,10 +275,10 @@ Return the appropriate CFFI name."))
                                 (symbol-package name))
                         (aval :value field)))))
 
-(defun parse-enum-to-const (fields)
+(defun parse-enum-to-const (fields location)
   (loop for field in fields
         as name = (aval :name field)
-        collect (maybe-add-constant name (aval :value field) field)
+        collect (maybe-add-constant name location (aval :value field))
           into constants
         finally (return (remove-if #'null constants))))
 
@@ -307,12 +307,12 @@ Return the appropriate CFFI name."))
            ',cunion-fields)))))
 
 (defmethod parse-form (form (tag (eql 'enum)) &key &allow-other-keys)
-  (alist-bind (name id fields) form
+  (alist-bind (name location id fields) form
     (let ((sym (foreign-type-symbol name :cenum *package*)))
       (when (and (symbol-package sym) (form-finally-included-p form))
         (pushnew sym *foreign-other-exports-list*))
       `(progn
-         ,@(parse-enum-to-const fields)
+         ,@(parse-enum-to-const fields location)
          (define-foreign-enum ',sym ,id ,name ',(parse-enum-fields fields))))))
 
 
@@ -329,8 +329,8 @@ Return the appropriate CFFI name."))
              ',cfun-fields))))))
 
 (defmethod parse-form (form (tag (eql 'const)) &key &allow-other-keys)
-  (alist-bind (name value) form
-    (maybe-add-constant name value form)))
+  (alist-bind (name value location) form
+    (maybe-add-constant name location value)))
 
 (defmethod parse-form (form (tag (eql 'extern)) &key &allow-other-keys)
   (alist-bind (name type) form
