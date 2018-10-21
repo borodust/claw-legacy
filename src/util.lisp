@@ -10,7 +10,11 @@
 (define-constant +byte-size+ 8)
 (define-constant +path-search-regex+
   "\\> search starts here:\\s*((.|\\s)*)?\\s*End of search list"
-  :test #'equalp)
+  :test #'equal)
+
+(define-constant +stupid-darwin-include-postfix+
+  " (framework directory)"
+  :test #'equal)
 
 (defun substr* (str start &optional end)
   "Make a shared substring of STR using MAKE-ARRAY :displaced-to"
@@ -248,9 +252,14 @@ object is specified by OBJECT-INITARG being non-NIL."
 
 
 (defun dump-all-gcc-include-paths ()
-  (remove-duplicates (append (dump-gcc-include-paths "c")
-                             (dump-gcc-include-paths "c++"))
-                     :test #'equal))
+  (flet ((cut-darwin-postfix (path)
+           (if (ends-with-subseq +stupid-darwin-include-postfix+ path)
+               (subseq path 0 (- (length path) (length +stupid-darwin-include-postfix+)))
+               path)))
+    (remove-duplicates (mapcar #'cut-darwin-postfix
+                               (append (dump-gcc-include-paths "c")
+                                       (dump-gcc-include-paths "c++")))
+                       :test #'equal)))
 
 
 (defun dump-gcc-version ()
