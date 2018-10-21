@@ -394,6 +394,7 @@ Return the appropriate CFFI name."))
                                include-definitions include-sources include-arch
                                sysincludes
                                includes
+                               framework-includes
                                (definition-package *package*)
                                exclude-constants
                                (trace-c2ffi *trace-c2ffi*)
@@ -431,6 +432,7 @@ Return the appropriate CFFI name."))
                                                 (list (local-arch))
                                                 include-arch)
                              :sysincludes (eval sysincludes)
+                             :framework-includes (eval framework-includes)
                              :includes (eval includes)
                              :language language
                              :standard standard
@@ -496,6 +498,7 @@ Return the appropriate CFFI name."))
                          "i686-apple-darwin-gnu")
           :sysincludes ',(append (parse-sysincludes system-name sysincludes)
                                  (dump-all-gcc-include-paths))
+          :framework-includes ',(dump-all-darwin-framework-paths)
           :includes ',(parse-sysincludes system-name includes)
           :include-sources ,include-sources
           :include-definitions ,include-definitions

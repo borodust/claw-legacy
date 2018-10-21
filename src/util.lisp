@@ -12,7 +12,7 @@
   "\\> search starts here:\\s*((.|\\s)*)?\\s*End of search list"
   :test #'equal)
 
-(define-constant +stupid-darwin-include-postfix+
+(define-constant +stupid-darwin-framework-postfix+
   " (framework directory)"
   :test #'equal)
 
@@ -251,15 +251,26 @@ object is specified by OBJECT-INITARG being non-NIL."
       nil)))
 
 
+(defun %darwin-framework-path-p (path)
+  (ends-with-subseq +stupid-darwin-framework-postfix+ path :test #'equal))
+
+
 (defun dump-all-gcc-include-paths ()
+  (remove-duplicates (remove-if #'%darwin-framework-path-p
+                                (append (dump-gcc-include-paths "c")
+                                        (dump-gcc-include-paths "c++")))
+                     :test #'equal))
+
+
+(defun dump-all-darwin-framework-paths ()
   (flet ((cut-darwin-postfix (path)
-           (if (ends-with-subseq +stupid-darwin-include-postfix+ path)
-               (subseq path 0 (- (length path) (length +stupid-darwin-include-postfix+)))
-               path)))
-    (remove-duplicates (mapcar #'cut-darwin-postfix
-                               (append (dump-gcc-include-paths "c")
-                                       (dump-gcc-include-paths "c++")))
-                       :test #'equal)))
+           (subseq path 0 (- (length path) (length +stupid-darwin-framework-postfix+)))))
+    (remove-duplicates
+     (mapcar #'cut-darwin-postfix
+             (remove-if (complement #'%darwin-framework-path-p)
+                        (append (dump-gcc-include-paths "c")
+                                (dump-gcc-include-paths "c++"))))
+     :test #'equal)))
 
 
 (defun dump-gcc-version ()

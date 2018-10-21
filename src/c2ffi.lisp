@@ -100,7 +100,8 @@ doesn't exist, we will get a return code other than 0."
                (format *debug-io* "~&; c2ffi include ignored: ~A not found" dir))))
 
 (defun run-c2ffi (input-file output-basename &key arch sysincludes includes ignore-error-status
-                                               (spec-processor #'pass-through-processor)
+                                               spec-processor
+                                               framework-includes
                                                language standard)
   "Run c2ffi on `INPUT-FILE`, outputting to `OUTPUT-FILE` and
 `MACRO-OUTPUT-FILE`, optionally specifying a target triple `ARCH`."
@@ -110,11 +111,12 @@ doesn't exist, we will get a return code other than 0."
            (arch (when arch (list "-A" arch)))
            (includes (prepare-includes includes "-I"))
            (sysincludes (prepare-includes sysincludes "-i"))
+           (framework-includes (prepare-includes framework-includes "-F"))
            (common-arg-list (append (when language
                                       (list "--lang" language))
                                     (when standard
                                       (list "--std" standard))
-                                    arch includes sysincludes)))
+                                    arch includes sysincludes framework-includes)))
       (ensure-directories-exist output-spec)
       ;; Invoke c2ffi to emit macros into TMP-MACRO-FILE
       (when (run-check *c2ffi-program* (list* (namestring input-file)
@@ -160,6 +162,7 @@ if the file does not exist."
                                  arch-includes
                                  sysincludes
                                  includes
+                                 framework-includes
                                  spec-processor
                                  language
                                  standard)
@@ -178,6 +181,7 @@ if the file does not exist."
                          :arch arch
                          :sysincludes sysincludes
                          :includes includes
+                         :framework-includes framework-includes
                          :spec-processor spec-processor
                          :language language
                          :standard standard))
@@ -191,6 +195,7 @@ if the file does not exist."
                                          :arch arch
                                          :sysincludes sysincludes
                                          :includes includes
+                                         :framework-includes framework-includes
                                          :ignore-error-status t
                                          :spec-processor spec-processor
                                          :language language
