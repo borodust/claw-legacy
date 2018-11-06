@@ -117,11 +117,11 @@ of pointer-to-record"
       ((string= tag ":pointer") t)
       (t nil))))
 
-(defun maybe-add-constant (name location value)
+(defun maybe-add-constant (name location value &optional forcibly-include)
   (push (cons name value) *foreign-raw-constant-list*)
   (unless (included-p name *foreign-constant-excludes*)
     (let ((sym (foreign-type-symbol name :cconst *package*)))
-      (when (finally-included-p name location)
+      (when (or forcibly-include (finally-included-p name location))
         (pushnew sym *exported-foreign-constant-list*))
       `(defparameter ,sym ,value))))
 
@@ -275,10 +275,10 @@ Return the appropriate CFFI name."))
                                 (symbol-package name))
                         (aval :value field)))))
 
-(defun parse-enum-to-const (fields location)
+(defun parse-enum-to-const (fields location &optional included-p)
   (loop for field in fields
         as name = (aval :name field)
-        collect (maybe-add-constant name location (aval :value field))
+        collect (maybe-add-constant name location (aval :value field) included-p)
           into constants
         finally (return (remove-if #'null constants))))
 
@@ -308,11 +308,12 @@ Return the appropriate CFFI name."))
 
 (defmethod parse-form (form (tag (eql 'enum)) &key &allow-other-keys)
   (alist-bind (name location id fields) form
-    (let ((sym (foreign-type-symbol name :cenum *package*)))
-      (when (and (symbol-package sym) (form-finally-included-p form))
-        (pushnew sym *foreign-other-exports-list*))
+    (let* ((sym (foreign-type-symbol name :cenum *package*))
+           (included-p (when (and (symbol-package sym) (form-finally-included-p form))
+                         (pushnew sym *foreign-other-exports-list*))))
+
       `(progn
-         ,@(parse-enum-to-const fields location)
+         ,@(parse-enum-to-const fields location included-p)
          (define-foreign-enum ',sym ,id ,name ',(parse-enum-fields fields))))))
 
 
