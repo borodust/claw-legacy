@@ -30,8 +30,8 @@
   (let ((children (gethash name graph)))
     (remhash name graph)
     (loop for child in children
-       unless (type-dependency-weak-p child)
-       do (exclude-type graph child))))
+          unless (type-dependency-weak-p child)
+            do (exclude-type graph child))))
 
 (defun traverse-dependencies (graph root-name probe)
   (labels ((%traverse-children (root-name extended-path)
@@ -88,19 +88,21 @@
 (defun extract-types (raw-spec)
   "Extracts names and their first-level dependencies into a graph."
   (loop with dependency-graph = (make-dependency-graph)
-     with types = (make-hash-table :test 'equal)
-     for form in raw-spec
-     as name = (aval :name form)
-     as tag = (aval :tag form)
-     as location = (aval :location form)
-     do (let ((weak-dependency-p (equal "struct" tag)))
-          (setf (gethash name types) form)
-          (register-type dependency-graph name)
-          (loop for dependency in (extract-dependencies form)
-             unless (or (emptyp dependency)
-                        (starts-with #\: dependency))
-                 do (register-dependency dependency-graph dependency name :weak-p weak-dependency-p)))
-     finally (return (values dependency-graph types))))
+        with types = (make-hash-table :test 'equal)
+        for form in raw-spec
+        as name = (aval :name form)
+        as tag = (aval :tag form)
+        as location = (aval :location form)
+        do (let ((weak-dependency-p (and (equal "struct" tag)
+                                         (not (explicitly-included-p name location)))))
+             (setf (gethash name types) form)
+             (register-type dependency-graph name)
+             (loop for dependency in (extract-dependencies form)
+                   unless (or (emptyp dependency)
+                              (starts-with #\: dependency))
+                     do (register-dependency dependency-graph dependency name
+                                             :weak-p weak-dependency-p)))
+        finally (return (values dependency-graph types))))
 
 (defun filter-types (types dependencies)
   "Leaves only included names and their dependencies unless explicitly excluded."
@@ -110,11 +112,11 @@
                  (values t t)
                  (values nil nil)))))
     (loop for name being the hash-key of types
-       as location = (aval :location (gethash name types))
-         when (or (explicitly-excluded-p name location)
-                  (not (traverse-dependencies dependencies name #'name-included)))
-         do (exclude-type dependencies name)
-       finally (return dependencies))))
+          as location = (aval :location (gethash name types))
+          when (or (explicitly-excluded-p name location)
+                   (not (traverse-dependencies dependencies name #'name-included)))
+            do (exclude-type dependencies name)
+          finally (return dependencies))))
 
 ;;;
 ;;; Spec filtering
@@ -145,8 +147,8 @@
     (multiple-value-bind (dependencies types) (extract-types raw-spec)
       (let* ((filtered-dependencies (filter-types types dependencies))
              (descriptors (loop for descriptor in raw-spec
-                             as name = (aval :name descriptor)
-                             when (or (emptyp name)
-                                      (name-exist-p filtered-dependencies name))
-                             collect (process-descriptor descriptor filtered-dependencies))))
+                                as name = (aval :name descriptor)
+                                when (or (emptyp name)
+                                         (name-exist-p filtered-dependencies name))
+                                  collect (process-descriptor descriptor filtered-dependencies))))
         (json:encode-json descriptors output-spec-stream)))))
