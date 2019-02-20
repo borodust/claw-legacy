@@ -371,13 +371,22 @@ Return the appropriate CFFI name."))
 
 ;; Exported API
 
-(defun parse-sysincludes (system includes)
+(defun %find-path (system relative &optional path)
+  (let ((relative (ensure-list relative)))
+    (if path
+        (flet ((%relative (base rel)
+                 (let ((base (uiop:ensure-directory-pathname base)))
+                   (uiop:merge-pathnames* (typecase rel
+                                            (pathname rel)
+                                            (t (string rel)))
+                                          base))))
+          (reduce #'%relative relative :initial-value path))
+        (path-or-asdf (append (list system) relative)))))
+
+
+(defun parse-sysincludes (system includes &optional path)
   (loop for include in includes
-     collect (if (stringp include)
-                 include
-                 (namestring
-                  (asdf:component-pathname
-                   (asdf:find-component (asdf:find-system system) include))))))
+        collect (%find-path system include path)))
 
 
 (defun package-functions (package-name)
@@ -467,7 +476,7 @@ Return the appropriate CFFI name."))
                (clear-wrap-failures))))))))
 
 
-(defmacro c-include (header system-name &body body
+(defmacro c-include (header system-opts &body body
                      &key in-package include-sources include-definitions
                        exclude-sources exclude-definitions
                        (spec-module :spec) rename-symbols
@@ -476,41 +485,43 @@ Return the appropriate CFFI name."))
                        (windows-environment "gnu")
                        language standard)
   (declare (ignore body))
-  (let ((header-path (append (list system-name) (ensure-list header)))
-        (spec-path (append (list system-name) (ensure-list spec-module))))
-    (destructuring-bind (in-package &rest nicknames) (ensure-list in-package)
-      (unless in-package
-        (error ":in-package must be supplied"))
-      `(progn
-         (uiop:define-package ,in-package
-           (:nicknames ,@nicknames)
-           (:use))
-         (%c-include
-          ',header-path
-          :spec-path ',spec-path
-          :definition-package ,in-package
-          :local-environment #+windows ,windows-environment #-windows "gnu"
-          :local-only ,*local-only*
-          :include-arch ("x86_64-pc-linux-gnu"
-                         "i686-pc-linux-gnu"
-                         ,(string+ "x86_64-pc-windows-" windows-environment)
-                         ,(string+ "i686-pc-windows-" windows-environment)
-                         "x86_64-apple-darwin-gnu"
-                         "i686-apple-darwin-gnu")
-          :sysincludes ',(append (parse-sysincludes system-name sysincludes)
-                                 (dump-all-gcc-include-paths))
-          :framework-includes ',(dump-all-darwin-framework-paths)
-          :includes ',(parse-sysincludes system-name includes)
-          :include-sources ,include-sources
-          :include-definitions ,include-definitions
-          :exclude-sources ,exclude-sources
-          :exclude-definitions ,exclude-definitions
-          :language ,language
-          :standard ,standard
-          :symbol-regex ,rename-symbols)
-         (defmethod dump-c-wrapper ((package-name (eql ,in-package)) wrapper-path &optional loader)
-           (declare (ignore package-name))
-           (write-c-library-implementation wrapper-path
-                                           (path-or-asdf ',header)
-                                           (package-functions ,in-package)
-                                           loader))))))
+  (destructuring-bind (include-name &key path system)
+      (ensure-list system-opts)
+    (let ((system-name (or system include-name)))
+      (destructuring-bind (in-package &rest nicknames) (ensure-list in-package)
+        (unless in-package
+          (error ":in-package must be supplied"))
+        `(progn
+           (uiop:define-package ,in-package
+               (:nicknames ,@nicknames)
+             (:use))
+           (%c-include
+            (%find-path ',system-name ,header ,path)
+            :spec-path (uiop:ensure-directory-pathname
+                        (%find-path ',system-name ,spec-module ,path))
+            :definition-package ,in-package
+            :local-environment #+windows ,windows-environment #-windows "gnu"
+            :local-only ,*local-only*
+            :include-arch ("x86_64-pc-linux-gnu"
+                           "i686-pc-linux-gnu"
+                           ,(string+ "x86_64-pc-windows-" windows-environment)
+                           ,(string+ "i686-pc-windows-" windows-environment)
+                           "x86_64-apple-darwin-gnu"
+                           "i686-apple-darwin-gnu")
+            :sysincludes (append (parse-sysincludes ',system-name ',sysincludes ,path)
+                                 ',(dump-all-gcc-include-paths))
+            :framework-includes ',(dump-all-darwin-framework-paths)
+            :includes (parse-sysincludes ',system-name ',includes ,path)
+            :include-sources ,include-sources
+            :include-definitions ,include-definitions
+            :exclude-sources ,exclude-sources
+            :exclude-definitions ,exclude-definitions
+            :language ,language
+            :standard ,standard
+            :symbol-regex ,rename-symbols)
+           (defmethod dump-c-wrapper ((package-name (eql ,in-package)) wrapper-path &optional loader)
+             (declare (ignore package-name))
+             (write-c-library-implementation wrapper-path
+                                             (path-or-asdf ',header)
+                                             (package-functions ,in-package)
+                                             loader))))))  )

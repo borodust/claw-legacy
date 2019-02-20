@@ -94,7 +94,7 @@ doesn't exist, we will get a return code other than 0."
 (defun prepare-includes (includes option)
   (loop for dir in includes
         if (uiop:directory-exists-p dir)
-          append (list option dir)
+          append (list option (namestring dir))
         else
           do (when *trace-c2ffi*
                (format *debug-io* "~&; c2ffi include ignored: ~A not found" dir))))
