@@ -496,9 +496,9 @@ Return the appropriate CFFI name."))
                (:nicknames ,@nicknames)
              (:use))
            (%c-include
-            (%find-path ',system-name ,header ,path)
+            (%find-path ',system-name ',header ,path)
             :spec-path (uiop:ensure-directory-pathname
-                        (%find-path ',system-name ,spec-module ,path))
+                        (%find-path ',system-name ',spec-module ,path))
             :definition-package ,in-package
             :local-environment #+windows ,windows-environment #-windows "gnu"
             :local-only ,*local-only*
