@@ -3,7 +3,7 @@
 (defvar *topmost-parent* nil)
 (defvar *final-value-set* nil)
 
- ;; Function calling
+;; Function calling
 
 (defmacro c-fun (name &rest args)
   (if-let (fun (find-function name))
@@ -26,7 +26,7 @@
             (nthcdr (length fields) args))))))
     (error 'c-unknown-function :name name)))
 
- ;; Refs
+;; Refs
 
 ;;; Because for some reason CFFI-SYS doesn't:
 (declaim (inline mem-ref (setf mem-ref)))
@@ -226,7 +226,7 @@
            ,(call-next-method))
       (build-ref nil :pointer current-ref rest)))
 
- ;; c-let
+;; c-let
 
 (defun make-bindings (free-default bindings rest)
   (labels ((maybe-make-macro (bindings rest tmp v c-type value)

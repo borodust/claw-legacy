@@ -1,8 +1,13 @@
-\#*
-.\#*
-*~
+# lisp junk
+*.FASL
 *.fasl
+*.lisp-temp
 *.lx??fsl
-*.so
-example/example.lisp
-example/macros.lisp
+
+# system dependent junk
+local/
+
+# binaries
+*.so*
+*.dylib*
+*.dll*

@@ -1,20 +1,106 @@
-(asdf:defsystem :claw
-  :description "Import c2ffi specs and generate CFFI wrappers"
+(asdf:defsystem :claw/util
+  :description "Import c2ffi specs and generate bindings"
   :author "Ryan Pavlik, Pavel Korolev"
   :license "BSD-2-Clause"
   :version "1.0"
-  :depends-on (:uiop :alexandria :cffi :cl-json :cl-ppcre :trivial-features)
-  :pathname "src"
+  :depends-on (:uiop :alexandria :cl-ppcre :local-time)
+  :pathname "src/"
   :serial t
-  :components ((:file "package")
+  :components ((:file "util")))
+
+
+(asdf:defsystem :claw/spec
+  :description "Import c2ffi specs and generate bindings"
+  :author "Ryan Pavlik, Pavel Korolev"
+  :license "BSD-2-Clause"
+  :version "1.0"
+  :depends-on (:uiop :alexandria :claw/util :cl-json)
+  :pathname "src/spec/"
+  :serial t
+  :components ((:file "packages")
                (:file "util")
-               (:file "conditions")
                (:file "c2ffi")
-               (:file "sffi")
-               (:file "alloc")
-               (:file "errno")
-               (:file "processing")
-               (:file "parse")
-               (:file "bitmask")
-               (:file "cbv")
-               (:file "plus-c")))
+               (:file "specification")
+               (:module entity
+                :serial t
+                :components ((:file "entity")
+                             (:file "primitive")
+                             (:file "alias")
+                             (:file "pointer")
+                             (:file "array")
+                             (:file "enum")
+                             (:file "record")
+                             (:file "function")
+                             (:file "extern")))
+               (:file "optimize")))
+
+
+(asdf:defsystem :claw/wrapper
+  :description "Import c2ffi specs and generate bindings"
+  :author "Pavel Korolev"
+  :license "BSD-2-Clause"
+  :version "1.0"
+  :depends-on (:uiop :alexandria :cl-ppcre :sha1 :claw/util :claw/spec)
+  :pathname "src/wrapper/"
+  :serial t
+  :components ((:file "packages")
+               (:file "library")
+               (:file "wrapper")))
+
+
+(asdf:defsystem :claw/cffi
+  :description "Import c2ffi specs and generate bindings"
+  :author "Pavel Korolev"
+  :license "BSD-2-Clause"
+  :version "1.0"
+  :depends-on (:uiop :alexandria
+               :cffi :cl-json :cl-ppcre :trivial-features
+                     :claw/util :claw/spec :claw/wrapper)
+  :pathname "src/cffi/c/"
+  :serial t
+  :components ((:file "packages")
+               (:file "util")
+               (:module generator
+                :serial t
+                :components ((:file "type")
+                             (:file "primitive")
+                             (:file "extern")
+                             (:file "constant")
+                             (:file "typedef")
+                             (:file "enum")
+                             (:file "struct")
+                             (:file "function")))
+               (:module adapter
+                :serial t
+                :components ((:file "adapter")
+                             (:static-file "template/dynamic.c")
+                             (:file "dynamic")
+                             (:static-file "template/static.c")
+                             (:file "static")))
+               (:file "library")))
+
+
+(asdf:defsystem :claw
+  :description "Import c2ffi specs and generate bindings"
+  :author "Pavel Korolev"
+  :license "BSD-2-Clause"
+  :version "1.0"
+  :depends-on (:cffi :claw/wrapper :claw/cffi)
+  :pathname "src/"
+  :serial t
+  :components ((:file "packages")))
+
+
+(asdf:defsystem :claw/tests
+  :description "Import c2ffi specs and generate bindings"
+  :author "Pavel Korolev"
+  :license "BSD-2-Clause"
+  :version "1.0"
+  :depends-on (:cffi :cffi-libffi :claw :fiveam)
+  :pathname "src/t/"
+  :serial t
+  :components ((:file "packages")
+               (:module :c
+                :components ((:static-file "c.h")
+                             (:static-file "c.c")
+                             (:file "c")))))
