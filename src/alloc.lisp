@@ -48,6 +48,11 @@
   (define-foreign-function '(c-memcpy "memcpy") :pointer
     '((dest :pointer)
       (src :pointer)
+      (n size-t)))
+
+  (define-foreign-function '(c-memcmp "memcmp") :int
+    '((src0 :pointer)
+      (src1 :pointer)
       (n size-t))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -56,7 +61,8 @@
   (define-cfun c-free)
   (define-cfun c-realloc)
   (define-cfun c-memset)
-  (define-cfun c-memcpy))
+  (define-cfun c-memcpy)
+  (define-cfun c-memcmp))
 
  ;; Allocating things
 
@@ -136,6 +142,9 @@
 
 (defun memcpy (dest src &optional (count 1) (type 'int8))
   (c-memcpy (ptr dest) (ptr src) (* count (sizeof type))))
+
+(defun memcmp (this that &optional (count 1) (type 'int8))
+  (c-memcmp (ptr this) (ptr that) (* count (sizeof type))))
 
 (defun alloc-string (string)
   (let ((ptr (calloc :char (1+ (length string)))))

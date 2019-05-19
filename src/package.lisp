@@ -12,7 +12,7 @@
    #:alloc #:calloc #:realloc #:free
    #:with-alloc #:with-free #:with-many-alloc #:with-many-free #:with-calloc
    #:null-pointer-p
-   #:memcpy #:sizeof #:offsetof #:alignof
+   #:memcpy #:memcmp #:sizeof #:offsetof #:alignof
 
    #:with-float-traps-masked
 
