@@ -11,7 +11,7 @@
 #endif
 
 #if defined(__cplusplus)
-extern C {
+extern "C" {
 #endif
 
 {{function-definitions}}

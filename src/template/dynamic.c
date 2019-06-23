@@ -61,4 +61,12 @@ __CLAW_API int {{loader-name}}(const char *name) {
   return 1;
 }
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 {{function-definitions}}
+
+#if defined(__cplusplus)
+}
+#endif
