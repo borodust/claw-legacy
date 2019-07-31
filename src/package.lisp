@@ -4,6 +4,7 @@
 
    #:by-removing-prefixes
    #:by-removing-complex-prefix
+   #:by-removing-postfixes
    #:by-changing
    #:in-pipeline
 

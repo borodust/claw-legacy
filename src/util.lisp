@@ -173,11 +173,24 @@ object is specified by OBJECT-INITARG being non-NIL."
           (subseq name (length prefix)))))
 
 
+(defun by-removing-postfix (postfix)
+  (list (format nil "^\\w+~A$" postfix)
+        (lambda (name)
+          (subseq name 0 (- (length name) (length postfix))))))
+
+
 (defun by-removing-prefixes (&rest prefixes)
   (flet ((by-prefix-length (this-prefix that-prefix)
            (> (length this-prefix)
               (length that-prefix))))
     (mapcar #'by-removing-prefix (stable-sort prefixes #'by-prefix-length))))
+
+
+(defun by-removing-postfixes (&rest prefixes)
+  (flet ((by-postfix-length (this-prefix that-prefix)
+           (> (length this-prefix)
+              (length that-prefix))))
+    (mapcar #'by-removing-postfix (stable-sort prefixes #'by-postfix-length))))
 
 
 (defun by-changing (from to)
