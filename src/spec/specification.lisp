@@ -1,7 +1,5 @@
 (cl:in-package :claw.spec)
 
-(defvar *rebuild-spec* nil)
-
 (declaim (special *library-specification*))
 
 
@@ -143,7 +141,7 @@
              (spec-path (arch)
                (when spec-path
                  (concatenate 'string
-                              (namestring (path-or-asdf spec-path))
+                              (namestring spec-path)
                               (pathname-name name)
                               "." arch ".spec")))
              (arch-excluded-p (arch)
@@ -174,7 +172,7 @@
                    (write-spec arch spec)))))
       (loop for arch in (list-arches)
             for spec-path = (probe-file (spec-path arch))
-            if (and (not *rebuild-spec*) spec-path)
+            if (and (not (uiop:featurep :claw-rebuild-spec)) spec-path)
               do (add-spec arch spec-path)
             else
               collect arch into missing-arches

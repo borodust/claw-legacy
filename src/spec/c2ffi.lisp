@@ -1,14 +1,11 @@
 (cl:in-package :claw.spec)
 
-(defvar *trace-c2ffi* nil)
-(defvar *spit-c2ffi-errors* nil)
 
 (defvar *c2ffi-program* #-windows "c2ffi" #+windows "c2ffi.exe")
 
 
-
 (defun run-check (program args &key output error-output ignore-error-status)
-  (when *trace-c2ffi*
+  (when (uiop:featurep :claw-trace-c2ffi)
     (format *debug-io* "~&; Invoking: ~A~{ ~A~}~%" program args))
   (zerop (nth-value 2 (uiop:run-program (list* program args)
                                         :output output
@@ -36,7 +33,7 @@ doesn't exist, we will get a return code other than 0."
         if (uiop:directory-exists-p dir)
           append (list option (namestring dir))
         else
-          do (when *trace-c2ffi*
+          do (when (uiop:featurep :claw-trace-c2ffi)
                (format *debug-io* "~&; c2ffi include ignored: ~A not found" dir))))
 
 
@@ -47,7 +44,7 @@ doesn't exist, we will get a return code other than 0."
   "Run c2ffi on `INPUT-FILE`, outputting to `OUTPUT-FILE` and
 `MACRO-OUTPUT-FILE`, optionally specifying a target triple `ARCH`."
   (with-temporary-file (:pathname tmp-macro-file
-                        :keep *trace-c2ffi*)
+                        :keep (uiop:featurep :claw-trace-c2ffi))
     (let* ((output-spec (namestring output-basename))
            (arch (when arch (list "-A" arch)))
            (includes (prepare-includes includes "-i"))
@@ -66,12 +63,13 @@ doesn't exist, we will get a return code other than 0."
                                               "-M" (namestring tmp-macro-file)
                                               common-arg-list)
                        :output *standard-output*
-                       :error-output (when *spit-c2ffi-errors* *error-output*)
+                       :error-output (when (uiop:featurep :claw-spit-c2ffi-errors)
+                                       *error-output*)
                        :ignore-error-status ignore-error-status)
         ;; Write a tmp header file that #include's the input file and the macros file.
         (with-temporary-file (:stream tmp-include-file-stream
                               :pathname tmp-include-file
-                              :keep *trace-c2ffi*)
+                              :keep (uiop:featurep :claw-trace-c2ffi))
           (format tmp-include-file-stream "#include \"~A\"~%" input-file)
           (format tmp-include-file-stream "#include \"~A\"~%" tmp-macro-file)
           (close tmp-include-file-stream)
@@ -113,7 +111,7 @@ doesn't exist, we will get a return code other than 0."
 
 (defmacro with-include-header ((header includes) &body body)
   `(with-temporary-file (:pathname ,header
-                         :keep *trace-c2ffi*)
+                         :keep (uiop:featurep :claw-trace-c2ffi))
      (write-include-header ,header ,includes)
      ,@body))
 

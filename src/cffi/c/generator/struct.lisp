@@ -4,16 +4,16 @@
 ;;; RECORD
 ;;;
 (defun generate-c-field (record-kind field)
-  (let* ((id (entity-type->cffi field))
-         (name (c-name->lisp (claw.spec:foreign-entity-name field)))
+  (let* ((name (c-name->lisp (claw.spec:foreign-entity-name field)))
          (byte-offset (/ (claw.spec:foreign-record-field-bit-offset field) 8))
          (offset-param `(:offset ,byte-offset)))
     (export-symbol name)
-    (destructuring-bind (kind &optional type count) (ensure-list id)
+    (destructuring-bind (kind &optional actual-type count)
+        (ensure-list (claw.spec:foreign-entity-type field))
       (append
        (if (and (eq kind :array) (numberp count))
-           `(,name ,(entity-type->cffi type) :count ,count)
-           `(,name ,id))
+           `(,name ,(entity-typespec->cffi actual-type) :count ,count)
+           `(,name ,(entity-type->cffi field)))
        (when (eq record-kind :struct)
          offset-param)))))
 

@@ -34,4 +34,4 @@
   (error "unimplemented"))
 
 
-(defmethod expand-adapter-routines ((this static-adapter)))
+(defmethod expand-adapter-routines ((this static-adapter) wrapper))

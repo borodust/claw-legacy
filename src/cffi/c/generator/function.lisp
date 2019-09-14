@@ -9,7 +9,7 @@
       (and (listp base-type) (member (first base-type) '(:struct :union))))))
 
 
-(defun adaptable-p (function)
+(defun adaptablep (function)
   (some #'recordp (list* (claw.spec:foreign-function-return-type function)
                          (mapcar #'claw.spec:foreign-entity-type
                                  (claw.spec:foreign-function-parameters function)))))
@@ -52,10 +52,13 @@
 
 (defmethod generate-binding ((entity claw.spec:foreign-function) &key)
   (let* ((id (entity-typespec->cffi (claw.spec:foreign-entity-type entity)))
-         (c-name (adapt-function-c-name (claw.spec:foreign-entity-name entity)))
+         (adaptable-p (adaptablep entity))
+         (c-name (if adaptable-p
+                     (adapt-function-c-name (claw.spec:foreign-entity-name entity))
+                     (claw.spec:foreign-entity-name entity)))
          (return-type (adapt-return-type entity))
          (params (generate-c-parameters entity)))
-    (when (and *adapter* (adaptable-p entity))
+    (when (and *adapter* adaptable-p)
       (register-adapted-function *adapter* entity))
     (export-symbol id)
     `((cffi:defcfun (,c-name ,id) ,return-type ,@params))))

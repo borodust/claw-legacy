@@ -1,5 +1,5 @@
 (asdf:defsystem :claw/util
-  :description "Import c2ffi specs and generate bindings"
+  :description "Various utilities used across CLAW subsystems"
   :author "Ryan Pavlik, Pavel Korolev"
   :license "BSD-2-Clause"
   :version "1.0"
@@ -10,7 +10,7 @@
 
 
 (asdf:defsystem :claw/spec
-  :description "Import c2ffi specs and generate bindings"
+  :description "Spec generation support and c2ffi interop for CLAW"
   :author "Ryan Pavlik, Pavel Korolev"
   :license "BSD-2-Clause"
   :version "1.0"
@@ -36,7 +36,7 @@
 
 
 (asdf:defsystem :claw/wrapper
-  :description "Import c2ffi specs and generate bindings"
+  :description "Wrapper definition interface for CLAW"
   :author "Pavel Korolev"
   :license "BSD-2-Clause"
   :version "1.0"
@@ -49,7 +49,7 @@
 
 
 (asdf:defsystem :claw/cffi
-  :description "Import c2ffi specs and generate bindings"
+  :description "CFFI generator for CLAW"
   :author "Pavel Korolev"
   :license "BSD-2-Clause"
   :version "1.0"
@@ -81,7 +81,7 @@
 
 
 (asdf:defsystem :claw
-  :description "Import c2ffi specs and generate bindings"
+  :description "Generate clean & lean bindings easily"
   :author "Pavel Korolev"
   :license "BSD-2-Clause"
   :version "1.0"
@@ -92,15 +92,18 @@
 
 
 (asdf:defsystem :claw/tests
-  :description "Import c2ffi specs and generate bindings"
+  :description "Tests for CLAW"
   :author "Pavel Korolev"
   :license "BSD-2-Clause"
   :version "1.0"
-  :depends-on (:cffi :cffi-libffi :claw :fiveam)
-  :pathname "src/t/"
+  :depends-on (:cffi :claw :fiveam :cffi-c-ref)
+  :pathname "t/"
   :serial t
   :components ((:file "packages")
                (:module :c
                 :components ((:static-file "c.h")
                              (:static-file "c.c")
-                             (:file "c")))))
+                             (:module :cffi
+                              :serial t
+                              :components ((:file "c")
+                                           (:file "tests")))))))

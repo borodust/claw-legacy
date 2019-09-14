@@ -1,7 +1,7 @@
 (cl:in-package :claw.cffi.c)
 
 
-(defgeneric initialize-adapater (library-name))
+(defgeneric initialize-adapter (library-name))
 
 
 (defclass dynamic-adapter (adapter) ())
@@ -45,7 +45,7 @@
 
 
 (defmethod generate-adapter-file ((this dynamic-adapter))
-  (when (or *rebuild-adapter*
+  (when (or (uiop:featurep :claw-rebuild-adapter)
             (not (probe-file (adapter-file-of this)))
             (> (wrapper-last-update-time-of this)
                (file-write-date (adapter-file-of this))))
@@ -88,7 +88,7 @@
                               (list (format nil "-std=~A" standard)))
                             (when pedantic
                               (list "-pedantic"))
-                            (list "-O2" "-fPIC")
+                            (list "-O3" "-fPIC")
                             (loop for directory in includes
                                   collect (format nil "-I~A"
                                                   (namestring directory)))
@@ -97,14 +97,22 @@
                     :error-output *debug-io*))
 
 
-(defmethod expand-adapter-routines ((this dynamic-adapter))
+(defun %verify-adapter-initialization (result)
+  (unless (zerop result)
+    (error "Failed to initialize adapater")))
+
+
+(defmethod expand-adapter-routines ((this dynamic-adapter) wrapper)
   (let ((name (wrapper-name-of this)))
     `((defmethod build-adapter ((wrapper-name (eql ',name)) target)
         (declare (ignore wrapper-name))
         (build-dynamic-adapter ,(standard-of this)
                                ,(adapter-file-of this)
                                (list ,@(includes-of this))
-                               target))
+                               (merge-pathnames target
+                                                ,(claw.wrapper:merge-wrapper-pathname
+                                                  "" wrapper))))
       (defmethod initialize-adapter ((wrapper-name (eql ',name)))
         (declare (ignore wrapper-name))
-        (cffi:foreign-funcall ,(library-loader-name name) :void)))))
+        (%verify-adapter-initialization
+         (cffi:foreign-funcall ,(library-loader-name name) :int))))))

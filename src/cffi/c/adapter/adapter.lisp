@@ -1,12 +1,9 @@
 (cl:in-package :claw.cffi.c)
 
 
-(defvar *rebuild-adapter* nil)
-
-
 (defgeneric generate-adapter-file (adapter))
 (defgeneric build-adapter (wrapper-name target-file))
-(defgeneric expand-adapter-routines (adapter))
+(defgeneric expand-adapter-routines (adapter wrapper))
 
 
 (defclass adapter ()
