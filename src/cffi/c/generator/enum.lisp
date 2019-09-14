@@ -8,7 +8,8 @@
              (last (aref sorted-strings (1- (length sorted-strings))))
              (mismatch-idx (mismatch first last)))
         (if mismatch-idx
-            (if-let ((hyphenated-prefix-idx (position #\- first :end mismatch-idx)))
+            (if-let ((hyphenated-prefix-idx (position #\- first :from-end t
+                                                                :end mismatch-idx)))
               (subseq first 0 (1+ hyphenated-prefix-idx))
               "")
             ""))

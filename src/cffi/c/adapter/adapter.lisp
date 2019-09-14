@@ -1,12 +1,9 @@
 (cl:in-package :claw.cffi.c)
 
 
-(defvar *rebuild-adapter* nil)
-
-
 (defgeneric generate-adapter-file (adapter))
 (defgeneric build-adapter (wrapper-name target-file))
-(defgeneric expand-adapter-routines (adapter))
+(defgeneric expand-adapter-routines (adapter wrapper))
 
 
 (defclass adapter ()
@@ -89,3 +86,9 @@
                                           (format nil "~A~A" invocation-prefix
                                                   (adapted-function-name function))
                                           stream))))
+
+(defun %adapter-needs-rebuilding-p (this)
+  (or (uiop:featurep :claw-rebuild-adapter)
+      (not (probe-file (adapter-file-of this)))
+      (> (wrapper-last-update-time-of this)
+         (file-write-date (adapter-file-of this)))))

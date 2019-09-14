@@ -7,8 +7,6 @@
                   *include-sources*
                   *exclude-sources*))
 
-(define-constant +byte-size+ 8)
-
 ;; alists
 
 (declaim (inline akey aval (setf aval)))
@@ -18,7 +16,6 @@
   (setf (cdr (assoc key alist :test test)) value))
 
 (defmacro alist-bind ((&rest vars) alist &body body)
-  "Inefficient but doesn't really matter here"
   (once-only (alist)
     `(let (,@(mapcar (lambda (x)
                        (if (consp x)
@@ -50,30 +47,13 @@
 (defun anonymous-p (form)
   (etypecase form
     (foreign-entity
-     (null (foreign-entity-name form)))
+     (or (null (foreign-entity-name form))
+         (emptyp (foreign-entity-name form))))
     (cons
      (or (string= "" (aval :name form))
          (and (string= ":array" (aval :tag form))
               (string= "" (aval :name (aval :type form))))))))
 
-
-(defun find-file-for-paths (file paths)
-  (loop for path in paths
-        as filename = (merge-pathnames file path)
-        do (when (probe-file filename)
-             (return filename))))
-
-;; ASDF paths
-
-(defun asdf-path (system &rest path)
-  (asdf:component-pathname
-   (or (asdf:find-component (asdf:find-system system t) path)
-       (error "System ~S path not found: ~S" system path))))
-
-(defun path-or-asdf (form)
-  (etypecase form
-    ((or string pathname) form)
-    (list (apply #'asdf-path (car form) (cdr form)))))
 
 ;;;
 ;;; Inclusion rules

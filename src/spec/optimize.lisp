@@ -36,7 +36,7 @@
   (let ((inclusion-status (find-inclusion-status entity)))
     (when (inclusion-status-included-p inclusion-status)
       (if (inclusion-status-weakly-p inclusion-status)
-          (make-instance 'foreign-record
+          (make-instance (class-of entity)
                          :id (foreign-entity-id entity)
                          :name (foreign-entity-name entity)
                          :location (foreign-entity-location entity)
@@ -145,6 +145,14 @@
   (update-inclusion-status entity t nil nil))
 
 
+(defun transfer-inclusion-status (from to)
+  (let ((status (find-inclusion-status from)))
+    (update-inclusion-status to
+                             (inclusion-status-included-p status)
+                             (inclusion-status-excluded-p status)
+                             (inclusion-status-weakly-p status))))
+
+
 (defun mark-weakly-included (entity)
   (unless (entity-included-p entity)
     (update-inclusion-status entity t nil t)))
@@ -157,34 +165,49 @@
       (update-inclusion-status entity nil t nil))))
 
 
-(defgeneric include-entity (entity)
+(defgeneric try-including-entity (entity)
   (:method ((entity foreign-entity))
     (when (entity-explicitly-included-p entity)
       (mark-included entity)
       t)))
 
 
-(defmethod include-entity ((entity foreign-alias))
-  (when (call-next-method)
-    (mark-included (find-foreign-entity (find-base-alias-type entity)))
-    t))
+(defmethod try-including-entity ((entity foreign-alias))
+  (prog1
+      (when (entity-explicitly-included-p entity)
+        (mark-included entity)
+        t)
+    (transfer-inclusion-status entity
+                               (find-foreign-entity (find-base-alias-type entity)))))
 
 
-(defmethod include-entity ((entity foreign-record))
+(defmethod try-including-entity ((entity foreign-record))
   (when (call-next-method)
     (loop for dep in (foreign-entity-dependencies entity)
           if (anonymous-p dep)
             do (mark-included dep)
           else
-            do (mark-weakly-included dep))
+            unless (entity-included-p dep)
+              do (mark-weakly-included dep)
+                 (try-including-entity dep))
     t))
 
 
-(defmethod include-entity ((entity foreign-function))
+(defmethod try-including-entity ((entity foreign-function))
   (when (call-next-method)
     (loop for dep in (foreign-entity-dependencies entity)
           do (mark-weakly-included dep))
     t))
+
+
+(defmethod try-including-entity ((entity foreign-enum))
+  (if (call-next-method)
+      (prog1 t
+        (mark-included entity))
+      (when (loop for (key . value) in (foreign-enum-values entity)
+                    thereis (explicitly-included-p key (foreign-entity-location entity)))
+        (mark-included entity)
+        t)))
 
 
 (defun make-inclusion-table (spec
@@ -201,7 +224,7 @@
     (do-foreign-entities (entity spec)
       (if (entity-explicitly-excluded-p entity)
           (mark-excluded entity)
-          (include-entity entity)))
+          (try-including-entity entity)))
     *inclusion-table*))
 
 

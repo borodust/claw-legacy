@@ -6,18 +6,21 @@
                                         headers
                                         specification
                                         standard
-                                        includes last-update-time)))
+                                        includes
+                                        last-update-time
+                                        path-mapper)))
   (name nil :read-only t)
   (headers nil :read-only t)
   (specification nil :read-only t)
   (standard nil :read-only t)
   (includes nil :read-only t)
-  (last-update-time 0 :read-only t))
+  (last-update-time 0 :read-only t)
+  (path-mapper nil :read-only t))
 
 
 (defun merge-wrapper-pathname (pathname wrapper)
-  (declare (ignore wrapper))
-  (map-path pathname))
+  (let ((*path-mapper* (wrapper-path-mapper wrapper)))
+    (map-path pathname)))
 
 
 (defun generate-default-header-name (symbol)
@@ -62,7 +65,7 @@
                  (spec-path (map-path (uiop:ensure-directory-pathname
                                        (or spec-path "spec/"))))
                  (language (or language :c))
-                 (generator (or generator :cffi))
+                 (generator (or generator :claw/cffi))
                  (windows-environment (or windows-environment "gnu"))
                  (includes (mapcar #'map-path
                                    (append
@@ -100,5 +103,6 @@
               (expand-library-definition generator language
                                          (make-wrapper name headers spec
                                                        standard includes
-                                                       last-update-time)
+                                                       last-update-time
+                                                       *path-mapper*)
                                          configuration))))))))

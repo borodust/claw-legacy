@@ -41,7 +41,8 @@
 
 
 (defun expand-constant (name value)
-  (let ((name (format-symbol (or *symbol-package* *package*) "+~A+" name)))
+  (let ((name (format-symbol (or (package-name (symbol-package name))
+                                 *package*) "+~A+" name)))
     (export-symbol name)
     `((defparameter ,name ,value))))
 

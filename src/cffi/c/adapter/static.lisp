@@ -10,23 +10,28 @@
 
 (defun load-static-adapter-template ()
   (alexandria:read-file-into-string
-   (asdf:system-relative-pathname :claw/cffi "src/template/static.c")))
+   (asdf:system-relative-pathname :claw/cffi "src/cffi/c/adapter/template/static.c")))
 
 
 (defun preprocess-static-adapter-template (header-file function-definitions)
   (preprocess-template (load-static-adapter-template)
                        "timestamp" (get-timestamp)
-                       "header-file" header-file
+                       "includes" header-file
                        "function-definitions" function-definitions))
 
 
 (defmethod generate-adapter-file ((this static-adapter))
-  (ensure-directories-exist (uiop:pathname-directory-pathname (adapter-file-of this)))
-  (with-output-to-file (output (adapter-file-of this) :if-exists :supersede)
-    (write-sequence "" output))
-  #++(format output "~A" (preprocess-static-adapter-template
-                          (library-headers library-name)
-                          (%generate-adapted-function-definitions library-name))))
+  (when (%adapter-needs-rebuilding-p this)
+    (ensure-directories-exist (uiop:pathname-directory-pathname (adapter-file-of this)))
+    (with-output-to-file (output (adapter-file-of this) :if-exists :supersede)
+      (let* ((functions (functions-of this))
+             (definitions (%generate-adapted-function-definitions functions "")))
+        (flet ((header-files ()
+                 (format nil "~{#include \"~A\"~^~%~}" (headers-of this))))
+          (format output "~A"
+                  (preprocess-static-adapter-template
+                   (header-files)
+                   definitions)))))))
 
 
 (defun build-static-adapter (library-name target-file)
@@ -34,4 +39,5 @@
   (error "unimplemented"))
 
 
-(defmethod expand-adapter-routines ((this static-adapter)))
+(defmethod expand-adapter-routines ((this static-adapter) wrapper)
+  (declare (ignore this wrapper)))
