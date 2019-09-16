@@ -123,6 +123,11 @@
           :type fixnum :reader foreign-constant-value)))
 
 
+(defmethod entity-constant-p ((this foreign-constant))
+  (declare (ignore this))
+  t)
+
+
 (defmethod parse-form (form (tag (eql :const)))
   (alist-bind (name value location) form
     (register-foreign-entity name

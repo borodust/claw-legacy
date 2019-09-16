@@ -50,33 +50,34 @@
   (adapt-record-type (claw.spec:foreign-function-return-type function)))
 
 
-(defmethod generate-binding ((entity claw.spec:foreign-function) &key)
-  (let* ((id (entity-typespec->cffi (claw.spec:foreign-entity-type entity)))
-         (adaptable-p (adaptablep entity))
-         (c-name (if adaptable-p
-                     (adapt-function-c-name (claw.spec:foreign-entity-name entity))
-                     (claw.spec:foreign-entity-name entity)))
-         (return-type (adapt-return-type entity))
-         (params (generate-c-parameters entity)))
-    (when (and *adapter* adaptable-p)
-      (register-adapted-function *adapter* entity))
-    (export-symbol id)
-    `((cffi:defcfun (,c-name ,id) ,return-type ,@params))))
-
-
 (defmethod adapted-function-name ((this claw.spec:foreign-function) &optional stream)
   (format stream "~A" (claw.spec:foreign-entity-name this)))
 
 
+(defun format-function-declaration (control-string function &key name
+                                                              stream
+                                                              collect-names)
+  (let* ((parameters (loop for param in (claw.spec:foreign-function-parameters function)
+                           for i from 0
+                           for type-name = (typespec->c
+                                            (claw.spec:foreign-entity-type param))
+                           if collect-names
+                             collect (format nil "~A ~A"
+                                             type-name
+                                             (or (claw.spec:foreign-entity-name param)
+                                                 (format nil "arg~A" i)))
+                           else
+                             collect type-name))
+         (param-string (format nil "~{~A~^, ~}" parameters)))
+    (format stream control-string
+            (typespec->c (claw.spec:foreign-function-return-type function))
+            (or name (claw.spec:foreign-entity-name function))
+            param-string)))
+
+
 (defmethod adapted-function-original-type ((this claw.spec:foreign-function)
                                            name &optional stream)
-  (let* ((parameters (loop for param in (claw.spec:foreign-function-parameters this)
-                           collect (typespec->c (claw.spec:foreign-entity-type param))))
-         (param-string (format nil "~{~A~^, ~}" parameters)))
-    (format stream "~A (*~A)(~A)"
-            (typespec->c (claw.spec:foreign-function-return-type this))
-            name
-            param-string)))
+  (format-function-declaration "~A (*~A)(~A)" this :name name :stream stream))
 
 
 (defmethod adapted-function-definition ((this claw.spec:foreign-function)
@@ -122,3 +123,19 @@
                                             "arg0"
                                             "result")))
       (format stream "~&}"))))
+
+
+(defmethod generate-binding ((entity claw.spec:foreign-function) &key)
+  (let* ((id (entity-typespec->cffi (claw.spec:foreign-entity-type entity)))
+         (adaptable-p (adaptablep entity))
+         (c-name (if adaptable-p
+                     (adapt-function-c-name (claw.spec:foreign-entity-name entity))
+                     (claw.spec:foreign-entity-name entity)))
+         (return-type (adapt-return-type entity))
+         (params (generate-c-parameters entity)))
+    (when (and *adapter* adaptable-p)
+      (register-adapted-function *adapter* entity))
+    (export-symbol id)
+    `((cffi:defcfun (,c-name ,id) ,return-type
+        ,(format-function-declaration "~A ~A(~A);" entity :collect-names t)
+        ,@params))))

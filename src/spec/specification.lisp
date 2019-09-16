@@ -3,9 +3,14 @@
 (declaim (special *library-specification*))
 
 
+(defgeneric entity-constant-p (entity)
+  (:method (entity) (declare (ignore entity)) nil))
+
+
 (defclass library-specification ()
   ((entity-table :initform (make-hash-table :test 'equal))
-   (symbol-order :initform (list))))
+   (symbol-order :initform (list))
+   (constants :initform (list))))
 
 
 (defgeneric parse-form (form tag)
@@ -24,6 +29,11 @@
   (format stream "false"))
 
 
+(defun library-symbol-order (library)
+  (append (sort (copy-list (slot-value library 'constants)) #'string<)
+          (reverse (slot-value library 'symbol-order))))
+
+
 (defun read-json (file)
   (let ((*read-default-float-format* 'double-float))
     (json:decode-json file)))
@@ -32,7 +42,7 @@
 (defmacro do-foreign-entities ((entity library) &body body)
   (with-gensyms (entity-name)
     (once-only (library)
-      `(loop for ,entity-name in (reverse (slot-value ,library 'symbol-order))
+      `(loop for ,entity-name in (library-symbol-order ,library)
              do (let ((,entity (gethash ,entity-name
                                         (slot-value ,library 'entity-table))))
                   (progn ,@body))))))
@@ -48,8 +58,8 @@
 
 
 (defun compose-forms ()
-  (with-slots (symbol-order entity-table) *library-specification*
-    (loop for symbol in (reverse symbol-order)
+  (with-slots (entity-table) *library-specification*
+    (loop for symbol in (library-symbol-order *library-specification*)
           collect (compose-form (gethash symbol entity-table)))))
 
 
@@ -63,22 +73,25 @@
     (format stream "~&]")))
 
 
-(defun preserve-order (name &optional (library-specification *library-specification*))
-  (with-slots (entity-table symbol-order) library-specification
+(defun preserve-order (name &optional (library-specification *library-specification*)
+                              constant-p)
+  (with-slots (entity-table symbol-order constants) library-specification
     (multiple-value-bind (entity reserved-p) (gethash name entity-table)
       (declare (ignore entity))
       (unless reserved-p
-        (push name symbol-order)
+        (if constant-p
+            (push name constants)
+            (push name symbol-order))
         (setf (gethash name entity-table) nil)))))
 
 
 (defun register-foreign-entity (name type &optional (library-specification
                                                      *library-specification*))
-  (with-slots (entity-table symbol-order) library-specification
+  (with-slots (entity-table) library-specification
     (if-let ((entity (gethash name entity-table)))
       (values entity nil)
       (values (progn
-                (preserve-order name library-specification)
+                (preserve-order name library-specification (entity-constant-p type))
                 (setf (gethash name entity-table) type))
               t))))
 

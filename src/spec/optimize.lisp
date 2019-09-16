@@ -78,27 +78,6 @@
 (defmethod foreign-entity-dependencies ((type foreign-record))
   (remove-if #'null (mapcar #'%find-entity-dependency (foreign-record-fields type))))
 
-
-(defun make-dependency-graph (spec)
-  (let ((*library-specification* spec)
-        (graph (make-hash-table :test 'equal)))
-    (do-foreign-entities (entity *library-specification*)
-      (let ((entity-type (foreign-entity-type entity))
-            (deps (foreign-entity-dependencies entity)))
-        (if deps
-            (loop for dep in deps
-                  do (pushnew entity-type (gethash (foreign-entity-type dep) graph)))
-            (pushnew entity-type (gethash nil graph)))))
-    graph))
-
-
-(defun dependency-graph-roots (graph)
-  (gethash nil graph))
-
-
-(defun dependency-graph-dependents (graph type)
-  (gethash type graph))
-
 ;;;
 ;;; FILTERING
 ;;;
