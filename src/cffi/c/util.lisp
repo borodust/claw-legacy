@@ -27,3 +27,38 @@
 
 (defun export-symbol (symbol)
   (setf (gethash symbol *export-table*) symbol))
+
+
+(defun primitive->c (name)
+  (switch (name :test #'equal)
+    ("char" :char)
+    ("signed char" :char)
+    ("unsigned char" :unsigned-char)
+    ("short" :short)
+    ("unsigned short" :unsigned-short)
+    ("int" :int)
+    ("unsigned int" :unsigned-int)
+    ("long" :long)
+    ("unsigned long" :unsigned-long)
+    ("long long" :long-long)
+    ("unsigned long long" :unsigned-long-long)
+    ("float" :float)
+    ("double" :double)
+    ("long double" :long-double)
+    ("void" :void)
+    (t (c-name->lisp name :type))))
+
+
+(defun entity-typespec->cffi (typespec)
+  (if (listp typespec)
+      (let ((kind (first typespec))
+            (type (second typespec)))
+        (case kind
+          ((or :pointer :array) (list :pointer (entity-typespec->cffi type)))
+          (:enum (entity-typespec->cffi type))
+          (t (list kind (c-name->lisp type :type)))))
+      (primitive->c typespec)))
+
+
+(defun entity-type->cffi (entity)
+  (entity-typespec->cffi (claw.spec:foreign-entity-type entity)))

@@ -13,4 +13,4 @@
   :in-package :%libctest
   :trim-enum-prefix t
   :with-adapter :dynamic
-  :rename-symbols (by-removing-prefixes "tst_" "TST_"))
+  :symbolicate-names (:by-removing-prefixes "tst_" "TST_"))

@@ -30,9 +30,9 @@
 (defmethod generate-binding ((entity claw.spec:foreign-enum) &key name)
   (let* ((name (or name
                    (unless (emptyp (claw.spec:foreign-entity-name entity))
-                     (c-name->lisp (claw.spec:foreign-entity-name entity)))))
+                     (c-name->lisp (claw.spec:foreign-entity-name entity) :type))))
          (values (loop for (key . value) in (claw.spec:foreign-enum-values entity)
-                       collect (cons (c-name->lisp key) value)))
+                       collect (cons (c-name->lisp key :enum) value)))
          (values (if *trim-enum-prefix-p* (trim-enum-prefix values) values)))
     (if name
         (progn

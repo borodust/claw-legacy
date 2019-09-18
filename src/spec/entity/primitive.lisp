@@ -111,6 +111,10 @@
   (register-primitive-type-renaming form ":long double"))
 
 
+(defmethod parse-form (form (tag (eql :__float128)))
+  (register-primitive-type-renaming form ":long double"))
+
+
 (defmethod compose-type-reference (type-group (tag (eql :void)) &rest type-args)
   (declare (ignore type-group type-args))
   (alist :tag ":void"))

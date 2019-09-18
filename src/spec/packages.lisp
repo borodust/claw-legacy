@@ -14,7 +14,7 @@
            #:foreign-entity-type
            #:foreign-entity-bit-size
            #:foreign-entity-bit-alignment
-           #:find-foreign-entity-dependencies
+           #:foreign-entity-dependencies
 
            #:foreign-primitive
 
@@ -24,6 +24,7 @@
            #:foreign-alias
            #:foreign-alias-type
            #:find-base-alias-type
+           #:aliases-type-p
 
            #:foreign-enum
            #:foreign-enum-values

@@ -46,15 +46,18 @@
       (if-let ((entity (find-foreign-entity tag)))
         (foreign-entity-type entity)
         (parse-form form (keywordify tag)))
-      (error "Unrecognized tag: ~A" tag)))
+      (error "Unrecognized tag: ~S" tag)))
 
 
 (defmethod compose-type-reference (type-group type-name &rest type-args)
-  (compose-entity-reference (find-foreign-entity (if type-group
-                                                     (list* type-group
-                                                            type-name
-                                                            type-args)
-                                                     type-name))))
+  (if-let ((entity (find-foreign-entity (if type-group
+                                            (list* type-group
+                                                   type-name
+                                                   type-args)
+                                            type-name))))
+    (compose-entity-reference entity)
+    (error "Failed to compose type reference and find an enity of ~S kind with name ~S"
+           type-group type-name)))
 
 (defun compose-reference (type)
   (if (listp type)
@@ -69,5 +72,5 @@
 (defun extract-entity-type (typespec)
   (let ((typespec-list (ensure-list typespec)))
     (case (first typespec-list)
-      ((or :pointer :array) (second typespec-list))
+      ((or :pointer :array) (extract-entity-type (second typespec-list)))
       (t typespec))))

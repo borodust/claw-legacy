@@ -4,7 +4,7 @@
 ;;; RECORD
 ;;;
 (defun generate-c-field (record-kind field)
-  (let* ((name (c-name->lisp (claw.spec:foreign-entity-name field)))
+  (let* ((name (c-name->lisp (claw.spec:foreign-entity-name field) :field))
          (byte-offset (/ (claw.spec:foreign-record-field-bit-offset field) 8))
          (offset-param `(:offset ,byte-offset)))
     (export-symbol name)
@@ -29,10 +29,14 @@
          (name (or name
                    (if (emptyp (claw.spec:foreign-entity-name entity))
                        (second id)
-                       (c-name->lisp (claw.spec:foreign-entity-name entity)))))
+                       (c-name->lisp (claw.spec:foreign-entity-name entity) :type))))
          (byte-size (/ (claw.spec:foreign-entity-bit-size entity) 8)))
     (export-symbol name)
     `((,kind (,name :size ,byte-size) ,@fields))))
+
+
+(defun %generate-forward-declaration (kind name)
+  `(,kind ,(c-name->lisp name :type)))
 
 ;;;
 ;;; STRUCT
@@ -46,6 +50,12 @@
   (first (generate-record-binding 'cffi:defcstruct entity name nil)))
 
 
+(defmethod generate-forward-declaration-from-typespec ((kind (eql :struct))
+                                                       &optional name &rest opts)
+  (declare (ignore opts))
+  (%generate-forward-declaration 'cffi:defcstruct name))
+
+
 ;;;
 ;;; UNION
 ;;;
@@ -56,3 +66,9 @@
 
 (defmethod generate-forward-declaration ((entity claw.spec:foreign-union) &key name)
   (first (generate-record-binding 'cffi:defcunion entity name nil)))
+
+
+(defmethod generate-forward-declaration-from-typespec ((kind (eql :union))
+                                                       &optional name &rest opts)
+  (declare (ignore opts))
+  (%generate-forward-declaration 'cffi:defcunion name))

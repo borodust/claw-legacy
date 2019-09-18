@@ -10,13 +10,20 @@
 
 
 (defun find-base-alias-type (alias &optional (spec *library-specification*))
-  (labels ((unwrap-alias (alias)
-             (if (typep alias 'foreign-alias)
-                 (unwrap-alias (find-foreign-entity
-                                (extract-entity-type (foreign-alias-type alias))
-                                spec))
-                 alias)))
-    (foreign-entity-type (unwrap-alias alias))))
+  (labels ((unwrap-alias (aliased-type)
+             (let* ((inner-type (extract-entity-type aliased-type))
+                    (entity (find-foreign-entity inner-type spec)))
+               ;; when entity is nil - probably a forward reference - no probs
+               (if (and entity (typep entity 'foreign-alias))
+                   (unwrap-alias (foreign-alias-type entity))
+                   inner-type))))
+    (unwrap-alias (foreign-alias-type alias))))
+
+
+(defun aliases-type-p (alias typespec
+                       &optional (library-specification *library-specification*))
+  (and (typep alias 'foreign-alias)
+       (equal (find-base-alias-type alias library-specification) typespec)))
 
 
 (defmethod parse-form (form (tag (eql :typedef)))

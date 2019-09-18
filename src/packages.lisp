@@ -6,6 +6,8 @@
            #:by-changing
            #:by-removing-prefixes
            #:by-removing-complex-prefix
+           #:by-prepending
+           #:if-none-matched
 
            #:build-adapter
            #:initialize-adapter))

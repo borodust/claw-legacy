@@ -1,41 +1,6 @@
 (cl:in-package :claw.cffi.c)
 
 
-(defun primitive->c (name)
-  (switch (name :test #'string=)
-    ("char" :char)
-    ("signed char" :char)
-    ("unsigned char" :unsigned-char)
-    ("short" :short)
-    ("unsigned short" :unsigned-short)
-    ("int" :int)
-    ("unsigned int" :unsigned-int)
-    ("long" :long)
-    ("unsigned long" :unsigned-long)
-    ("long long" :long-long)
-    ("unsigned long long" :unsigned-long-long)
-    ("float" :float)
-    ("double" :double)
-    ("long double" :long-double)
-    ("void" :void)
-    (t (c-name->lisp name))))
-
-
-(defun entity-typespec->cffi (typespec)
-  (if (listp typespec)
-      (let ((kind (first typespec))
-            (type (second typespec)))
-        (case kind
-          ((or :pointer :array) (list :pointer (entity-typespec->cffi type)))
-          (:enum (entity-typespec->cffi type))
-          (t (list kind (c-name->lisp type)))))
-      (primitive->c typespec)))
-
-
-(defun entity-type->cffi (entity)
-  (entity-typespec->cffi (claw.spec:foreign-entity-type entity)))
-
-
 (defun anonymous-p (entity)
   (not (claw.spec:foreign-entity-name entity)))
 
@@ -58,3 +23,39 @@
           (:struct (format nil "struct ~A" type))
           (:union (format nil "union ~A" type))))
       typespec))
+
+
+(defmethod generate-binding :around (entity &rest args &key)
+  "Generates dependency bindings first"
+  (labels ((%generate-bindings ()
+             (loop for dep-typespec
+                     in (claw.spec:foreign-entity-dependencies entity)
+                   for dep = (claw.spec:find-foreign-entity dep-typespec *spec*)
+                   if dep
+                     append (generate-binding dep)
+                   else
+                     collect (apply #'generate-forward-declaration-from-typespec
+                                    (ensure-list dep-typespec))))
+           (%generate-depenencies ()
+             (let* ((type (entity-type->cffi entity))
+                    (*dependency-type-list* (list* type *dependency-type-list*)))
+               (multiple-value-bind (existing-type present-p) (gethash type *visit-table*)
+                 ;; to prevent redefinitions and stack overflow for recursive deps
+                 (if present-p
+                     ;; but if we get here through recursive definitions
+                     ;; and type is still not defined we need to put forward decls
+                     (when (and (not existing-type)
+                              (not (gethash type *forward-declaration-table*))
+                              (member type (rest *dependency-type-list*) :test #'equal))
+                         (setf (gethash type *forward-declaration-table*) type)
+                         (list (apply #'generate-forward-declaration entity args)))
+                     (progn
+                       ;; register a visit
+                       (setf (gethash type *visit-table*) nil)
+                       (let ((deps (%generate-bindings)))
+                         (prog1 (append deps (call-next-method))
+                           (setf (gethash type *visit-table*) entity)))))))))
+    (check-duplicates entity)
+    (if (typep entity 'claw.spec:foreign-constant)
+        (call-next-method)
+        (%generate-depenencies))))

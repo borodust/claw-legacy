@@ -2,6 +2,6 @@
 
 
 (defmethod generate-binding ((entity claw.spec:foreign-constant) &key)
-  (let* ((name (c-name->lisp (claw.spec:foreign-entity-name entity)))
+  (let* ((name (c-name->lisp (claw.spec:foreign-entity-name entity) :constant))
          (value (claw.spec:foreign-constant-value entity)))
     (expand-constant name value)))

@@ -23,13 +23,13 @@
   (loop for param in (claw.spec:foreign-function-parameters function)
         for param-idx from 0
         collect (let* ((id (adapt-record-type (claw.spec:foreign-entity-type param)))
-                       (name (or (c-name->lisp
-                                  (claw.spec:foreign-entity-name param))
-                                 (c-name->lisp (format nil "~A~A" 'arg param-idx)))))
+                       (name (c-name->lisp (or (claw.spec:foreign-entity-name param)
+                                               (format nil "~A~A" 'arg param-idx))
+                                           :parameter)))
                   `(,name ,id))
           into adapted-parameters
         finally (return (if (returns-struct-p function)
-                            (list* `(,(c-name->lisp "result")
+                            (list* `(,(c-name->lisp "result" :parameter)
                                      ,(adapt-return-type function))
                                    adapted-parameters)
                             adapted-parameters))))

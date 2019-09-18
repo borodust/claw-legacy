@@ -13,13 +13,9 @@
 
            #:get-timestamp
 
+           #:parse-renaming-pipeline
            #:with-symbol-renaming
-           #:c-name->lisp
-           #:make-scanners
-           #:in-pipeline
-           #:by-changing
-           #:by-removing-prefixes
-           #:by-removing-complex-prefix))
+           #:c-name->lisp))
 (cl:in-package :claw.util)
 
 
@@ -28,7 +24,9 @@
                   *include-sources*
                   *exclude-sources*
                   *symbol-package*
-                  *symbol-renaming-pipeline*))
+                  *symbol-type*
+                  *symbol-renaming-pipeline*
+                  *hit-count*))
 
 
 (define-constant +byte-size+ 8)
@@ -60,7 +58,9 @@
       "arm-pc-linux-gnu")
   :test #'equal)
 
-
+;;;
+;;; PATH SEARCH
+;;;
 (defun %find-asdf-component-child (component child)
   (or (asdf:find-component component child)
       (error "Component ~S child not found: ~S"
@@ -97,47 +97,8 @@
         (path-or-asdf (append (list system) relative)))))
 
 ;;;
-;;; Filtering
+;;; INCLUDE PATHS
 ;;;
-(defun by-removing-prefix (prefix)
-  (list (format nil "^~A\\w+$" prefix)
-        (lambda (name)
-          (subseq name (length prefix)))))
-
-
-(defun by-removing-postfix (postfix)
-  (list (format nil "^\\w+~A$" postfix)
-        (lambda (name)
-          (subseq name 0 (- (length name) (length postfix))))))
-
-
-(defun by-removing-prefixes (&rest prefixes)
-  (flet ((by-prefix-length (this-prefix that-prefix)
-           (> (length this-prefix)
-              (length that-prefix))))
-    (mapcar #'by-removing-prefix (stable-sort prefixes #'by-prefix-length))))
-
-
-(defun by-removing-postfixes (&rest prefixes)
-  (flet ((by-postfix-length (this-prefix that-prefix)
-           (> (length this-prefix)
-              (length that-prefix))))
-    (mapcar #'by-removing-postfix (stable-sort prefixes #'by-postfix-length))))
-
-
-(defun by-changing (from to)
-  (list (list (format nil "^~A$" from)
-              (lambda (name) (declare (ignore name)) (string to)))))
-
-
-(defun in-pipeline (&rest processors)
-  (reduce #'append processors))
-
-
-(defun by-removing-complex-prefix (regex symbols-to-cut)
-  (list (list regex (lambda (name) (subseq name symbols-to-cut)))))
-
-
 (defun dump-gcc-include-paths (lang)
   (handler-case
       (let* ((command (format nil "echo | gcc -x~A -E -v -" lang))
@@ -182,29 +143,8 @@
     (t () "")))
 
 ;;;
-;;; Inclusion rules
+;;; EVALUATION
 ;;;
-(defun explicitly-included-p (name location)
-  (or (included-p name *include-definitions*)
-      (and (included-p location *include-sources*)
-           (not (included-p name *exclude-definitions*)))))
-
-(defun explicitly-excluded-p (name location)
-  (or (included-p name *exclude-definitions*)
-      (and (included-p location *exclude-sources*)
-           (not (included-p name *include-definitions*)))))
-
-(defun finally-included-p (name location)
-  (and (explicitly-included-p name location)
-       (not (explicitly-excluded-p name location))))
-
-(defun form-finally-included-p (form)
-  (let ((name (aval :name form))
-        (location (aval :location form)))
-    (and (explicitly-included-p name location)
-         (not (explicitly-excluded-p name location)))))
-
-
 (defmacro with-evaluated-lists ((&rest bindings) &body body)
   (let ((rebindings (loop for binding in bindings
                           collect (destructuring-bind (name &optional list)
@@ -225,7 +165,6 @@
 ;;;
 ;;; PLATFORM
 ;;;
-;; Arch
 (defvar *local-os* nil)
 (defvar *local-environment* nil)
 (defvar *local-cpu* nil)
@@ -275,28 +214,191 @@
                                   (nsubstitute #\- #\_ string)))))))
 
 
+;;;
+;;; RENAMING
+;;;
+(defun make-scanners (list)
+  (flet ((%to-scanner (regex-action)
+           (cons (ppcre:create-scanner (car regex-action)) (cdr regex-action))))
+    (mapcar #'%to-scanner list)))
+
+
+(defmacro with-symbol-renaming ((in-package renaming-pipeline) &body body)
+  `(let ((*symbol-renaming-pipeline* (make-scanners ,renaming-pipeline))
+         (*symbol-package* ,in-package))
+     ,@body))
+
+
+(defun pipeline-rename (name)
+  (loop with *hit-count* = 0
+        with string = (format nil "~A" name)
+        for scanner-action in *symbol-renaming-pipeline*
+        when (ppcre:scan-to-strings (car scanner-action) string)
+          do (setf string (funcall (cdr scanner-action) string)
+                   *hit-count* (1+ *hit-count*))
+        finally
+           (unless (stringp string)
+             (break "~A" string))
+           (return string)))
+
+
+(defun c-name->lisp (name &optional type)
+  (when name
+    (let* ((*symbol-package* (or *symbol-package* *package*))
+           (*symbol-type* type)
+           (name (pipeline-rename name)))
+      (default-c-name-to-lisp name (or *symbol-package* *package*)))))
+
+
+(defun %%by-removing-prefix (prefix)
+  (cons (format nil "^~A\\w+$" prefix)
+        (lambda (name)
+          (subseq name (length prefix)))))
+
+
+(defun %%by-removing-postfix (postfix)
+  (cons (format nil "^\\w+~A$" postfix)
+        (lambda (name)
+          (subseq name 0 (- (length name) (length postfix))))))
+
+
+(defun %by-removing-prefixes (&rest prefixes)
+  (flet ((by-prefix-length (this-prefix that-prefix)
+            (> (length this-prefix)
+               (length that-prefix))))
+    (mapcar #'%%by-removing-prefix (stable-sort prefixes #'by-prefix-length))))
+
+
+(defun by-removing-prefixes (configuration)
+  `(%by-removing-prefixes ,@configuration))
+
+
+(defun %by-removing-postfixes (&rest prefixes)
+  (flet ((by-postfix-length (this-prefix that-prefix)
+           (> (length this-prefix)
+              (length that-prefix))))
+    (mapcar #'%%by-removing-postfix (stable-sort prefixes #'by-postfix-length))))
+
+
+(defun by-removing-postfixes (configuration)
+  `(%by-removing-prefixes ,@configuration))
+
+
+(defun %by-changing (from to)
+  (list (cons (format nil "^~A$" from)
+              (lambda (name) (declare (ignore name)) (string to)))))
+
+
+(defun by-changing (configuration)
+  `(%by-chaning ,@configuration))
+
+
+(defun %switch-package (package)
+  (list (cons ".*" (lambda (name)
+                     (setf *symbol-package* package)
+                     name))))
+
+
+(defun switch-package (new-package)
+  `(%switch-package ',(first new-package)))
+
+
+(defun %except-for (types &rest pipelines)
+  (list (cons ".*" (lambda (name)
+                     (if (member *symbol-type* types :test #'eq)
+                         name
+                         (apply-pipeline pipelines name))))))
+
+
+(defun except-for (configuration)
+  (multiple-value-bind (types pipelines)
+      (loop for (type . rest) on configuration
+            while (keywordp type)
+            collect type into types
+            finally (return (values types (list* type rest))))
+    `(%except-for ',types ,@(collect-renaming-pipelines pipelines))))
+
+
+(defun %only-for (types &rest pipelines)
+  (list (cons ".*" (lambda (name)
+                     (if (member *symbol-type* types :test #'eq)
+                         (apply-pipeline pipelines name)
+                         name)))))
+
+
+(defun only-for (configuration)
+  (multiple-value-bind (types pipelines)
+      (loop for (type . rest) on configuration
+            while (keywordp type)
+            collect type into types
+            finally (return (values types (list* type rest))))
+    `(%only-for ',types ,@(collect-renaming-pipelines pipelines))))
+
+
+(defun apply-pipeline (processors name)
+  (let ((*symbol-renaming-pipeline* (reduce #'append processors)))
+    (pipeline-rename name)))
+
+
+(defun %in-pipeline (&rest processors)
+  (list (cons ".*" (lambda (name)
+                     (apply-pipeline processors name)))))
+
+
+(defun in-pipeline (configuration)
+  `(%in-pipeline ,@(collect-renaming-pipelines configuration)))
+
+
+(defun %by-removing-complex-prefix (regex symbols-to-cut)
+  (list (cons regex (lambda (name) (subseq name symbols-to-cut)))))
+
+
+(defun by-removing-complex-prefix (configuration)
+  `(%by-removing-complex-prefx ,@configuration))
+
+
+(defun %by-prepending (prefix)
+  (list (cons ".*" (lambda (name) (concatenate 'string prefix name)))))
+
+
+(defun by-prepending (configuration)
+  `(%by-prepending ,@configuration))
+
+
+(defun %if-none-matched (&rest processors)
+  (list (cons ".*" (lambda (name)
+                     (if (zerop *hit-count*)
+                         (apply-pipeline processors name)
+                         name)))))
+
+
+(defun if-none-matched (configuration)
+  `(%if-none-matched ,@(collect-renaming-pipelines configuration)))
+
+
+(defun collect-renaming-pipelines (configuration)
+  (loop for description in configuration
+        collect (parse-renaming-pipeline description)))
+
+
+(defun parse-renaming-pipeline (description)
+  (let ((descriptor (first description)))
+    (funcall
+     (eswitch (descriptor :test #'string=)
+       ('in-pipeline #'in-pipeline)
+       ('by-changing #'by-changing)
+       ('by-removing-prefixes #'by-removing-prefixes)
+       ('by-removing-complex-prefix #'by-removing-complex-prefix)
+       ('by-prepending #'by-prepending)
+       ('switch-package #'switch-package)
+       ('if-none-matched #'if-none-matched)
+       ('except-for #'except-for)
+       ('only-for #'only-for))
+     (rest description))))
+
+
+;;;
+;;; VARIOUS
+;;;
 (defun get-timestamp ()
   (local-time:format-timestring nil (local-time:now) :timezone local-time:+utc-zone+))
-
-
-(defun c-name->lisp (name)
-  (when name
-    (loop with string = (format nil "~A" name)
-          for r in *symbol-renaming-pipeline*
-          when (ppcre:scan-to-strings (car r) string)
-            do (setf string (funcall (cdr r) string))
-          finally (return (default-c-name-to-lisp string
-                                                  (or *symbol-package* *package*))))))
-
-
-(defun make-scanners (list)
-  (mapcar (lambda (x)
-            (cons (ppcre:create-scanner (first x))
-                  (second x)))
-          list))
-
-
-(defmacro with-symbol-renaming ((package renaming-pipeline) &body body)
-  `(let ((*symbol-renaming-pipeline* (make-scanners ,renaming-pipeline))
-         (*symbol-package* ,package))
-     ,@body))

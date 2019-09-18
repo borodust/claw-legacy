@@ -51,32 +51,26 @@
   (:method (entity) (declare (ignore entity))))
 
 
-(defun find-foreign-entity-dependencies (entity &optional spec)
-  (let ((*library-specification* (or spec *library-specification*)))
-    (foreign-entity-dependencies entity)))
-
-
 (defun %find-dependency (typespec)
-  (find-foreign-entity (extract-entity-type typespec)))
+  (extract-entity-type typespec))
 
 
 (defun %find-entity-dependency (entity)
-  (%find-dependency (extract-entity-type (foreign-entity-type entity))))
+  (%find-dependency (foreign-entity-type entity)))
 
 
 (defmethod foreign-entity-dependencies ((type foreign-alias))
-  (when-let ((dependency (%find-dependency (foreign-alias-type type))))
-    (list dependency)))
+  (list (%find-dependency (foreign-alias-type type))))
 
 
 (defmethod foreign-entity-dependencies ((type foreign-function))
-  (remove-if #'null (list* (%find-dependency (foreign-function-return-type type))
-                           (mapcar #'%find-entity-dependency
-                                   (foreign-function-parameters type)))))
+  (list* (%find-dependency (foreign-function-return-type type))
+         (mapcar #'%find-entity-dependency
+                 (foreign-function-parameters type))))
 
 
 (defmethod foreign-entity-dependencies ((type foreign-record))
-  (remove-if #'null (mapcar #'%find-entity-dependency (foreign-record-fields type))))
+  (mapcar #'%find-entity-dependency (foreign-record-fields type)))
 
 ;;;
 ;;; FILTERING
@@ -152,30 +146,34 @@
 
 
 (defmethod try-including-entity ((entity foreign-alias))
-  (prog1
-      (when (entity-explicitly-included-p entity)
-        (mark-included entity)
-        t)
-    (transfer-inclusion-status entity
-                               (find-foreign-entity (find-base-alias-type entity)))))
+  (prog1 (when (entity-explicitly-included-p entity)
+           (mark-included entity)
+           t)
+    ;; when nil - probably a forward reference
+    (when-let ((dep (find-foreign-entity (find-base-alias-type entity))))
+      (transfer-inclusion-status entity dep))))
+
+
+(defun weakly-include-dependencies (entity)
+  (loop for dep-typespec in (foreign-entity-dependencies entity)
+        for dep = (find-foreign-entity dep-typespec)
+        when dep
+          do (if (anonymous-p dep)
+                 (mark-included dep)
+                 (unless (entity-included-p dep)
+                   (mark-weakly-included dep)
+                   (try-including-entity dep)))))
 
 
 (defmethod try-including-entity ((entity foreign-record))
   (when (call-next-method)
-    (loop for dep in (foreign-entity-dependencies entity)
-          if (anonymous-p dep)
-            do (mark-included dep)
-          else
-            unless (entity-included-p dep)
-              do (mark-weakly-included dep)
-                 (try-including-entity dep))
+    (weakly-include-dependencies entity)
     t))
 
 
 (defmethod try-including-entity ((entity foreign-function))
   (when (call-next-method)
-    (loop for dep in (foreign-entity-dependencies entity)
-          do (mark-weakly-included dep))
+    (weakly-include-dependencies entity)
     t))
 
 

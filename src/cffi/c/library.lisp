@@ -3,32 +3,28 @@
 
 (defgeneric generate-binding (entity &key &allow-other-keys))
 (defgeneric generate-forward-declaration (entity &key &allow-other-keys))
+(defgeneric generate-forward-declaration-from-typespec (kind &optional name &rest opts))
 
-
-(defmethod generate-binding :around (entity &rest args &key)
-  "Generates dependency bindings first"
-  (let* ((type (claw.spec:foreign-entity-type entity))
-         (*dependency-type-list* (list* type *dependency-type-list*)))
-    (multiple-value-bind (existing-type present-p) (gethash type *visit-table*)
-      ;; to prevent redefinitions and stack overflow for recursive deps
-      (if present-p
-          ;; but if we get here through recursive definitions
-          ;; and type is still not defined we need to put forward decls
-          (progn
-            (when (and (not existing-type)
-                       (not (gethash type *forward-declaration-table*))
-                       (member type (rest *dependency-type-list*) :test #'equal))
-              (setf (gethash type *forward-declaration-table*) type)
-              (list (apply #'generate-forward-declaration entity args))))
-          (progn
-            ;; register a visit
-            (setf (gethash type *visit-table*) nil)
-            (let ((deps (loop
-                          for dep in (claw.spec:find-foreign-entity-dependencies entity
-                                                                                 *spec*)
-                          append (generate-binding dep))))
-              (prog1 (append deps (call-next-method))
-                (setf (gethash type *visit-table*) entity))))))))
+(defun check-duplicates (entity)
+  (flet ((%aliased-types-p (this that)
+           (or (claw.spec:aliases-type-p this
+                                         (claw.spec:foreign-entity-type that)
+                                         *spec*)
+               (claw.spec:aliases-type-p that
+                                         (claw.spec:foreign-entity-type this)
+                                         *spec*)))
+         (%constant-p (entity)
+           (typep entity 'claw.spec:foreign-constant)))
+    (let ((cffi-type (entity-type->cffi entity)))
+      (when-let ((existing-entity (gethash cffi-type *visit-table*)))
+        (when (and (not (equal (claw.spec:foreign-entity-name existing-entity)
+                               (claw.spec:foreign-entity-name entity)))
+                   (or (and (%constant-p entity) (%constant-p existing-entity))
+                       (and (not (%aliased-types-p entity existing-entity))
+                            (not (or (%constant-p entity)
+                                     (%constant-p existing-entity))))))
+          (error "Entity for type ~S already registered.~&Previous:~&~A~&New:~&~A"
+                 cffi-type existing-entity entity))))))
 
 
 (defmethod claw.wrapper:expand-library-definition ((generator (eql :claw/cffi))
@@ -39,7 +35,7 @@
                  (claw.wrapper:wrapper-specification wrapper))))
     (unless *spec*
       (error "No specification defined for current paltform ~A" (local-platform)))
-    (destructuring-bind (&key in-package rename-symbols trim-enum-prefix with-adapter)
+    (destructuring-bind (&key in-package symbolicate-names trim-enum-prefix with-adapter)
         configuration
       (let ((in-package (eval in-package))
             (*trim-enum-prefix-p* (eval trim-enum-prefix))
@@ -55,11 +51,12 @@
                                (:dynamic (make-dynamic-adapter wrapper
                                                                adapter-path)))))))
             (*export-table* (make-hash-table))
-            (rename-symbols (eval rename-symbols))
+            (rename-symbols (eval (parse-renaming-pipeline symbolicate-names)))
             (bindings (list)))
         (with-symbol-renaming (in-package rename-symbols)
           (claw.spec:do-foreign-entities (entity *spec*)
             (let ((*dependency-type-list* nil))
+              (check-duplicates entity)
               (loop for bing in (generate-binding entity)
                     do (push bing bindings))))
           (when *adapter*
@@ -67,6 +64,6 @@
           `(progn
              ,@(nreverse bindings)
              ,@(loop for symbol being the hash-key of *export-table*
-                     collect `(export ',symbol ,(or in-package (package-name *package*))))
+                     collect `(export ',symbol ,(package-name (symbol-package symbol))))
              ,@(when *adapter*
                  (expand-adapter-routines *adapter* wrapper))))))))
