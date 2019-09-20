@@ -13,4 +13,7 @@
   :in-package :%libctest
   :trim-enum-prefix t
   :with-adapter :dynamic
+  :recognize-strings t
+  :override-types ((:pointer claw-utils:claw-pointer)
+                   (:string claw-utils:claw-string))
   :symbolicate-names (:by-removing-prefixes "tst_" "TST_"))

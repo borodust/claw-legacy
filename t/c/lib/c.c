@@ -39,7 +39,7 @@ struct tst_node_t tst_create_colored_node(union tst_color_t color) {
   return node;
 }
 
-struct tst_node_t tst_create_named_node(char* name) {
+struct tst_node_t tst_create_named_node(char name[TST_NAME_MAX_LENGTH]) {
   struct tst_node_t node;
   node.children = NULL;
   node.child_count = 0;

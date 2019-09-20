@@ -96,7 +96,7 @@
   :author "Pavel Korolev"
   :license "BSD-2-Clause"
   :version "1.0"
-  :depends-on (:cffi :claw :fiveam :cffi-c-ref)
+  :depends-on (:cffi :claw :fiveam :cffi-c-ref :claw-utils)
   :pathname "t/"
   :serial t
   :components ((:file "packages")

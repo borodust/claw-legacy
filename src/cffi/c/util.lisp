@@ -8,7 +8,10 @@
                   *dependency-list*
                   *trim-enum-prefix-p*
                   *adapter*
-                  *export-table*))
+                  *export-table*
+                  *pointer-type*
+                  *recognize-strings-p*
+                  *override-table*))
 
 
 (define-constant +adapted-variable-prefix+ "__v_claw_"
@@ -27,6 +30,10 @@
 
 (defun export-symbol (symbol)
   (setf (gethash symbol *export-table*) symbol))
+
+
+(defun get-overriden-type (type)
+  (gethash type *override-table* type))
 
 
 (defun primitive->c (name)
@@ -54,10 +61,13 @@
       (let ((kind (first typespec))
             (type (second typespec)))
         (case kind
-          ((or :pointer :array) (list :pointer (entity-typespec->cffi type)))
+          ((or :pointer :array)
+           (if (and *recognize-strings-p* (equal type "char"))
+               (get-overriden-type :string)
+               (list (get-overriden-type kind) (entity-typespec->cffi type))))
           (:enum (entity-typespec->cffi type))
-          (t (list kind (c-name->lisp type :type)))))
-      (primitive->c typespec)))
+          (t (list (get-overriden-type kind) (c-name->lisp type :type)))))
+      (get-overriden-type (primitive->c typespec))))
 
 
 (defun entity-type->cffi (entity)

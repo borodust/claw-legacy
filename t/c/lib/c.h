@@ -79,7 +79,7 @@ void tst_destroy_tree(tst_tree_t* tree);
 
 struct tst_node_t tst_create_colored_node(union tst_color_t);
 
-struct tst_node_t tst_create_named_node(char* name);
+struct tst_node_t tst_create_named_node(char name[TST_NAME_MAX_LENGTH]);
 
 void tst_destroy_node(struct tst_node_t node);
 

@@ -4,18 +4,18 @@
 (declaim (special *values*))
 
 (5am:test version
-  (5am:is (equal "1.0.0" (cffi:foreign-string-to-lisp (%libctest:version-string)))))
+  (5am:is (equal "1.0.0" (cffi:foreign-string-to-lisp
+                          (%libctest:version-string)))))
 
 
 (5am:test named-node-creation
   (c-let ((node (:struct %libctest:node-t) :alloc t))
-    (cffi:with-foreign-string (var "YO")
-      (%libctest:create-named-node (node &) var))
+    (%libctest:create-named-node (node &) "YO")
     (unwind-protect
          (5am:is (equal "YO"
                         (cffi:foreign-string-to-lisp
-                         (node (:data (:pointer (:struct %libctest:named-node-t)))
-                               * :name &))))
+                         (node (:data (:pointer (:struct %libctest:named-node-t))) *
+                               :name &))))
       (%libctest:destroy-node (node &)))))
 
 
@@ -35,7 +35,8 @@
 
 (cffi:defcallback visit-node :void ((node-ptr (:pointer (:struct %libctest:node-t))))
   (push (ecase (%libctest:get-node-kind node-ptr)
-          (:named (cffi:foreign-string-to-lisp (%libctest:get-node-name node-ptr)))
+          (:named (cffi:foreign-string-to-lisp
+                   (%libctest:get-node-name node-ptr)))
           (:colored (c-with ((color (:union %libctest:color-t)))
                       (%libctest:get-node-color (color &) node-ptr)
                       (list (color :component :r)
@@ -46,10 +47,9 @@
 
 
 (5am:test tree-manipulation
-  (let ((root (cffi:with-foreign-string (str "ROOT")
-                (%libctest:create-named-node (cffi:foreign-alloc
-                                              '(:struct %libctest:node-t))
-                                             str))))
+  (let ((root (%libctest:create-named-node (cffi:foreign-alloc
+                                            '(:struct %libctest:node-t))
+                                           "ROOT")))
     (c-let ((tree %libctest:tree-t :from (%libctest:create-tree root)))
       (unwind-protect
            (progn

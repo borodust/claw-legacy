@@ -27,6 +27,13 @@
                  cffi-type existing-entity entity))))))
 
 
+(defun parse-overrides (configuration)
+  (loop with override-table = (make-hash-table :test 'equal)
+        for (cffi-type new-type) in configuration
+        do (setf (gethash cffi-type override-table) new-type)
+        finally (return override-table)))
+
+
 (defmethod claw.wrapper:expand-library-definition ((generator (eql :claw/cffi))
                                                    (language (eql :c))
                                                    wrapper
@@ -35,7 +42,12 @@
                  (claw.wrapper:wrapper-specification wrapper))))
     (unless *spec*
       (error "No specification defined for current paltform ~A" (local-platform)))
-    (destructuring-bind (&key in-package symbolicate-names trim-enum-prefix with-adapter)
+    (destructuring-bind (&key in-package
+                           symbolicate-names
+                           trim-enum-prefix
+                           with-adapter
+                           recognize-strings
+                           override-types)
         configuration
       (let ((in-package (eval in-package))
             (*trim-enum-prefix-p* (eval trim-enum-prefix))
@@ -51,6 +63,8 @@
                                (:dynamic (make-dynamic-adapter wrapper
                                                                adapter-path)))))))
             (*export-table* (make-hash-table))
+            (*override-table* (parse-overrides override-types))
+            (*recognize-strings-p* recognize-strings)
             (rename-symbols (eval (parse-renaming-pipeline symbolicate-names)))
             (bindings (list)))
         (with-symbol-renaming (in-package rename-symbols)
