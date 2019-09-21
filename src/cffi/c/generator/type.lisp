@@ -18,7 +18,7 @@
         (ecase kind
           (:pointer (format nil "~A*" (typespec->c type)))
           (:array (if count
-                      (format nil "~A[~A]" type count)))
+                      (format nil "~A[~A]" (typespec->c type) count)))
           (:enum (format nil "enum ~A" type))
           (:struct (format nil "struct ~A" type))
           (:union (format nil "union ~A" type))))
@@ -56,6 +56,7 @@
                          (prog1 (append deps (call-next-method))
                            (setf (gethash type *visit-table*) entity)))))))))
     (check-duplicates entity)
-    (if (typep entity 'claw.spec:foreign-constant)
+    (if (or (typep entity 'claw.spec:foreign-constant)
+            (typep entity 'claw.spec:foreign-extern))
         (call-next-method)
         (%generate-depenencies))))

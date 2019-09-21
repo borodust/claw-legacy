@@ -21,12 +21,6 @@
                                   params
                                   variadic-p
                                   storage-class)
-  "=> FOREIGN-FUNCTION
-
-Define a foreign function given a lisp symbol, C symbol (as a string),
-return type and parameters.  Note this just defines to SFFI what the
-foreign function looks like .. it doesn't actually DEFUN something to
-call it.  "
   (let ((fun (make-instance 'foreign-function
                             :name name
                             :location location
@@ -40,24 +34,35 @@ call it.  "
 
 
 (defun parse-parameters (params)
-  (loop for param in params
-        collect (alist-bind (name type) param
-                  (make-instance 'foreign-parameter
+  (loop with variadic-p = nil
+        for param in params
+        for name = (aval :name param)
+        for type = (aval :type param)
+        for parsed-type = (parse-form type (aval :tag type))
+        for basic-type = (find-basic-type parsed-type)
+        if (equal "va_list" basic-type)
+          do (setf variadic-p t)
+        else
+          collect (make-instance 'foreign-parameter
                                  :name (unless (emptyp name)
                                          name)
-                                 :type (parse-form type (aval :tag type))))))
+                                 :type parsed-type)
+            into parsed-parameters
+        finally (return (values parsed-parameters variadic-p))))
 
 
 (defmethod parse-form (form (tag (eql :function)))
   (alist-bind (name inline parameters return-type variadic location storage-class) form
     (unless inline
-      (foreign-entity-type
-       (register-foreign-function name
-                                  location
-                                  (parse-form return-type (aval :tag return-type))
-                                  (parse-parameters parameters)
-                                  variadic
-                                  storage-class)))))
+      (multiple-value-bind (params variadic-p)
+          (parse-parameters parameters)
+        (foreign-entity-type
+         (register-foreign-function name
+                                    location
+                                    (parse-form return-type (aval :tag return-type))
+                                    params
+                                    (or variadic-p variadic)
+                                    storage-class))))))
 
 
 (defmethod parse-form (form (tag (eql :function-pointer)))
@@ -83,4 +88,49 @@ call it.  "
 
 
 (defmethod compose-entity-reference ((this foreign-function))
-  (alist :tag ":function-pointer"))
+  (alist :tag ":pointer"))
+
+
+(defmethod foreign-entity-dependencies ((type foreign-function))
+  (cleanup-dependencies
+   (list* (%find-dependency (foreign-function-return-type type))
+          (mapcar #'%find-entity-dependency
+                  (foreign-function-parameters type)))))
+
+
+(defmethod try-including-entity ((entity foreign-function))
+  (when (call-next-method)
+    (loop for dep-typespec in (foreign-entity-dependencies entity)
+          for dep = (find-foreign-entity dep-typespec)
+          unless (marked-strongly-included-p dep)
+            do (if (anonymous-p dep)
+                   (progn
+                     (mark-included dep t)
+                     (try-including-entity dep))
+                   (unless (marked-strongly-partially-included-p dep)
+                     (mark-partially-included dep t)
+                     (try-including-entity dep))))
+    t))
+
+
+(defun optimize-parameters (parameters)
+  (loop for parameter in parameters
+        for type = (optimize-typespec (foreign-entity-type parameter))
+        unless type
+          do (error "~S was optimized away where shouldn't"
+                    (foreign-entity-type parameter))
+        collect (make-instance 'foreign-parameter
+                               :name (foreign-entity-name parameter)
+                               :type type)))
+
+
+(defmethod optimize-entity ((this foreign-function))
+  (when (marked-included-p this)
+    (make-instance 'foreign-function
+                   :name (foreign-entity-name this)
+                   :location (foreign-entity-location this)
+                   :type (foreign-entity-type this)
+                   :return-type (optimize-typespec (foreign-function-return-type this))
+                   :storage-class (foreign-function-storage-class this)
+                   :variadic-p (foreign-function-variadic-p this)
+                   :parameters (optimize-parameters (foreign-function-parameters this)))))

@@ -7,6 +7,11 @@
 (defclass foreign-primitive (aligned foreign-entity) ())
 
 
+(defmethod primitivep ((this foreign-primitive))
+  (declare (ignore this))
+  t)
+
+
 (defun %to-primitive-name (name)
   (ppcre:regex-replace-all "\\s+" name "-"))
 
@@ -37,13 +42,13 @@
 
 
 (defmethod compose-form ((this foreign-primitive))
-  (alist :tag (foreign-entity-name this)
+  (alist :tag (%to-primitive-name (foreign-entity-name this))
          :bit-size (foreign-entity-bit-size this)
          :bit-alignment (foreign-entity-bit-alignment this)))
 
 
 (defmethod compose-entity-reference ((this foreign-primitive))
-  (alist :tag (format nil ":~A" (foreign-entity-name this))))
+  (alist :tag (format nil ":~A" (%to-primitive-name (foreign-entity-name this)))))
 
 
 (defmethod parse-form (form (tag (eql :char)))
@@ -115,6 +120,14 @@
   (register-primitive-type-renaming form ":long double"))
 
 
+(defmethod parse-form (form (tag (eql :__builtin_va_list)))
+  (register-primitive-type-renaming form ":va_list"))
+
+
+(defmethod parse-form (form (tag (eql :va_list)))
+  (register-primitive-type-renaming form ":va_list"))
+
+
 (defmethod compose-type-reference (type-group (tag (eql :void)) &rest type-args)
   (declare (ignore type-group type-args))
   (alist :tag ":void"))
@@ -146,3 +159,7 @@
          :name (foreign-entity-name this)
          :location (foreign-entity-location this)
          :value (foreign-constant-value this)))
+
+
+(defmethod optimize-entity ((entity foreign-primitive))
+  entity)

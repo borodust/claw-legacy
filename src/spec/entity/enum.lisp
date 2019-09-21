@@ -55,3 +55,13 @@ by ID."
   (alist :tag ":enum"
          :id (foreign-entity-id this)
          :name (foreign-entity-name this)))
+
+
+(defmethod try-including-entity ((entity foreign-enum))
+  (if (call-next-method)
+      (prog1 t
+        (mark-included entity))
+      (when (loop for (key . value) in (foreign-enum-values entity)
+                    thereis (explicitly-included-p key (foreign-entity-location entity)))
+        (mark-included entity)
+        t)))

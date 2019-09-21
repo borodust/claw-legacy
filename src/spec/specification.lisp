@@ -2,6 +2,7 @@
 
 (declaim (special *library-specification*))
 
+(defgeneric optimize-entity (entity))
 
 (defgeneric entity-constant-p (entity)
   (:method (entity) (declare (ignore entity)) nil))
@@ -118,6 +119,45 @@
 (defun find-specification-for-current-platform (library-container)
   (with-slots (platform-table) library-container
     (gethash (local-platform) platform-table)))
+
+
+(defun make-inclusion-table (spec
+                             include-definitions
+                             include-sources
+                             exclude-definitions
+                             exclude-sources)
+  (let ((*library-specification* spec)
+        (*inclusion-table* (make-hash-table :test 'equal))
+        (*include-definitions* include-definitions)
+        (*exclude-definitions* exclude-definitions)
+        (*include-sources* include-sources)
+        (*exclude-sources* exclude-sources))
+    (do-foreign-entities (entity spec)
+      (if (primitivep entity)
+          (mark-included entity t)
+          (if (entity-explicitly-excluded-p entity)
+              (mark-excluded entity)
+              (try-including-entity entity))))
+    *inclusion-table*))
+
+
+(defun optimize-specification (spec
+                               include-definitions
+                               include-sources
+                               exclude-definitions
+                               exclude-sources)
+  (let* ((*library-specification* spec)
+         (*inclusion-table* (make-inclusion-table *library-specification*
+                                                  include-definitions
+                                                  include-sources
+                                                  exclude-definitions
+                                                  exclude-sources))
+         (optimized-spec (make-instance 'library-specification)))
+    (do-foreign-entities (entity *library-specification*)
+      (when-let ((optimized-entity (optimize-entity entity)))
+        (let ((entity-type (foreign-entity-type optimized-entity)))
+          (register-foreign-entity entity-type optimized-entity optimized-spec))))
+    optimized-spec))
 
 
 (defun describe-foreign-library (name headers &key spec-path

@@ -117,6 +117,63 @@ appropriate."
            (register-foreign-record id name location type
                                     bit-size bit-alignment
                                     (parse-fields fields)))))))
+
+
+(defmethod foreign-entity-dependencies ((type foreign-record))
+  (cleanup-dependencies
+   (mapcar #'%find-entity-dependency (foreign-record-fields type))))
+
+
+(defmethod try-including-entity ((entity foreign-record))
+  (when (call-next-method)
+    (unless (marked-partially-included-p entity)
+      (loop for dep-typespec in (foreign-entity-dependencies entity)
+            for dep = (find-foreign-entity dep-typespec)
+            when dep
+              do (if (anonymous-p dep)
+                     (unless (marked-strongly-included-p dep)
+                       (mark-included dep t)
+                       (try-including-entity dep))
+                     (unless (marked-included-p dep)
+                       (mark-partially-included dep)
+                       (try-including-entity dep)))))
+    t))
+
+
+(defun optimize-fields (fields)
+  (loop for field in fields
+        for type = (optimize-typespec (foreign-entity-type field))
+        when type
+          collect (make-instance 'foreign-record-field
+                                 :name (foreign-entity-name field)
+                                 :type type
+                                 :bit-size (foreign-entity-bit-size field)
+                                 :bit-alignment (foreign-entity-bit-alignment field)
+                                 :bit-offset (foreign-record-field-bit-offset field)
+                                 :bitfield-p (foreign-record-field-bitfield-p field)
+                                 :bit-width (foreign-record-field-bit-width field))))
+
+
+(defmethod optimize-entity ((entity foreign-record))
+  (let ((inclusion-status (find-entity-inclusion-status entity)))
+    (when (inclusion-status-included-p inclusion-status)
+      (if (inclusion-status-partially-p inclusion-status)
+          (make-instance (class-of entity)
+                         :id (foreign-entity-id entity)
+                         :name (foreign-entity-name entity)
+                         :location (foreign-entity-location entity)
+                         :type (foreign-entity-type entity)
+                         :bit-size (foreign-entity-bit-size entity)
+                         :bit-alignment (foreign-entity-bit-alignment entity))
+          (make-instance (class-of entity)
+                         :id (foreign-entity-id entity)
+                         :name (foreign-entity-name entity)
+                         :location (foreign-entity-location entity)
+                         :type (foreign-entity-type entity)
+                         :bit-size (foreign-entity-bit-size entity)
+                         :bit-alignment (foreign-entity-bit-alignment entity)
+                         :fields (optimize-fields (foreign-record-fields entity)))))))
+
 ;;;
 ;;; STRUCTS
 ;;;

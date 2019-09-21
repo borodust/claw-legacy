@@ -49,18 +49,6 @@
            (not (included-p name *include-definitions*)))))
 
 
-(defun finally-included-p (name location)
-  (and (explicitly-included-p name location)
-       (not (explicitly-excluded-p name location))))
-
-
-(defun form-finally-included-p (form)
-  (let ((name (aval :name form))
-        (location (aval :location form)))
-    (and (explicitly-included-p name location)
-         (not (explicitly-excluded-p name location)))))
-
-
 (defun keywordify (tag)
   (let* ((tag (if (eq #\: (aref tag 0)) (subseq tag 1) tag)))
     (make-keyword (uiop:standard-case-symbol-name tag))))

@@ -21,6 +21,7 @@
                (:file "util")
                (:file "json")
                (:file "c2ffi")
+               (:file "inclusion")
                (:file "specification")
                (:module entity
                 :serial t
@@ -32,8 +33,7 @@
                              (:file "enum")
                              (:file "record")
                              (:file "function")
-                             (:file "extern")))
-               (:file "optimize")))
+                             (:file "extern")))))
 
 
 (asdf:defsystem :claw/wrapper
@@ -61,6 +61,7 @@
   :serial t
   :components ((:file "packages")
                (:file "util")
+               (:file "compat")
                (:module generator
                 :serial t
                 :components ((:file "type")

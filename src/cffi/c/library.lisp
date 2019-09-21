@@ -28,10 +28,11 @@
 
 
 (defun parse-overrides (configuration)
-  (loop with override-table = (make-hash-table :test 'equal)
-        for (cffi-type new-type) in configuration
-        do (setf (gethash cffi-type override-table) new-type)
-        finally (return override-table)))
+  (let ((override-table (make-hash-table :test 'equal)))
+    (setf (gethash :long-double override-table) 'long-double)
+    (loop for (cffi-type new-type) in configuration
+          do (setf (gethash cffi-type override-table) new-type)
+          finally (return override-table))))
 
 
 (defmethod claw.wrapper:expand-library-definition ((generator (eql :claw/cffi))

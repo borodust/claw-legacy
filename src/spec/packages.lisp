@@ -15,6 +15,7 @@
            #:foreign-entity-bit-size
            #:foreign-entity-bit-alignment
            #:foreign-entity-dependencies
+           #:find-basic-type
 
            #:foreign-primitive
 

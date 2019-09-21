@@ -236,10 +236,7 @@
         when (ppcre:scan-to-strings (car scanner-action) string)
           do (setf string (funcall (cdr scanner-action) string)
                    *hit-count* (1+ *hit-count*))
-        finally
-           (unless (stringp string)
-             (break "~A" string))
-           (return string)))
+        finally (return string)))
 
 
 (defun c-name->lisp (name &optional type)
@@ -319,6 +316,16 @@
     `(%except-for ',types ,@(collect-renaming-pipelines pipelines))))
 
 
+(defun %by-replacing (regex replacement)
+  (list (cons regex (lambda (name)
+                      (ppcre:regex-replace-all regex name replacement)))))
+
+
+(defun by-replacing (configuration)
+  (destructuring-bind (regex replacement) configuration
+   `(%by-replacing ,regex ,replacement)))
+
+
 (defun %only-for (types &rest pipelines)
   (list (cons ".*" (lambda (name)
                      (if (member *symbol-type* types :test #'eq)
@@ -382,11 +389,12 @@
 
 
 (defun parse-renaming-pipeline (description)
-  (let ((descriptor (first description)))
+  (when-let ((descriptor (first description)))
     (funcall
      (eswitch (descriptor :test #'string=)
        ('in-pipeline #'in-pipeline)
        ('by-changing #'by-changing)
+       ('by-replacing #'by-replacing)
        ('by-removing-prefixes #'by-removing-prefixes)
        ('by-removing-complex-prefix #'by-removing-complex-prefix)
        ('by-prepending #'by-prepending)

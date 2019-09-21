@@ -66,8 +66,14 @@
                                              type-name
                                              (or (claw.spec:foreign-entity-name param)
                                                  (format nil "arg~A" i)))
+                               into params
                            else
-                             collect type-name))
+                             collect type-name
+                               into params
+                           finally (return
+                                     (if (claw.spec:foreign-function-variadic-p function)
+                                         (append params (list "..."))
+                                         params))))
          (param-string (format nil "~{~A~^, ~}" parameters)))
     (format stream control-string
             (typespec->c (claw.spec:foreign-function-return-type function))
@@ -138,4 +144,6 @@
     (export-symbol id)
     `((cffi:defcfun (,c-name ,id) ,return-type
         ,(format-function-declaration "~A ~A(~A);" entity :collect-names t)
-        ,@params))))
+        ,@params
+        ,@(when (claw.spec:foreign-function-variadic-p entity)
+            (list 'cl:&rest))))))

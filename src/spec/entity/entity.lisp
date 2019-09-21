@@ -1,9 +1,6 @@
 (cl:in-package :claw.spec)
 
 
-(defvar *tag* nil)
-
-
 (defgeneric compose-entity-reference (entity)
   (:documentation "Compose FORM referencing a type from entity"))
 
@@ -25,6 +22,57 @@
    (location :initarg :location :initform nil :reader foreign-entity-location
              :type (or null string))
    (type :initarg :type :initform (error ":type missing") :reader foreign-entity-type)))
+
+
+(defgeneric foreign-entity-basic-type (entity &optional spec)
+  (:method ((this foreign-entity) &optional spec)
+    (declare (ignore spec))
+    (foreign-entity-type this)))
+
+
+(defgeneric foreign-entity-dependencies (entity)
+  (:method (entity) (declare (ignore entity))))
+
+
+(defun cleanup-dependencies (list)
+  (flet ((%null-or-void (element)
+           (or (null element) (eq :void element))))
+    (remove-if #'%null-or-void list)))
+
+
+(defmethod optimize-entity (entity)
+  (when (inclusion-status-included-p (find-entity-inclusion-status entity))
+    entity))
+
+
+(defun find-basic-type (typespec &optional (spec *library-specification*))
+  (let ((typespec-list (ensure-list typespec)))
+    (case (first typespec-list)
+      ((or :pointer :array) (list* (first typespec-list)
+                                   (find-basic-type (second typespec-list) spec)
+                                   (cddr typespec-list)))
+      (t (foreign-entity-basic-type (find-foreign-entity typespec spec) spec)))))
+
+
+(defun optimize-typespec (typespec &optional (spec *library-specification*))
+  (let ((base-type (extract-base-type typespec)))
+    (if (inclusion-status-included-p (find-inclusion-status base-type))
+        typespec
+        (let ((basic-type (find-basic-type typespec spec)))
+          (if (equal typespec basic-type)
+              (case (first (ensure-list basic-type))
+                ((or :pointer :array) (list :pointer :void))
+                (t nil))
+              (optimize-typespec basic-type))))))
+
+
+(defmethod try-including-entity ((entity foreign-entity))
+  (if (and (entity-explicitly-included-p entity)
+           (not (entity-explicitly-excluded-p entity)))
+      (prog1 t
+        (mark-included entity t))
+      (when (marked-included-p entity)
+        t)))
 
 
 (defmethod foreign-entity-name ((object symbol))
@@ -59,6 +107,7 @@
     (error "Failed to compose type reference and find an enity of ~S kind with name ~S"
            type-group type-name)))
 
+
 (defun compose-reference (type)
   (if (listp type)
       (apply #'compose-type-reference type)
@@ -69,8 +118,17 @@
   (and tag (not (emptyp tag)) (equal #\: (aref tag 0))))
 
 
-(defun extract-entity-type (typespec)
+(defun extract-base-type (typespec)
   (let ((typespec-list (ensure-list typespec)))
     (case (first typespec-list)
-      ((or :pointer :array) (extract-entity-type (second typespec-list)))
+      ((or :pointer :array) (extract-base-type (second typespec-list)))
+      (nil :void)
       (t typespec))))
+
+
+(defun %find-dependency (typespec)
+  (extract-base-type typespec))
+
+
+(defun %find-entity-dependency (entity)
+  (%find-dependency (foreign-entity-type entity)))
