@@ -7,27 +7,6 @@
                   *include-sources*
                   *exclude-sources*))
 
-;; alists
-
-(declaim (inline akey aval (setf aval)))
-(defun akey (val alist &key (test 'eql)) (car (rassoc val alist :test test)))
-(defun aval (key alist &key (test 'eql)) (cdr (assoc key alist :test test)))
-(defun (setf aval) (value key alist &key (test 'eql))
-  (setf (cdr (assoc key alist :test test)) value))
-
-(defmacro alist-bind ((&rest vars) alist &body body)
-  (once-only (alist)
-    `(let (,@(mapcar (lambda (x)
-                       (if (consp x)
-                           `(,(car x) (aval ,(cadr x) ,alist))
-                           `(,x (aval ,(make-keyword x) ,alist))))
-                     vars))
-       ,@body)))
-
-
-(defun alist (&rest args &key &allow-other-keys)
-  (plist-alist args))
-
 ;; testing
 
 (defun included-p (thing includes)

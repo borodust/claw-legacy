@@ -37,13 +37,13 @@
 
 
 (defmethod compose-form ((this foreign-primitive))
-  (alist :tag (%to-primitive-name (foreign-entity-name this))
+  (alist :tag (foreign-entity-name this)
          :bit-size (foreign-entity-bit-size this)
          :bit-alignment (foreign-entity-bit-alignment this)))
 
 
 (defmethod compose-entity-reference ((this foreign-primitive))
-  (alist :tag (format nil ":~A" (%to-primitive-name (foreign-entity-name this)))))
+  (alist :tag (format nil ":~A" (foreign-entity-name this))))
 
 
 (defmethod parse-form (form (tag (eql :char)))

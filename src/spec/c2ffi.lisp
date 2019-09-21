@@ -88,7 +88,8 @@ doesn't exist, we will get a return code other than 0."
                                                       language standard)
   "Run c2ffi on `INPUT-FILE`, outputting to `OUTPUT-FILE` and
 `MACRO-OUTPUT-FILE`, optionally specifying a target triple `ARCH`."
-  (with-temporary-file (:pathname tmp-spec-file)
+  (with-temporary-file (:pathname tmp-spec-file
+                        :keep (uiop:featurep :claw-trace-c2ffi))
     (when (run-c2ffi input-file tmp-spec-file
                      :arch arch
                      :includes includes

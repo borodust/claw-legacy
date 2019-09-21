@@ -21,22 +21,9 @@
   (:documentation "Compose FORM from TYPE"))
 
 
-(defmethod json:encode-json ((object (eql 'true)) &optional (stream json:*json-output*))
-  (format stream "true"))
-
-
-(defmethod json:encode-json ((object (eql 'false)) &optional (stream json:*json-output*))
-  (format stream "false"))
-
-
 (defun library-symbol-order (library)
   (append (sort (copy-list (slot-value library 'constants)) #'string<)
           (reverse (slot-value library 'symbol-order))))
-
-
-(defun read-json (file)
-  (let ((*read-default-float-format* 'double-float))
-    (json:decode-json file)))
 
 
 (defmacro do-foreign-entities ((entity library) &body body)
@@ -50,7 +37,7 @@
 
 (defun read-library-specification (stream)
   (loop with *library-specification* = (make-instance 'library-specification)
-        for form in (read-json stream)
+        for form in (decode-json stream)
         for name = (aval :name form)
         for location = (aval :location form)
         do (parse-form form (aval :tag form))
@@ -67,7 +54,7 @@
   (let ((*library-specification* specification))
     (format stream "[~%")
     (loop for form on (compose-forms)
-          collect (json:encode-json (first form) stream)
+          collect (encode-json (first form) stream)
           when (rest form)
             do (format stream ",~%"))
     (format stream "~&]")))

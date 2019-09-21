@@ -57,7 +57,7 @@
                                exclude-sources
                                exclude-definitions
                                arch-includes)
-          (let* ((system (or system (when (asdf:find-system name nil) name)))
+          (let* ((system (or (first system) (when (asdf:find-system name nil) name)))
                  (base-path (when base-path
                               (find-path base-path :system system)))
                  (*path-mapper* (lambda (path)

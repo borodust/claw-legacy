@@ -19,6 +19,7 @@
   :serial t
   :components ((:file "packages")
                (:file "util")
+               (:file "json")
                (:file "c2ffi")
                (:file "specification")
                (:module entity
