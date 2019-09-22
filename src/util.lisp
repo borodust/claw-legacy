@@ -287,7 +287,7 @@
 
 
 (defun by-changing (configuration)
-  `(%by-chaning ,@configuration))
+  `(%by-changing ,@configuration))
 
 
 (defun %switch-package (package)

@@ -102,14 +102,17 @@
   (when (call-next-method)
     (loop for dep-typespec in (foreign-entity-dependencies entity)
           for dep = (find-foreign-entity dep-typespec)
-          unless (marked-strongly-included-p dep)
+          if (and dep (not (marked-strongly-included-p dep)))
             do (if (anonymous-p dep)
                    (progn
                      (mark-included dep t)
                      (try-including-entity dep))
                    (unless (marked-strongly-partially-included-p dep)
                      (mark-partially-included dep t)
-                     (try-including-entity dep))))
+                     (try-including-entity dep)))
+          else
+            ;; most likely a forward decl
+            do (update-inclusion-status dep-typespec t nil t t))
     t))
 
 
