@@ -99,14 +99,30 @@
     (error "Failed to initialize adapater")))
 
 
+(defun shared-extension-name ()
+  #+(and unix (not darwin))
+  "so"
+  #+windows
+  "dll"
+  #+darwin
+  "dylib"
+  #-(or windows unix darwin)
+  (error "Unrecognized system"))
+
+
+(defun default-shared-adapter-library-name ()
+  (format nil "adapter.~A" (shared-extension-name)))
+
+
 (defmethod expand-adapter-routines ((this dynamic-adapter) wrapper)
-  (let ((name (wrapper-name-of this)))
-    `((defmethod build-adapter ((wrapper-name (eql ',name)) target)
+  (let ((name (wrapper-name-of this))
+        (shared-library-name (default-shared-adapter-library-name)))
+    `((defmethod build-adapter ((wrapper-name (eql ',name)) &optional target)
         (declare (ignore wrapper-name))
         (build-dynamic-adapter ,(standard-of this)
                                ,(adapter-file-of this)
                                (list ,@(includes-of this))
-                               (merge-pathnames target
+                               (merge-pathnames (or target ,shared-library-name)
                                                 ,(claw.wrapper:merge-wrapper-pathname
                                                   "" wrapper))))
       (defmethod initialize-adapter ((wrapper-name (eql ',name)))

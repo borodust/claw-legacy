@@ -8,14 +8,16 @@
            #:do-foreign-entities
            #:find-foreign-entity
 
+           #:find-basic-type
+
            #:foreign-entity
            #:foreign-entity-id
            #:foreign-entity-name
            #:foreign-entity-type
+           #:foreign-entity-basic-type
            #:foreign-entity-bit-size
            #:foreign-entity-bit-alignment
            #:foreign-entity-dependencies
-           #:find-basic-type
 
            #:foreign-primitive
 

@@ -61,7 +61,6 @@
   :serial t
   :components ((:file "packages")
                (:file "util")
-               (:file "compat")
                (:module generator
                 :serial t
                 :components ((:file "type")

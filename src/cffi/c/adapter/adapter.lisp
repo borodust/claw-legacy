@@ -2,7 +2,7 @@
 
 
 (defgeneric generate-adapter-file (adapter))
-(defgeneric build-adapter (wrapper-name target-file))
+(defgeneric build-adapter (wrapper-name &optional target-file))
 (defgeneric expand-adapter-routines (adapter wrapper))
 
 

@@ -2,11 +2,10 @@
 
 
 (defun recordp (type)
-  (when-let ((entity (claw.spec:find-foreign-entity type *spec*)))
-    (let ((base-type (if (typep entity 'claw.spec:foreign-alias)
-                         (claw.spec:find-base-alias-type entity *spec*)
-                         (claw.spec:foreign-entity-type entity))))
-      (and (listp base-type) (member (first base-type) '(:struct :union))))))
+  (or (equal "long double" type)
+      (when-let ((entity (claw.spec:find-foreign-entity type *spec*)))
+        (let ((basic-type (claw.spec:foreign-entity-basic-type entity *spec*)))
+          (and (listp basic-type) (member (first basic-type) '(:struct :union)))))))
 
 
 (defun adaptablep (function)
