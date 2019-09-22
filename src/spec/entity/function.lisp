@@ -40,7 +40,7 @@
         for type = (aval :type param)
         for parsed-type = (parse-form type (aval :tag type))
         for basic-type = (find-basic-type parsed-type)
-        if (equal "va_list" basic-type)
+        if (and basic-type (equal "va_list" basic-type))
           do (setf variadic-p t)
         else
           collect (make-instance 'foreign-parameter

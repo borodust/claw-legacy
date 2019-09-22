@@ -36,7 +36,7 @@
 
 (defun cleanup-dependencies (list)
   (flet ((%null-or-void (element)
-           (or (null element) (eq :void element))))
+           (or (null element) (equal "void" element))))
     (remove-if #'%null-or-void list)))
 
 
@@ -51,7 +51,9 @@
       ((or :pointer :array) (list* (first typespec-list)
                                    (find-basic-type (second typespec-list) spec)
                                    (cddr typespec-list)))
-      (t (foreign-entity-basic-type (find-foreign-entity typespec spec) spec)))))
+      (t (if-let ((entity (find-foreign-entity typespec spec)))
+           (foreign-entity-basic-type entity spec)
+           "void")))))
 
 
 (defun optimize-typespec (typespec &optional (spec *library-specification*))
@@ -61,8 +63,8 @@
         (let ((basic-type (find-basic-type typespec spec)))
           (if (equal typespec basic-type)
               (case (first (ensure-list basic-type))
-                ((or :pointer :array) (list :pointer :void))
-                (t nil))
+                ((or :pointer :array) (list :pointer "void"))
+                (t "void"))
               (optimize-typespec basic-type))))))
 
 
@@ -119,11 +121,12 @@
 
 
 (defun extract-base-type (typespec)
-  (let ((typespec-list (ensure-list typespec)))
-    (case (first typespec-list)
-      ((or :pointer :array) (extract-base-type (second typespec-list)))
-      (nil :void)
-      (t typespec))))
+  (if (null typespec)
+      "void"
+      (let ((typespec-list (ensure-list typespec)))
+        (case (first typespec-list)
+          ((or :pointer :array) (extract-base-type (second typespec-list)))
+          (t typespec)))))
 
 
 (defun %find-dependency (typespec)

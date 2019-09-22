@@ -51,7 +51,7 @@
     ("unsigned long long" :unsigned-long-long)
     ("float" :float)
     ("double" :double)
-    ("long double" :long-double)
+    ("long double" (c-name->lisp :long-double :type))
     ("void" :void)
     (t (c-name->lisp name :type))))
 

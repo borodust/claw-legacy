@@ -5,7 +5,7 @@
   (switch ((claw.spec:foreign-entity-type type) :test #'string=)
     ("long double" (let ((size (ceiling (/ (claw.spec:foreign-entity-bit-size type)
                                            +byte-size+)))
-                         (name (c-name->lisp 'long-double :type)))
+                         (name (entity-type->cffi type)))
                      (export-symbol name)
                      `((cffi:defcstruct (,name :size ,size)
                          (data :unsigned-char :count ,size))

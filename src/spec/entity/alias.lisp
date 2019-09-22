@@ -62,7 +62,9 @@
   (prog1 (call-next-method)
     (let ((dep-typespec (find-base-alias-type entity)))
       (when-let ((dep (find-foreign-entity dep-typespec)))
-        (mark-partially-included dep t)
+        (if (marked-strongly-included-p entity)
+            (mark-included dep t)
+            (mark-partially-included dep t))
         (try-including-entity dep)))))
 
 
