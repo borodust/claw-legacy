@@ -62,8 +62,8 @@
                               (find-path base-path :system system)))
                  (*path-mapper* (lambda (path)
                                   (find-path path :system system :path base-path)))
-                 (spec-path (map-path (uiop:ensure-directory-pathname
-                                       (or spec-path "spec/"))))
+                 (spec-path (uiop:ensure-directory-pathname
+                             (map-path (or spec-path "spec/"))))
                  (language (or language :c))
                  (generator (or generator :claw/cffi))
                  (windows-environment (or windows-environment "gnu"))

@@ -48,7 +48,8 @@
                            trim-enum-prefix
                            with-adapter
                            recognize-strings
-                           override-types)
+                           override-types
+                           recognize-bitfields)
         configuration
       (let ((in-package (eval in-package))
             (*trim-enum-prefix-p* (eval trim-enum-prefix))
@@ -66,6 +67,7 @@
             (*export-table* (make-hash-table))
             (*override-table* (parse-overrides override-types))
             (*recognize-strings-p* recognize-strings)
+            (*recognize-bitfields-p* recognize-bitfields)
             (rename-symbols (eval (parse-renaming-pipeline symbolicate-names)))
             (bindings (list)))
         (with-symbol-renaming (in-package rename-symbols)

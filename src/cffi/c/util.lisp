@@ -11,6 +11,7 @@
                   *export-table*
                   *pointer-type*
                   *recognize-strings-p*
+                  *recognize-bitfields-p*
                   *override-table*))
 
 
