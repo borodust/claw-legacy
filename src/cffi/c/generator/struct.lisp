@@ -1,10 +1,27 @@
 (cl:in-package :claw.cffi.c)
 
+
+(declaim (special *anonymous-field-number*))
+
+
+(defun next-anonymous-field-number ()
+  (prog1 *anonymous-field-number*
+    (incf *anonymous-field-number*)))
+
 ;;;
 ;;; RECORD
 ;;;
+(defun field-c-name->lisp (field)
+  (let ((name (claw.spec:foreign-entity-name field)))
+    (if (emptyp name)
+        (let ((lispified (c-name->lisp (next-anonymous-field-number) :field)))
+          (setf (getf (symbol-plist lispified) :cffi-c-ref-anonymous-field-p) t)
+          lispified)
+        (c-name->lisp name :field))))
+
+
 (defun generate-c-field (record-kind field)
-  (let* ((name (c-name->lisp (claw.spec:foreign-entity-name field) :field))
+  (let* ((name (field-c-name->lisp field))
          (byte-offset (/ (claw.spec:foreign-record-field-bit-offset field) 8))
          (offset-param `(:offset ,byte-offset)))
     (export-symbol name)
@@ -21,7 +38,8 @@
 (defun generate-c-fields (kind entity)
   (flet ((%generate-c-field (field)
            (generate-c-field kind field)))
-    (mapcar #'%generate-c-field (claw.spec:foreign-record-fields entity))))
+    (let ((*anonymous-field-number* 0))
+      (mapcar #'%generate-c-field (claw.spec:foreign-record-fields entity)))))
 
 
 (defun generate-record-binding (kind entity name fields)
