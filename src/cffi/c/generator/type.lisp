@@ -37,7 +37,7 @@
                      collect (apply #'generate-forward-declaration-from-typespec
                                     (ensure-list dep-typespec))))
            (%generate-depenencies ()
-             (let* ((type (entity-type->cffi entity))
+             (let* ((type (claw.spec:foreign-entity-type entity))
                     (*dependency-type-list* (list* type *dependency-type-list*)))
                (multiple-value-bind (existing-type present-p) (gethash type *visit-table*)
                  ;; to prevent redefinitions and stack overflow for recursive deps
@@ -55,7 +55,6 @@
                        (let ((deps (%generate-bindings)))
                          (prog1 (append deps (call-next-method))
                            (setf (gethash type *visit-table*) entity)))))))))
-    (check-duplicates entity)
     (if (or (typep entity 'claw.spec:foreign-constant)
             (typep entity 'claw.spec:foreign-extern))
         (call-next-method)

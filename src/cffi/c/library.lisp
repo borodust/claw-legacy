@@ -5,27 +5,6 @@
 (defgeneric generate-forward-declaration (entity &key &allow-other-keys))
 (defgeneric generate-forward-declaration-from-typespec (kind &optional name &rest opts))
 
-(defun check-duplicates (entity)
-  (flet ((%aliased-types-p (this that)
-           (or (claw.spec:aliases-type-p this
-                                         (claw.spec:foreign-entity-type that)
-                                         *spec*)
-               (claw.spec:aliases-type-p that
-                                         (claw.spec:foreign-entity-type this)
-                                         *spec*)))
-         (%constant-p (entity)
-           (typep entity 'claw.spec:foreign-constant)))
-    (let ((cffi-type (entity-type->cffi entity)))
-      (when-let ((existing-entity (gethash cffi-type *visit-table*)))
-        (when (and (not (equal (claw.spec:foreign-entity-name existing-entity)
-                               (claw.spec:foreign-entity-name entity)))
-                   (or (and (%constant-p entity) (%constant-p existing-entity))
-                       (and (not (%aliased-types-p entity existing-entity))
-                            (not (or (%constant-p entity)
-                                     (%constant-p existing-entity))))))
-          (error "Entity for type ~S already registered.~&Previous:~&~A~&New:~&~A"
-                 cffi-type existing-entity entity))))))
-
 
 (defun parse-overrides (configuration)
   (let ((override-table (make-hash-table :test 'equal)))
@@ -73,7 +52,6 @@
         (with-symbol-renaming (in-package rename-symbols)
           (claw.spec:do-foreign-entities (entity *spec*)
             (let ((*dependency-type-list* nil))
-              (check-duplicates entity)
               (loop for bing in (generate-binding entity)
                     do (push bing bindings))))
           (when *adapter*
