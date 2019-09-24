@@ -41,7 +41,7 @@
 
 
 (defmethod optimize-entity (entity)
-  (when (inclusion-status-included-p (find-entity-inclusion-status entity))
+  (when (marked-included-p (foreign-entity-type entity))
     entity))
 
 
@@ -58,7 +58,7 @@
 
 (defun optimize-typespec (typespec &optional (spec *library-specification*))
   (let ((base-type (extract-base-type typespec)))
-    (if (inclusion-status-included-p (find-inclusion-status base-type))
+    (if (marked-included-p base-type)
         typespec
         (let ((basic-type (find-basic-type typespec spec)))
           (if (equal typespec basic-type)
@@ -68,12 +68,24 @@
               (optimize-typespec basic-type))))))
 
 
+(defun entity-explicitly-included-p (entity)
+  (or (primitivep entity)
+      (explicitly-included-p (foreign-entity-name entity)
+                             (foreign-entity-location entity))))
+
+
+(defun entity-explicitly-excluded-p (entity)
+  (and (not (primitivep entity))
+       (explicitly-excluded-p (foreign-entity-name entity)
+                              (foreign-entity-location entity))))
+
+
 (defmethod try-including-entity ((entity foreign-entity))
   (if (and (entity-explicitly-included-p entity)
            (not (entity-explicitly-excluded-p entity)))
       (prog1 t
-        (mark-included entity t))
-      (when (marked-included-p entity)
+        (mark-included (foreign-entity-type entity) t))
+      (when (marked-included-p (foreign-entity-type entity))
         t)))
 
 

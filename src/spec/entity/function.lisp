@@ -102,17 +102,17 @@
   (when (call-next-method)
     (loop for dep-typespec in (foreign-entity-dependencies entity)
           for dep = (find-foreign-entity dep-typespec)
-          if (and dep (not (marked-strongly-included-p dep)))
+          if (and dep (not (marked-enforced-p dep-typespec)))
             do (if (anonymous-p dep)
                    (progn
-                     (mark-included dep t)
+                     (mark-included dep-typespec t)
                      (try-including-entity dep))
-                   (unless (marked-strongly-partially-included-p dep)
-                     (mark-partially-included dep t)
+                   (unless (marked-enforced-p dep-typespec)
+                     (mark-partially-included dep-typespec t)
                      (try-including-entity dep)))
           else
             ;; most likely a forward decl
-            do (update-inclusion-status dep-typespec t nil t t))
+            do (mark-partially-included dep-typespec t))
     t))
 
 
@@ -128,7 +128,7 @@
 
 
 (defmethod optimize-entity ((this foreign-function))
-  (when (marked-included-p this)
+  (when (marked-included-p (foreign-entity-type this))
     (make-instance 'foreign-function
                    :name (foreign-entity-name this)
                    :location (foreign-entity-location this)

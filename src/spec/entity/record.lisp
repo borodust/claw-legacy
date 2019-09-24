@@ -126,16 +126,16 @@ appropriate."
 
 (defmethod try-including-entity ((entity foreign-record))
   (when (call-next-method)
-    (unless (marked-partially-included-p entity)
+    (unless (marked-partially-included-p (foreign-entity-type entity))
       (loop for dep-typespec in (foreign-entity-dependencies entity)
             for dep = (find-foreign-entity dep-typespec)
             when dep
               do (if (anonymous-p dep)
-                     (unless (marked-strongly-included-p dep)
-                       (mark-included dep t)
+                     (unless (marked-fully-enforced-p dep-typespec)
+                       (mark-included dep-typespec t)
                        (try-including-entity dep))
-                     (unless (marked-included-p dep)
-                       (mark-partially-included dep)
+                     (unless (marked-included-p dep-typespec)
+                       (mark-partially-included dep-typespec)
                        (try-including-entity dep)))))
     t))
 
@@ -155,9 +155,9 @@ appropriate."
 
 
 (defmethod optimize-entity ((entity foreign-record))
-  (let ((inclusion-status (find-entity-inclusion-status entity)))
-    (when (inclusion-status-included-p inclusion-status)
-      (if (inclusion-status-partially-p inclusion-status)
+  (let ((type (foreign-entity-type entity)))
+    (when (marked-included-p type)
+      (if (marked-partially-included-p type)
           (make-instance (class-of entity)
                          :id (foreign-entity-id entity)
                          :name (foreign-entity-name entity)

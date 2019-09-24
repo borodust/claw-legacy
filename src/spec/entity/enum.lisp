@@ -60,8 +60,8 @@ by ID."
 (defmethod try-including-entity ((entity foreign-enum))
   (if (call-next-method)
       (prog1 t
-        (mark-included entity))
+        (mark-included (foreign-entity-type entity)))
       (when (loop for (key . value) in (foreign-enum-values entity)
                     thereis (explicitly-included-p key (foreign-entity-location entity)))
-        (mark-included entity)
+        (mark-included (foreign-entity-type entity))
         t)))

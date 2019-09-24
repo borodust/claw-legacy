@@ -121,6 +121,9 @@
     (gethash (local-platform) platform-table)))
 
 
+(defgeneric try-including-entity (entity))
+
+
 (defun make-inclusion-table (spec
                              include-definitions
                              include-sources
@@ -134,9 +137,9 @@
         (*exclude-sources* exclude-sources))
     (do-foreign-entities (entity spec)
       (if (primitivep entity)
-          (mark-included entity t)
+          (mark-included (foreign-entity-type entity) t)
           (if (entity-explicitly-excluded-p entity)
-              (mark-excluded entity)
+              (mark-excluded (foreign-entity-type entity))
               (try-including-entity entity))))
     *inclusion-table*))
 

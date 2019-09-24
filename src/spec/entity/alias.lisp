@@ -60,16 +60,17 @@
 
 (defmethod try-including-entity ((entity foreign-alias))
   (prog1 (call-next-method)
-    (let ((dep-typespec (find-base-alias-type entity)))
-      (when-let ((dep (find-foreign-entity dep-typespec)))
-        (if (marked-strongly-included-p entity)
-            (mark-included dep t)
-            (mark-partially-included dep t))
-        (try-including-entity dep)))))
+    (let* ((dep-typespec (find-base-alias-type entity))
+           (dep-inclusion-status (find-inclusion-status dep-typespec)))
+      (unless (eq dep-inclusion-status
+                  (transfer-inclusion-status (foreign-entity-type entity)
+                                             dep-typespec))
+        (when-let ((dep (find-foreign-entity dep-typespec)))
+          (try-including-entity dep))))))
 
 
 (defmethod optimize-entity ((entity foreign-alias))
-  (when (marked-included-p entity)
+  (when (marked-included-p (foreign-entity-type entity))
     (labels ((unwrap-alias (entity)
                (if (typep entity 'foreign-alias)
                    (let ((aliased-type (foreign-alias-type entity)))

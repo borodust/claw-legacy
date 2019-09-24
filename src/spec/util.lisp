@@ -34,6 +34,10 @@
               (string= "" (aval :name (aval :type form))))))))
 
 
+(defgeneric primitivep (entity)
+  (:method (entity) (declare (ignore entity)) nil))
+
+
 ;;;
 ;;; Inclusion rules
 ;;;
