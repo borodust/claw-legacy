@@ -206,12 +206,15 @@
 
 
 (defun default-c-name-to-lisp (string &optional (package *package*))
-  (let ((string (ppcre:regex-replace-all "([A-Z]+)([A-Z][a-z])" string "\\1_\\2")))
-    (let ((string (ppcre:regex-replace-all "([a-z]+)([A-Z])" string "\\1_\\2")))
-      (format-symbol package (uiop:standard-case-symbol-name
-                              (if (ppcre:all-matches "^(:_|_)" string)
-                                  string
-                                  (nsubstitute #\- #\_ string)))))))
+  (let* ((string (ppcre:regex-replace-all "([A-Z]+)([A-Z][a-z])" string "\\1_\\2"))
+         (string (ppcre:regex-replace-all "([A-Z]+)([A-Z][a-z])" string "\\1_\\2"))
+         (string (ppcre:regex-replace-all "([a-z]+)([A-Z])" string "\\1_\\2"))
+         (string (if (ppcre:all-matches "^(:_|_)" string)
+                     (let ((position (position #\_ string :test (complement #'equal))))
+                       (nsubstitute #\% #\_ string :end position))
+                     string))
+         (string (nsubstitute #\- #\_ string)))
+    (format-symbol package (uiop:standard-case-symbol-name string))))
 
 
 ;;;

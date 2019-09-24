@@ -16,11 +16,11 @@
 
 
 (define-constant +adapted-variable-prefix+ "__v_claw_"
-  :test #'equal)
+  :test #'string=)
 
 
-(define-constant +adapted-function-prefix+ "___claw_"
-  :test #'equal)
+(define-constant +adapted-function-prefix+ "__claw_"
+  :test #'string=)
 
 
 (defgeneric adapted-function-name (function &optional stream))
