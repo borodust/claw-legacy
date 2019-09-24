@@ -4,6 +4,10 @@
 (declaim (special *anonymous-field-number*))
 
 
+(uiop:define-package :%claw.anonymous
+  (:use))
+
+
 (defun next-anonymous-field-number ()
   (prog1 *anonymous-field-number*
     (incf *anonymous-field-number*)))
@@ -14,7 +18,8 @@
 (defun field-c-name->lisp (field)
   (let ((name (claw.spec:foreign-entity-name field)))
     (if (emptyp name)
-        (let ((lispified (c-name->lisp (next-anonymous-field-number) :field)))
+        (let ((lispified (format-symbol :%claw.anonymous "~A"
+                                        (next-anonymous-field-number))))
           (setf (getf (symbol-plist lispified) :cffi-c-ref-anonymous-field-p) t)
           lispified)
         (c-name->lisp name :field))))
