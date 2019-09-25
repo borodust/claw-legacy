@@ -63,8 +63,7 @@
         (let ((basic-type (find-basic-type typespec spec)))
           (if (equal typespec basic-type)
               (case (first (ensure-list basic-type))
-                ((or :pointer :array) (list :pointer "void"))
-                (t "void"))
+                ((or :pointer :array) (list :pointer "void")))
               (optimize-typespec basic-type))))))
 
 

@@ -5,9 +5,9 @@
 
 
 (define-constant +inclusion-status-weights+
-    '(:enforced 6
-      :weakly-enforced 5
-      :partially-enforced 4
+    '(:enforced 6 ; included unconditionally
+      :weakly-enforced 5 ; included but can be downgraded to :partially-enforced
+      :partially-enforced 4 ; partially included unconditionally
       :excluded 3
       :included 2
       :partially-included 1
@@ -32,6 +32,12 @@
   :weakly-enforced)
 
 
+(defmethod next-inclusion-status ((old-status (eql :included))
+                                  (new-status (eql :partially-enforced)))
+  (declare (ignore old-status new-status))
+  :weakly-enforced)
+
+
 (defmethod next-inclusion-status ((old-status (eql :weakly-enforced))
                                   (new-status (eql :excluded)))
   (declare (ignore old-status new-status))
@@ -43,10 +49,10 @@
 
 
 (defun upgrade-inclusion-status (typespec new-status)
-  (let ((old-status (find-inclusion-status typespec)))
-    (unless (eq old-status (next-inclusion-status old-status new-status))
-      (setf (gethash typespec *inclusion-table*) new-status)
-      old-status)))
+  "Returns new status if successfully upgraded or old one otherwise"
+  (let* ((old-status (find-inclusion-status typespec))
+         (next-status (next-inclusion-status old-status new-status)))
+    (setf (gethash typespec *inclusion-table*) next-status)))
 
 
 (defun transfer-inclusion-status (from-typespec to-typespec)

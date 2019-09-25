@@ -59,12 +59,15 @@
 
 
 (defmethod try-including-entity ((entity foreign-alias))
-  (prog1 (call-next-method)
-    (let* ((dep-typespec (find-base-alias-type entity))
-           (dep-inclusion-status (find-inclusion-status dep-typespec)))
-      (unless (eq dep-inclusion-status
-                  (transfer-inclusion-status (foreign-entity-type entity)
-                                             dep-typespec))
+  (when (call-next-method)
+    (let* ((aliased-type (find-basic-type (foreign-alias-type entity)))
+           (dep-typespec (first (foreign-entity-dependencies entity)))
+           (old-status (find-inclusion-status dep-typespec))
+           (new-status (case (first (ensure-list aliased-type))
+                         ((or :array :pointer) (mark-partially-included dep-typespec))
+                         (t (transfer-inclusion-status (foreign-entity-type entity)
+                                                       dep-typespec)))))
+      (unless (eq old-status new-status)
         (when-let ((dep (find-foreign-entity dep-typespec)))
           (try-including-entity dep))))))
 
