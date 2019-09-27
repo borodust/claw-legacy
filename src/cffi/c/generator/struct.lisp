@@ -70,7 +70,7 @@
 
 
 (defmethod generate-forward-declaration ((entity claw.spec:foreign-struct) &key name)
-  (first (generate-record-binding 'cffi:defcstruct entity name nil)))
+  (generate-record-binding 'cffi:defcstruct entity name nil))
 
 
 (defmethod generate-forward-declaration-from-typespec ((kind (eql :struct))
@@ -88,7 +88,7 @@
 
 
 (defmethod generate-forward-declaration ((entity claw.spec:foreign-union) &key name)
-  (first (generate-record-binding 'cffi:defcunion entity name nil)))
+  (generate-record-binding 'cffi:defcunion entity name nil))
 
 
 (defmethod generate-forward-declaration-from-typespec ((kind (eql :union))

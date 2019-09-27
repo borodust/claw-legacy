@@ -25,6 +25,10 @@
       typespec))
 
 
+(defun register-visit (entity)
+  (setf (gethash (claw.spec:foreign-entity-type entity) *visit-table*) entity))
+
+
 (defmethod generate-binding :around (entity &rest args &key)
   "Generates dependency bindings first"
   (labels ((%generate-bindings ()
@@ -45,16 +49,16 @@
                      ;; but if we get here through recursive definitions
                      ;; and type is still not defined we need to put forward decls
                      (when (and (not existing-type)
-                              (not (gethash type *forward-declaration-table*))
-                              (member type (rest *dependency-type-list*) :test #'equal))
-                         (setf (gethash type *forward-declaration-table*) type)
-                         (list (apply #'generate-forward-declaration entity args)))
+                                (not (gethash type *forward-declaration-table*))
+                                (member type (rest *dependency-type-list*) :test #'equal))
+                       (setf (gethash type *forward-declaration-table*) type)
+                       (apply #'generate-forward-declaration entity args))
                      (progn
                        ;; register a visit
                        (setf (gethash type *visit-table*) nil)
                        (let ((deps (%generate-bindings)))
                          (prog1 (append deps (call-next-method))
-                           (setf (gethash type *visit-table*) entity)))))))))
+                           (register-visit entity)))))))))
     (if (or (typep entity 'claw.spec:foreign-constant)
             (typep entity 'claw.spec:foreign-extern))
         (call-next-method)
