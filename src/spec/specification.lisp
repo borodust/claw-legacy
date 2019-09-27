@@ -136,11 +136,9 @@
         (*include-sources* include-sources)
         (*exclude-sources* exclude-sources))
     (do-foreign-entities (entity spec)
-      (if (primitivep entity)
-          (mark-included (foreign-entity-type entity) t)
-          (if (entity-explicitly-excluded-p entity)
-              (mark-excluded (foreign-entity-type entity))
-              (try-including-entity entity))))
+      (if (entity-explicitly-excluded-p entity)
+          (mark-excluded (foreign-entity-type entity))
+          (try-including-entity entity)))
     *inclusion-table*))
 
 

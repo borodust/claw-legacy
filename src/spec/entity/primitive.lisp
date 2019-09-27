@@ -127,11 +127,6 @@
 (defmethod parse-form (form (tag (eql :va_list)))
   (register-primitive-type-renaming form ":va_list"))
 
-
-(defmethod compose-type-reference (type-group (tag (eql :void)) &rest type-args)
-  (declare (ignore type-group type-args))
-  (alist :tag ":void"))
-
 ;;;
 ;;; CONSTANTS
 ;;;
@@ -162,4 +157,5 @@
 
 
 (defmethod optimize-entity ((entity foreign-primitive))
-  entity)
+  (when (marked-included-p (foreign-entity-type entity))
+    entity))

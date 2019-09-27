@@ -281,7 +281,7 @@
 
 
 (defun by-removing-postfixes (configuration)
-  `(%by-removing-prefixes ,@configuration))
+  `(%by-removing-postfixes ,@configuration))
 
 
 (defun %by-changing (from to)
@@ -399,6 +399,7 @@
        ('by-changing #'by-changing)
        ('by-replacing #'by-replacing)
        ('by-removing-prefixes #'by-removing-prefixes)
+       ('by-removing-postfixes #'by-removing-postfixes)
        ('by-removing-complex-prefix #'by-removing-complex-prefix)
        ('by-prepending #'by-prepending)
        ('switch-package #'switch-package)

@@ -40,8 +40,7 @@
                    (unless (emptyp (claw.spec:foreign-entity-name entity))
                      (c-name->lisp (claw.spec:foreign-entity-name entity) :type))))
          (values (loop for (key . value) in (claw.spec:foreign-enum-values entity)
-                       collect (cons (c-name->lisp key :enum) value)))
-         (values (if *trim-enum-prefix-p* (trim-enum-prefix values) values)))
+                       collect (cons (c-name->lisp key :enum) value))))
     (if name
         (progn
           (export-symbol name)
@@ -49,7 +48,9 @@
                   'cffi:defbitfield
                   'cffi:defcenum)
              ,name
-             ,@(loop for (key . value) in values
+             ,@(loop for (key . value) in (if *trim-enum-prefix-p*
+                                              (trim-enum-prefix values)
+                                              values)
                      collect (list (make-keyword key) value)))))
         `(,@(loop for (key . value) in values
                   append (expand-constant key value))))))

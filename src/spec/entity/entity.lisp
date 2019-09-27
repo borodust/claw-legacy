@@ -35,9 +35,7 @@
 
 
 (defun cleanup-dependencies (list)
-  (flet ((%null-or-void (element)
-           (or (null element) (equal "void" element))))
-    (remove-if #'%null-or-void list)))
+  (remove-if #'null list))
 
 
 (defmethod optimize-entity (entity)
@@ -68,9 +66,8 @@
 
 
 (defun entity-explicitly-included-p (entity)
-  (or (primitivep entity)
-      (explicitly-included-p (foreign-entity-name entity)
-                             (foreign-entity-location entity))))
+  (explicitly-included-p (foreign-entity-name entity)
+                         (foreign-entity-location entity)))
 
 
 (defun entity-explicitly-excluded-p (entity)
