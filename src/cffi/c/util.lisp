@@ -12,6 +12,7 @@
                   *pointer-type*
                   *recognize-strings-p*
                   *recognize-bitfields-p*
+                  *recognize-arrays-p*
                   *override-table*))
 
 
@@ -65,9 +66,12 @@
           ((or :pointer :array)
            (if (and *recognize-strings-p* (equal type "char"))
                (get-overriden-type :string)
-               (list* (get-overriden-type kind)
-                      (entity-typespec->cffi type)
-                      (cddr typespec))))
+               (if (and (eq kind :array) *recognize-arrays-p*)
+                   (list* (get-overriden-type :array)
+                          (entity-typespec->cffi type)
+                          (cddr typespec))
+                   (list (get-overriden-type :pointer)
+                         (entity-typespec->cffi type)))))
           (:enum (entity-typespec->cffi type))
           (t (list (get-overriden-type kind) (c-name->lisp type :type)))))
       (get-overriden-type (primitive->c typespec))))

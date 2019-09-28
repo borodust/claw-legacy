@@ -26,9 +26,10 @@
                            symbolicate-names
                            trim-enum-prefix
                            with-adapter
-                           recognize-strings
                            override-types
-                           recognize-bitfields)
+                           recognize-bitfields
+                           recognize-arrays
+                           recognize-strings)
         configuration
       (let ((in-package (eval in-package))
             (*trim-enum-prefix-p* (eval trim-enum-prefix))
@@ -47,6 +48,7 @@
             (*override-table* (parse-overrides override-types))
             (*recognize-strings-p* recognize-strings)
             (*recognize-bitfields-p* recognize-bitfields)
+            (*recognize-arrays-p* recognize-arrays)
             (rename-symbols (eval (parse-renaming-pipeline symbolicate-names)))
             (bindings (list)))
         (with-symbol-renaming (in-package rename-symbols)

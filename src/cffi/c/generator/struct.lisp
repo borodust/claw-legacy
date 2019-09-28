@@ -25,19 +25,27 @@
         (c-name->lisp name :field))))
 
 
+(defun %generate-c-field (field name kind type count)
+  (if (and (eq kind :array) (numberp count))
+      `(,name ,(entity-typespec->cffi type) :count ,count)
+      `(,name ,(entity-type->cffi field))))
+
+
 (defun generate-c-field (record-kind field)
   (let* ((name (field-c-name->lisp field))
-         (byte-offset (/ (claw.spec:foreign-record-field-bit-offset field) 8))
-         (offset-param `(:offset ,byte-offset)))
+         (type (claw.spec:foreign-entity-type field))
+         (entity (claw.spec:find-foreign-entity type *spec*)))
     (export-symbol name)
-    (destructuring-bind (kind &optional actual-type count)
-        (ensure-list (claw.spec:foreign-entity-type field))
-      (append
-       (if (and (eq kind :array) (numberp count))
-           `(,name ,(entity-typespec->cffi actual-type) :count ,count)
-           `(,name ,(entity-type->cffi field)))
-       (when (eq record-kind :struct)
-         offset-param)))))
+    (append
+     (destructuring-bind (kind &optional actual-type count)
+         (ensure-list (if (and entity
+                               (typep entity 'claw.spec:foreign-alias)
+                               (not *recognize-arrays-p*))
+                          (ensure-list (claw.spec:find-basic-type type *spec*))
+                          type))
+       (%generate-c-field field name kind actual-type count))
+     (when (eq record-kind :struct)
+       `(:offset ,(/ (claw.spec:foreign-record-field-bit-offset field) 8))))))
 
 
 (defun generate-c-fields (kind entity)
