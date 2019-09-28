@@ -27,6 +27,7 @@
            #:foreign-alias
            #:foreign-alias-type
            #:find-base-alias-type
+           #:find-alias-for-type
            #:aliases-type-p
 
            #:foreign-enum

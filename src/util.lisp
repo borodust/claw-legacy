@@ -12,6 +12,7 @@
            #:default-c-name-to-lisp
 
            #:get-timestamp
+           #:common-prefix
 
            #:parse-renaming-pipeline
            #:with-symbol-renaming
@@ -364,7 +365,7 @@
 
 
 (defun by-removing-complex-prefix (configuration)
-  `(%by-removing-complex-prefx ,@configuration))
+  `(%by-removing-complex-prefix ,@configuration))
 
 
 (defun %by-prepending (prefix)
@@ -414,3 +415,20 @@
 ;;;
 (defun get-timestamp ()
   (local-time:format-timestring nil (local-time:now) :timezone local-time:+utc-zone+))
+
+
+(defun common-prefix (strings)
+  (let ((len (length strings))
+        (strings (map 'vector #'string strings)))
+    (if (> len 1)
+        (let* ((sorted-strings (sort strings #'string<))
+               (first (aref sorted-strings 0))
+               (last (aref sorted-strings (1- (length sorted-strings))))
+               (mismatch-idx (mismatch first last)))
+          (if mismatch-idx
+              (if-let ((hyphenated-prefix-idx (position #\- first :from-end t
+                                                                  :end mismatch-idx)))
+                (subseq first 0 (1+ hyphenated-prefix-idx))
+                "")
+              ""))
+        "")))

@@ -31,6 +31,13 @@
        (equal (find-base-alias-type alias library-specification) typespec)))
 
 
+(defun find-alias-for-type (type &optional (spec *library-specification*))
+  (catch 'result
+    (do-foreign-entities (entity spec)
+      (when (aliases-type-p entity type spec)
+        (throw 'result entity)))))
+
+
 (defmethod parse-form (form (tag (eql :typedef)))
   (alist-bind (name location type) form
     (foreign-entity-type

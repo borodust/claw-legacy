@@ -53,16 +53,19 @@
 
 (defmethod parse-form (form (tag (eql :function)))
   (alist-bind (name inline parameters return-type variadic location storage-class) form
-    (unless inline
-      (multiple-value-bind (params variadic-p)
-          (parse-parameters parameters)
-        (foreign-entity-type
-         (register-foreign-function name
-                                    location
-                                    (parse-form return-type (aval :tag return-type))
-                                    params
-                                    (or variadic-p variadic)
-                                    storage-class))))))
+    (if return-type
+        (unless inline
+          (multiple-value-bind (params variadic-p)
+              (parse-parameters parameters)
+            (foreign-entity-type
+             (register-foreign-function name
+                                        location
+                                        (parse-form return-type (aval :tag return-type))
+                                        params
+                                        (or variadic-p variadic)
+                                        storage-class))))
+        ;; typedef'd
+        '(:pointer "void"))))
 
 
 (defmethod parse-form (form (tag (eql :function-pointer)))
