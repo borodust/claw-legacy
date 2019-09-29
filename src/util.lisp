@@ -197,9 +197,7 @@
 
 (defun local-environment ()
   (or (and *local-environment* (format nil "-~A" *local-environment*))
-      #+linux "-gnu"
-      #+windows "-msvc"
-      #-(or linux windows) ""))
+      "-gnu"))
 
 
 (defun local-platform ()
