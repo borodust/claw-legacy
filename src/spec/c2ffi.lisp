@@ -88,6 +88,8 @@ doesn't exist, we will get a return code other than 0."
                                                       language standard)
   "Run c2ffi on `INPUT-FILE`, outputting to `OUTPUT-FILE` and
 `MACRO-OUTPUT-FILE`, optionally specifying a target triple `ARCH`."
+  (unless (c2ffi-p)
+      (error "c2ffi not found"))
   (with-temporary-file (:pathname tmp-spec-file
                         :keep (uiop:featurep :claw-trace-c2ffi))
     (when (run-c2ffi input-file tmp-spec-file
@@ -124,8 +126,6 @@ doesn't exist, we will get a return code other than 0."
                                                     language
                                                     standard)
   (with-include-header (header headers)
-    (unless (c2ffi-p)
-      (error "c2ffi not found"))
     (loop for arch in arch-includes
           do (unless (for-encoded-specification
                       action header
