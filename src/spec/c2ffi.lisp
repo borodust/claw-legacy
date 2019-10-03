@@ -1,9 +1,6 @@
 (cl:in-package :claw.spec)
 
 
-(defvar *c2ffi-program* #-windows "c2ffi" #+windows "c2ffi.exe")
-
-
 (defun run-check (program args &key output error-output ignore-error-status)
   (when (uiop:featurep :claw-trace-c2ffi)
     (format *debug-io* "~&; Invoking: ~A~{ ~A~}~%" program args))
@@ -15,7 +12,7 @@
 (defun c2ffi-p ()
   "This is a hack to determine if c2ffi exists; it assumes if it
 doesn't exist, we will get a return code other than 0."
-  (zerop (nth-value 2 (uiop:run-program `(,*c2ffi-program* "-h") :ignore-error-status t))))
+  (zerop (nth-value 2 (uiop:run-program `(,(claw.support:find-c2ffi-program) "-h") :ignore-error-status t))))
 
 
 ;;; UIOP:WITH-TEMPORARY-FILE does not seem to compile below as of asdf
@@ -58,7 +55,7 @@ doesn't exist, we will get a return code other than 0."
                                     arch includes framework-includes)))
       (ensure-directories-exist output-spec)
       ;; Invoke c2ffi to emit macros into TMP-MACRO-FILE
-      (when (run-check *c2ffi-program* (list* (namestring input-file)
+      (when (run-check (claw.support:find-c2ffi-program) (list* (namestring input-file)
                                               "-D" "null"
                                               "-M" (namestring tmp-macro-file)
                                               common-arg-list)
@@ -74,7 +71,7 @@ doesn't exist, we will get a return code other than 0."
           (format tmp-include-file-stream "#include \"~A\"~%" tmp-macro-file)
           (close tmp-include-file-stream)
           ;; Invoke c2ffi again to generate the raw output.
-          (run-check *c2ffi-program* (list* (namestring tmp-include-file)
+          (run-check (claw.support:find-c2ffi-program) (list* (namestring tmp-include-file)
                                             "-o" (namestring output-spec)
                                             common-arg-list)
                      :output *standard-output*

@@ -14,7 +14,7 @@
   :author "Ryan Pavlik, Pavel Korolev"
   :license "BSD-2-Clause"
   :version "1.0"
-  :depends-on (:uiop :alexandria :claw/util :cl-json)
+  :depends-on (:uiop :alexandria :claw-support :claw/util :cl-json)
   :pathname "src/spec/"
   :serial t
   :components ((:file "packages")
