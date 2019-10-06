@@ -2,6 +2,12 @@
 
 (declaim (special *library-specification*))
 
+(defvar *spec-path-override* nil)
+
+(defmacro with-overriden-spec-path ((spec-path) &body body)
+  `(let ((*spec-path-override* ,spec-path))
+     ,@body))
+
 (defgeneric optimize-entity (entity))
 
 (defgeneric entity-constant-p (entity)
@@ -180,11 +186,12 @@
                                        exclude-definitions
                                        exclude-sources))
              (spec-path (arch)
-               (when spec-path
-                 (concatenate 'string
-                              (namestring spec-path)
-                              (pathname-name name)
-                              "." arch ".spec")))
+               (let ((spec-path (or *spec-path-override* spec-path)))
+                 (when spec-path
+                   (concatenate 'string
+                                (namestring spec-path)
+                                (pathname-name name)
+                                "." arch ".spec"))))
              (arch-excluded-p (arch)
                (member arch arch-excludes :test #'string=))
              (write-spec (arch spec)

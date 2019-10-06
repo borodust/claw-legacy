@@ -4,6 +4,7 @@
            #:map-platforms
            #:find-specification-for-platform
            #:find-specification-for-current-platform
+           #:with-overriden-spec-path
 
            #:do-foreign-entities
            #:find-foreign-entity
