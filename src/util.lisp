@@ -16,7 +16,10 @@
 
            #:parse-renaming-pipeline
            #:with-symbol-renaming
-           #:c-name->lisp))
+           #:c-name->lisp
+
+           #:with-local-cpu
+           #:with-local-environment))
 (cl:in-package :claw.util)
 
 
@@ -169,6 +172,16 @@
 (defvar *local-os* nil)
 (defvar *local-environment* nil)
 (defvar *local-cpu* nil)
+
+
+(defmacro with-local-cpu ((cpu) &body body)
+  `(let ((*local-cpu* ,cpu))
+     ,@body))
+
+
+(defmacro with-local-environment ((env) &body body)
+  `(let ((*local-environment* ,env))
+     ,@body))
 
 
 (defun local-cpu ()

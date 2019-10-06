@@ -200,7 +200,9 @@
                                             arch
                                             (read-spec stream))))
              (list-arches ()
-               (remove-if #'arch-excluded-p (or arch-includes +known-platforms+)))
+               (if (uiop:featurep :claw-local-only)
+                   (list (local-platform))
+                   (remove-if #'arch-excluded-p (or arch-includes +known-platforms+))))
              (generate-and-add-missing-specs (missing-arches)
                (do-encoded-library-specifications ((stream arch) headers
                                                    :arch-includes missing-arches
