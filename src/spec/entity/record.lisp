@@ -175,6 +175,21 @@ appropriate."
                          :fields (optimize-fields (foreign-record-fields entity)))))))
 
 ;;;
+;;; BITFIELDS
+;;;
+(defmethod parse-form (form (tag (eql :bitfield)))
+  (alist-bind (type width) form
+    `(:bitfield ,(parse-form type (aval :tag type)) ,width)))
+
+
+(defmethod compose-type-reference ((type-group (eql :bitfield)) type &rest args)
+  (destructuring-bind (width) args
+    (alist :tag ":bitfield"
+           :width width
+           :type (compose-reference type))))
+
+
+;;;
 ;;; STRUCTS
 ;;;
 (defmethod parse-form (form (tag (eql :struct)))
