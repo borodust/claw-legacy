@@ -103,7 +103,9 @@
   (if (stringp tag)
       (if-let ((entity (find-foreign-entity tag)))
         (foreign-entity-type entity)
-        (parse-form form (keywordify tag)))
+        (if (starts-with #\< tag)
+            (parse-form form :unknown)
+            (parse-form form (keywordify tag))))
       (error "Unrecognized tag: ~S" tag)))
 
 
@@ -143,3 +145,19 @@
 
 (defun %find-entity-dependency (entity)
   (%find-dependency (foreign-entity-type entity)))
+
+;;;
+;;; UNKNOWN TYPE
+;;;
+(defmethod parse-form (form (tag (eql :unknown)))
+  (multiple-value-bind (matched groups)
+      (ppcre:scan-to-strings "<.+:(\\w+)>" (aval :tag form))
+    (declare (ignore matched))
+    (when (emptyp groups)
+      (error "Cannot parse unknown type declaration"))
+    `(:unknown ,(aref groups 0))))
+
+
+(defmethod compose-type-reference ((type-group (eql :unknown)) type-name &rest type-args)
+  (declare (ignore type-args))
+  (alist :tag (format nil "<unknown-type:~A>" type-name)))
