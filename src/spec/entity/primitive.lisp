@@ -132,7 +132,7 @@
 ;;;
 (defclass foreign-constant (foreign-entity)
   ((value :initform (error ":value missing") :initarg :value
-          :type fixnum :reader foreign-constant-value)))
+          :reader foreign-constant-value)))
 
 
 (defmethod entity-constant-p ((this foreign-constant))

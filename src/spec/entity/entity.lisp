@@ -16,9 +16,9 @@
 
 (defclass foreign-entity ()
   ((id :initarg :id :initform nil :reader foreign-entity-id
-       :type (or string number))
+       :type (or null string number))
    (name :initarg :name :initform (error ":name missing") :reader foreign-entity-name
-         :type (or string number))
+         :type (or null string number))
    (location :initarg :location :initform nil :reader foreign-entity-location
              :type (or null string))
    (type :initarg :type :initform (error ":type missing") :reader foreign-entity-type)))
