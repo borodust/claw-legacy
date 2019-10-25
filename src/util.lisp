@@ -5,7 +5,6 @@
 
            #:with-evaluated-variables
            #:with-evaluated-lists
-           #:local-platform
            #:find-path
            #:list-all-known-include-paths
            #:list-all-known-framework-paths
@@ -19,7 +18,9 @@
            #:c-name->lisp
 
            #:with-local-cpu
-           #:with-local-environment))
+           #:with-local-environment
+           #:local-environment
+           #:local-platform))
 (cl:in-package :claw.util)
 
 
@@ -193,28 +194,30 @@
 
 
 (defun local-vendor ()
-  #+(or linux windows) "-pc"
-  #+darwin "-apple"
-  #+(not (or linux windows darwin)) "-unknown")
+  #+(or linux windows) "pc"
+  #+darwin "apple"
+  #+(not (or linux windows darwin)) "unknown")
 
 
 (defun local-os ()
-  (or (and *local-os* (format nil "-~A" *local-os*))
-      #+linux "-linux"
-      #+windows "-windows"
-      #+darwin "-darwin"
-      #+freebsd "-freebsd"
-      #+openbsd "-openbsd"
+  (or *local-os*
+      #+linux "linux"
+      #+windows "windows"
+      #+darwin "darwin"
+      #+freebsd "freebsd"
+      #+openbsd "openbsd"
       #-(or linux windows darwin freebsd openbsd) (error "Unknown operating system")))
 
 
 (defun local-environment ()
-  (or (and *local-environment* (format nil "-~A" *local-environment*))
-      "-gnu"))
+  (or *local-environment* "gnu"))
 
 
 (defun local-platform ()
-  (concatenate 'string (local-cpu) (local-vendor) (local-os) (local-environment)))
+  (format nil "~{~A~^-~}" (remove-if #'null (list (local-cpu)
+                                                  (local-vendor)
+                                                  (local-os)
+                                                  (local-environment)))))
 
 
 (defun default-c-name-to-lisp (string &optional (package *package*))
