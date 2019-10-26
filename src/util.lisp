@@ -16,19 +16,17 @@
            #:parse-renaming-pipeline
            #:with-symbol-renaming
            #:c-name->lisp
+           #:string+
 
            #:with-local-cpu
            #:with-local-environment
+           #:with-windows-environment
            #:local-environment
            #:local-platform))
 (cl:in-package :claw.util)
 
 
-(declaim (special *include-definitions*
-                  *exclude-definitions*
-                  *include-sources*
-                  *exclude-sources*
-                  *symbol-package*
+(declaim (special *symbol-package*
                   *symbol-type*
                   *symbol-renaming-pipeline*
                   *hit-count*))
@@ -172,6 +170,7 @@
 ;;;
 (defvar *local-os* nil)
 (defvar *local-environment* nil)
+(defvar *windows-environment* nil)
 (defvar *local-cpu* nil)
 
 
@@ -182,6 +181,11 @@
 
 (defmacro with-local-environment ((env) &body body)
   `(let ((*local-environment* ,env))
+     ,@body))
+
+
+(defmacro with-windows-environment ((env) &body body)
+  `(let ((*windows-environment* ,env))
      ,@body))
 
 
@@ -209,15 +213,18 @@
       #-(or linux windows darwin freebsd openbsd) (error "Unknown operating system")))
 
 
-(defun local-environment ()
-  (or *local-environment* "gnu"))
+(defun local-environment (&optional os)
+  (or (and (equal os (local-os))
+           *windows-environment*)
+      *local-environment* "gnu"))
 
 
 (defun local-platform ()
-  (format nil "~{~A~^-~}" (remove-if #'null (list (local-cpu)
-                                                  (local-vendor)
-                                                  (local-os)
-                                                  (local-environment)))))
+  (let ((os (local-os)))
+    (format nil "~{~A~^-~}" (remove-if #'null (list (local-cpu)
+                                                    (local-vendor)
+                                                    os
+                                                    (local-environment os))))))
 
 
 (defun default-c-name-to-lisp (string &optional (package *package*))
@@ -446,3 +453,7 @@
                 "")
               ""))
         "")))
+
+
+(defun string+ (&rest strings)
+  (apply #'concatenate 'string strings))

@@ -36,7 +36,7 @@
                            language
                            standard
                            generator
-                           environment
+                           windows-environment
                            headers
                            includes
                            framework-includes
@@ -48,8 +48,8 @@
                                  language
                                  standard
                                  generator
-                                 environment
-                                 spec-path)
+                                 spec-path
+                                 windows-environment)
         (with-evaluated-lists (headers
                                includes
                                include-sources
@@ -57,22 +57,22 @@
                                exclude-sources
                                exclude-definitions
                                arch-includes)
-          (with-local-environment ((or environment "gnu"))
-            (let* ((system (or (first system) (when (asdf:find-system name nil) name)))
-                   (base-path (when base-path
-                                (find-path base-path :system system)))
-                   (*path-mapper* (lambda (path)
-                                    (find-path path :system system :path base-path)))
-                   (spec-path (uiop:ensure-directory-pathname
-                               (map-path (or spec-path "spec/"))))
-                   (language (or language :c))
-                   (generator (or generator :claw/cffi))
-                   (includes (mapcar #'map-path
-                                     (append
-                                      (list nil)
-                                      includes
-                                      (list-all-known-include-paths))))
-                   (headers (or headers (list (generate-default-header-name name)))))
+          (let* ((system (or (first system) (when (asdf:find-system name nil) name)))
+                 (base-path (when base-path
+                              (find-path base-path :system system)))
+                 (*path-mapper* (lambda (path)
+                                  (find-path path :system system :path base-path)))
+                 (spec-path (uiop:ensure-directory-pathname
+                             (map-path (or spec-path "spec/"))))
+                 (language (or language :c))
+                 (generator (or generator :claw/cffi))
+                 (includes (mapcar #'map-path
+                                   (append
+                                    (list nil)
+                                    includes
+                                    (list-all-known-include-paths))))
+                 (headers (or headers (list (generate-default-header-name name)))))
+            (with-windows-environment (windows-environment)
               (multiple-value-bind (spec last-update-time)
                   (claw.spec:describe-foreign-library
                    (symbol-name name)
@@ -91,18 +91,18 @@
                    :exclude-sources exclude-sources
                    :exclude-definitions exclude-definitions
                    :arch-includes (append
-                                   (list (concatenate 'string "x86_64-pc-linux-"
-                                                      (local-environment))
-                                         (concatenate 'string "i686-pc-linux-"
-                                                      (local-environment))
-                                         (concatenate 'string "x86_64-pc-windows-"
-                                                      (local-environment))
-                                         (concatenate 'string "i686-pc-windows-"
-                                                      (local-environment))
-                                         (concatenate 'string "x86_64-apple-darwin-"
-                                                      (local-environment))
-                                         (concatenate 'string "i686-apple-darwin-"
-                                                      (local-environment)))
+                                   (list (string+ "x86_64-pc-linux-"
+                                                  (local-environment))
+                                         (string+ "i686-pc-linux-"
+                                                  (local-environment))
+                                         (string+ "x86_64-pc-windows-"
+                                                  (local-environment))
+                                         (string+ "i686-pc-windows-"
+                                                  (local-environment))
+                                         (string+ "x86_64-apple-darwin-"
+                                                  (local-environment))
+                                         (string+ "i686-apple-darwin-"
+                                                  (local-environment)))
                                    arch-includes))
                 (expand-library-definition generator language
                                            (make-wrapper name headers spec
