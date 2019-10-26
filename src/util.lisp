@@ -213,8 +213,8 @@
       #-(or linux windows darwin freebsd openbsd) (error "Unknown operating system")))
 
 
-(defun local-environment (&optional os)
-  (or (and (equal os (local-os))
+(defun local-environment (os)
+  (or (and (equal "windows" os)
            *windows-environment*)
       *local-environment* "gnu"))
 

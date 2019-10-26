@@ -92,17 +92,17 @@
                    :exclude-definitions exclude-definitions
                    :arch-includes (append
                                    (list (string+ "x86_64-pc-linux-"
-                                                  (local-environment))
+                                                  (local-environment "linux"))
                                          (string+ "i686-pc-linux-"
-                                                  (local-environment))
+                                                  (local-environment "linux"))
                                          (string+ "x86_64-pc-windows-"
-                                                  (local-environment))
+                                                  (local-environment "windows"))
                                          (string+ "i686-pc-windows-"
-                                                  (local-environment))
+                                                  (local-environment "windows"))
                                          (string+ "x86_64-apple-darwin-"
-                                                  (local-environment))
+                                                  (local-environment "darwin"))
                                          (string+ "i686-apple-darwin-"
-                                                  (local-environment)))
+                                                  (local-environment "darwin")))
                                    arch-includes))
                 (expand-library-definition generator language
                                            (make-wrapper name headers spec
