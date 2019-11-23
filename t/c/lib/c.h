@@ -9,11 +9,13 @@
 
 extern char tst_version_string_g[16];
 
+/**
+ * Predefined color
+ */
 enum {
   tst_black = 0x0,
   tst_white = 0xFFFFFFFF
 };
-
 
 typedef struct {
   void* __data;
@@ -24,7 +26,9 @@ typedef struct {
   __metadata_t data;
 } metadata_t;
 
-
+/**
+ * Color descriptor
+ */
 union tst_color_t {
   uint32_t encoded;
   struct {
@@ -36,6 +40,9 @@ union tst_color_t {
   uint8_t array[4];
 };
 
+/**
+ * Kind of a node
+ */
 enum tst_node_kind {
   tst_node_kind_unknown = 10,
   tst_node_kind_named,
@@ -43,10 +50,16 @@ enum tst_node_kind {
 };
 
 
+/**
+ * Named node
+ */
 struct tst_named_node_t {
   char name[TST_NAME_MAX_LENGTH + 1];
 };
 
+/**
+ * Colored node
+ */
 struct tst_colored_node_t {
   union tst_color_t color;
 };
@@ -60,8 +73,14 @@ struct tst_node_t {
   void* data;
 };
 
+/**
+ * Node visitor
+ */
 typedef void (*tst_node_visitor_t)(struct tst_node_t*);
 
+/*
+  Tree descriptor
+ */
 typedef struct tst_tree_t {
   struct tst_node_t root;
   struct {

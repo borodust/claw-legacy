@@ -24,8 +24,10 @@
                             (if-let ((package (symbol-package library-name)))
                               (package-name package)
                               "")
-                            (symbol-name library-name)))))
-    (subseq (format nil "~A~(~A~)_loader_~A" +adapted-function-prefix+ c-name hex) 0 64)))
+                            (symbol-name library-name))))
+         (full-name (format nil "~A~(~A~)_loader_~A"
+                            +adapted-function-prefix+ c-name hex)))
+    (subseq full-name 0 (min (length full-name) 64))))
 
 
 (defun preprocess-dynamic-adapter-template (includes

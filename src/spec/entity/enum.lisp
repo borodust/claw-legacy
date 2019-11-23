@@ -65,3 +65,34 @@ by ID."
                     thereis (explicitly-included-p key (foreign-entity-location entity)))
         (mark-included (foreign-entity-type entity))
         t)))
+
+
+;;;
+;;; RESECT
+;;;
+(defclass enum-builder ()
+  ((values :initform nil)
+   (id :initarg :id)
+   (name :initarg :name)
+   (location :initarg :location)))
+
+
+(defmethod make-builder ((this foreign-entity-stream-parser) (kind (eql :enum)))
+  (make-instance 'enum-builder
+                 :id 0
+                 :name (claw.resect:cursor-name *cursor*)
+                 :location *location*))
+
+
+(defmethod consume-cursor ((this enum-builder)
+                           (kind (eql :enum-constant)))
+  (with-entity-builder (builder enum-builder) this
+    (with-slots (values) builder
+      (push (cons (claw.resect:cursor-name *cursor*)
+                  (claw.resect:cursor-value *cursor*))
+            values))))
+
+
+(defmethod build-foreign-entity ((this enum-builder))
+  (with-slots (id name location values) this
+    (register-foreign-enum id name location values)))

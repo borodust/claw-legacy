@@ -69,6 +69,7 @@
 
 
 (defmethod parse-form (form (tag (eql :function-pointer)))
+  (declare (ignore form))
   `(:pointer "void"))
 
 
@@ -140,3 +141,40 @@
                    :storage-class (foreign-function-storage-class this)
                    :variadic-p (foreign-function-variadic-p this)
                    :parameters (optimize-parameters (foreign-function-parameters this)))))
+
+
+;;;
+;;; RESECT
+;;;
+(defclass function-builder (entity-builder)
+  ((params :initform nil)
+   (return-type :initarg :return-type)
+   (variadic-p :initarg :variadic-p)
+   (storage-class :initarg :storage-class)))
+
+
+(defmethod build-foreign-entity ((this function-builder))
+  (with-slots (params return-type variadic-p storage-class) this
+    (register-foreign-function (name-of this)
+                               (location-of this)
+                               return-type
+                               params
+                               variadic-p
+                               storage-class)))
+
+
+(defmethod make-entity-builder ((kind (eql :function)))
+  (make-instance 'function-builder
+                 :id (claw.resect:cursor-id *cursor*)
+                 :name (claw.resect:cursor-name *cursor*)
+                 :location *location*
+                 :return-type nil
+                 :variadic-p nil
+                 :storage-class nil))
+
+
+(defmethod consume-cursor ((this function-builder) (kind (eql :parameter)))
+  (with-slots (params) this
+    (push (cons (claw.resect:cursor-name *cursor*)
+                (claw.resect:cursor-value *cursor*))
+          params)))

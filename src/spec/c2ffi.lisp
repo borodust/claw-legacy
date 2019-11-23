@@ -44,7 +44,8 @@ doesn't exist, we will get a return code other than 0."
                         :keep (uiop:featurep :claw-trace-c2ffi))
     (let* ((output-spec (namestring output-basename))
            (arch (when arch (list "-A" arch)))
-           (includes (prepare-includes includes "-i"))
+           (prepared-includes (append (prepare-includes includes "-I")
+                                      (prepare-includes includes "-i")))
            (framework-includes (prepare-includes framework-includes "-F"))
            (common-arg-list (append (when language
                                       (list "--lang" (string-downcase
@@ -52,13 +53,14 @@ doesn't exist, we will get a return code other than 0."
                                     (when standard
                                       (list "--std" (string-downcase
                                                      (string standard))))
-                                    arch includes framework-includes)))
+                                    arch prepared-includes framework-includes)))
       (ensure-directories-exist output-spec)
       ;; Invoke c2ffi to emit macros into TMP-MACRO-FILE
-      (when (run-check (claw.support:find-c2ffi-program) (list* (namestring input-file)
-                                              "-D" "null"
-                                              "-M" (namestring tmp-macro-file)
-                                              common-arg-list)
+      (when (run-check (claw.support:find-c2ffi-program)
+                       (list* (namestring input-file)
+                              "-D" "null"
+                              "-M" (namestring tmp-macro-file)
+                              common-arg-list)
                        :output *standard-output*
                        :error-output (when (uiop:featurep :claw-spit-c2ffi-errors)
                                        *error-output*)
@@ -72,8 +74,8 @@ doesn't exist, we will get a return code other than 0."
           (close tmp-include-file-stream)
           ;; Invoke c2ffi again to generate the raw output.
           (run-check (claw.support:find-c2ffi-program) (list* (namestring tmp-include-file)
-                                            "-o" (namestring output-spec)
-                                            common-arg-list)
+                                                              "-o" (namestring output-spec)
+                                                              common-arg-list)
                      :output *standard-output*
                      :ignore-error-status ignore-error-status))))))
 

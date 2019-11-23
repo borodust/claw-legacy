@@ -45,8 +45,6 @@
 (defun read-library-specification (stream)
   (loop with *library-specification* = (make-instance 'library-specification)
         for form in (decode-json stream)
-        for name = (aval :name form)
-        for location = (aval :location form)
         do (parse-form form (aval :tag form))
         finally (return *library-specification*)))
 

@@ -219,3 +219,72 @@ appropriate."
 (defmethod compose-type-reference ((group (eql :union)) name &rest args)
   (declare (ignore args))
   (compose-record-reference group name "union"))
+
+
+;;;
+;;; RESECT
+;;;
+(defclass record-builder (entity-builder)
+  ((fields :initform nil)
+   (bit-size :initarg :bit-size)
+   (bit-alignment :initarg :bit-alignment)))
+
+
+(defclass struct-builder (record-builder) ())
+
+
+(defmethod build-foreign-entity ((this struct-builder))
+  (with-slots (fields bit-size bit-alignment) this
+    (register-foreign-record (id-of this)
+                             (name-of this)
+                             (location-of this)
+                             (list :struct (if (emptyp (name-of this))
+                                               (id-of this)
+                                               (name-of this)))
+                             bit-size
+                             bit-alignment
+                             fields)))
+
+
+(defmethod make-entity-builder ((kind (eql :struct)))
+  (make-instance 'struct-builder
+                 :id (claw.resect:cursor-id *cursor*)
+                 :name (claw.resect:cursor-name *cursor*)
+                 :location *location*
+                 :bit-size 0
+                 :bit-alignment 0))
+
+
+(defmethod consume-cursor ((this struct-builder) (kind (eql :field)))
+  (with-slots (fields) this
+    (push (claw.resect:cursor-name *cursor*) fields)))
+
+
+(defclass union-builder (record-builder) ())
+
+
+(defmethod build-foreign-entity ((this union-builder))
+  (with-slots (fields bit-size bit-alignment) this
+    (register-foreign-record (id-of this)
+                             (name-of this)
+                             (location-of this)
+                             (list :union (if (emptyp (name-of this))
+                                              (id-of this)
+                                              (name-of this)))
+                             bit-size
+                             bit-alignment
+                             fields)))
+
+
+(defmethod make-entity-builder ((kind (eql :union)))
+  (make-instance 'union-builder
+                 :id (claw.resect:cursor-id *cursor*)
+                 :name (claw.resect:cursor-name *cursor*)
+                 :location *location*
+                 :bit-size 0
+                 :bit-alignment 0))
+
+
+(defmethod consume-cursor ((this union-builder) (kind (eql :field)))
+  (with-slots (fields) this
+    (push (claw.resect:cursor-name *cursor*) fields)))

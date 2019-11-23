@@ -161,3 +161,11 @@
 (defmethod compose-type-reference ((type-group (eql :unknown)) type-name &rest type-args)
   (declare (ignore type-args))
   (alist :tag (format nil "<unknown-type:~A>" type-name)))
+
+;;;
+;;; RESECT
+;;;
+(defclass entity-builder ()
+  ((id :initarg :id :initform (error ":id missing") :reader id-of)
+   (name :initarg :name :initform (error ":name missing") :reader name-of)
+   (location :initarg :location :initform (error ":location missing") :reader location-of)))

@@ -38,15 +38,21 @@
         (throw 'result entity)))))
 
 
+(defun register-foreign-alias (name location aliased-type)
+  (register-foreign-entity name
+                           (make-instance 'foreign-alias
+                                          :name name
+                                          :type name
+                                          :aliased aliased-type
+                                          :location location)))
+
+
 (defmethod parse-form (form (tag (eql :typedef)))
   (alist-bind (name location type) form
     (foreign-entity-type
-     (register-foreign-entity name
-                              (make-instance 'foreign-alias
-                                             :name name
-                                             :type name
-                                             :aliased (parse-form type (aval :tag type))
-                                             :location location)))))
+     (register-foreign-alias name
+                             location
+                             (parse-form type (aval :tag type))))))
 
 
 (defmethod compose-form ((this foreign-alias))
@@ -93,3 +99,37 @@
                      :type (foreign-entity-name entity)
                      :aliased (unwrap-alias entity)
                      :location (foreign-entity-location entity)))))
+
+;;;
+;;; RESECT
+;;;
+(defclass typedef-builder (entity-builder)
+  ((aliased-type :initarg :aliased-type :initform nil)))
+
+
+(defmethod make-entity-builder ((kind (eql :typedef)))
+  (make-instance 'typedef-builder
+                 :id (claw.resect:cursor-id *cursor*)
+                 :name (claw.resect:cursor-name *cursor*)
+                 :location *location*
+                 :aliased-type (claw.resect:cursor-aliased-type *cursor*)))
+
+
+(defmethod build-foreign-entity ((this typedef-builder))
+  (with-slots (aliased-type) this
+    (process-primitive-type aliased-type)
+    (register-foreign-alias (name-of this)
+                            (location-of this)
+                            aliased-type)))
+
+
+(defmethod consume-cursor ((this typedef-builder) (kind (eql :typedef))))
+
+(defmethod consume-cursor ((this typedef-builder) (kind (eql :parameter)))
+  ;; function typedef
+  )
+
+
+(defmethod consume-cursor ((this typedef-builder) (kind (eql :type-reference)))
+  ;; another typedef?
+  )
