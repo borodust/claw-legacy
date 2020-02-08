@@ -60,7 +60,10 @@
 
 
 (defmethod parse-form (form (tag (eql :_bool)))
-  (register-primitive-type-renaming form ":bool"))
+  (alist-bind (bit-size) form
+    (eswitch (bit-size :test #'=)
+      (8 (register-primitive-type-renaming form ":char"))
+      (32 (register-primitive-type-renaming form ":int")))))
 
 
 (defmethod parse-form (form (tag (eql :void)))
@@ -112,12 +115,28 @@
   (register-primitive-type form))
 
 
+(defmethod parse-form (form (tag (eql :int128)))
+  (register-primitive-type form))
+
+
+(defmethod parse-form (form (tag (eql :uint128)))
+  (register-primitive-type form))
+
+
 (defmethod parse-form (form (tag (eql :long-double)))
   (register-primitive-type-renaming form ":long double"))
 
 
 (defmethod parse-form (form (tag (eql :__float128)))
   (register-primitive-type-renaming form ":long double"))
+
+
+(defmethod parse-form (form (tag (eql :unsigned-__int128)))
+  (register-primitive-type-renaming form ":uint128"))
+
+
+(defmethod parse-form (form (tag (eql :__int128)))
+  (register-primitive-type-renaming form ":int128"))
 
 
 (defmethod parse-form (form (tag (eql :__builtin_va_list)))
