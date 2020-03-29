@@ -143,38 +143,33 @@
                    :parameters (optimize-parameters (foreign-function-parameters this)))))
 
 
+(defmethod compose-type-reference (type-group (type (eql :function-prototype)) &rest type-args)
+  (declare (ignore type type-group type-args))
+  (alist :tag ":function-prototype"))
+
 ;;;
 ;;; RESECT
 ;;;
-(defclass function-builder (entity-builder)
-  ((params :initform nil)
-   (return-type :initarg :return-type)
-   (variadic-p :initarg :variadic-p)
-   (storage-class :initarg :storage-class)))
+(defmethod parse-declaration ((type (eql :function)) decl)
+  (let (params)
+    (resect:docollection (param (%resect:function-parameters decl))
+      (let* ((name (%resect:declaration-name param))
+             (param-type (%resect:declaration-type param)))
+        (push (make-instance 'foreign-parameter
+                             :name (unless (emptyp name)
+                                     name)
+                             :location (format-declaration-location param)
+                             :type (parse-type-by-category param-type))
+              params)))
+    (foreign-entity-type
+     (register-foreign-function (%resect:declaration-name decl)
+                                (format-declaration-location decl)
+                                (parse-type-by-category (%resect:function-return-type decl))
+                                (nreverse params)
+                                (%resect:function-variadic-p decl)
+                                (%resect:function-storage-class decl)))))
 
 
-(defmethod build-foreign-entity ((this function-builder))
-  (with-slots (params return-type variadic-p storage-class) this
-    (register-foreign-function (name-of this)
-                               (location-of this)
-                               return-type
-                               params
-                               variadic-p
-                               storage-class)))
-
-
-(defmethod make-entity-builder ((kind (eql :function)))
-  (make-instance 'function-builder
-                 :id (claw.resect:cursor-id *cursor*)
-                 :name (claw.resect:cursor-name *cursor*)
-                 :location *location*
-                 :return-type nil
-                 :variadic-p nil
-                 :storage-class nil))
-
-
-(defmethod consume-cursor ((this function-builder) (kind (eql :parameter)))
-  (with-slots (params) this
-    (push (cons (claw.resect:cursor-name *cursor*)
-                (claw.resect:cursor-value *cursor*))
-          params)))
+(defmethod parse-type (category (kind (eql :function-prototype)) type)
+  (declare (ignorable category kind type))
+  :function-prototype)

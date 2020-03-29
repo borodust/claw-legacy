@@ -32,10 +32,9 @@
 
 
 (defun find-alias-for-type (type &optional (spec *library-specification*))
-  (catch 'result
-    (do-foreign-entities (entity spec)
-      (when (aliases-type-p entity type spec)
-        (throw 'result entity)))))
+  (do-foreign-entities (entity spec)
+    (when (aliases-type-p entity type spec)
+      (return-from find-alias-for-type entity))))
 
 
 (defun register-foreign-alias (name location aliased-type)
@@ -103,33 +102,13 @@
 ;;;
 ;;; RESECT
 ;;;
-(defclass typedef-builder (entity-builder)
-  ((aliased-type :initarg :aliased-type :initform nil)))
+(defmethod parse-declaration ((kind (eql :typedef)) decl)
+  (foreign-entity-type
+   (register-foreign-alias (%resect:declaration-name decl)
+                           (format-declaration-location decl)
+                           (parse-type-by-category (%resect:typedef-aliased-type decl)))))
 
 
-(defmethod make-entity-builder ((kind (eql :typedef)))
-  (make-instance 'typedef-builder
-                 :id (claw.resect:cursor-id *cursor*)
-                 :name (claw.resect:cursor-name *cursor*)
-                 :location *location*
-                 :aliased-type (claw.resect:cursor-aliased-type *cursor*)))
-
-
-(defmethod build-foreign-entity ((this typedef-builder))
-  (with-slots (aliased-type) this
-    (process-primitive-type aliased-type)
-    (register-foreign-alias (name-of this)
-                            (location-of this)
-                            aliased-type)))
-
-
-(defmethod consume-cursor ((this typedef-builder) (kind (eql :typedef))))
-
-(defmethod consume-cursor ((this typedef-builder) (kind (eql :parameter)))
-  ;; function typedef
-  )
-
-
-(defmethod consume-cursor ((this typedef-builder) (kind (eql :type-reference)))
-  ;; another typedef?
-  )
+(defmethod parse-type (category (kind (eql :typedef)) type)
+  (declare (ignore category kind))
+  (parse-declaration-by-kind (%resect:type-declaration type)))

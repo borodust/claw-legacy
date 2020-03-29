@@ -152,14 +152,6 @@
   (%%register-primitive-type-renaming form ":va_list"))
 
 
-(defmethod parse-form (form (tag (eql :__int128)))
-  (%%register-primitive-type-renaming form ":longer-int"))
-
-
-(defmethod parse-form (form (tag (eql :unsigned-__int128)))
-  (%%register-primitive-type-renaming form ":unsigned-longer-int"))
-
-
 (defmethod parse-form (form (tag (eql :wchar_t)))
   (%%register-primitive-type-renaming form ":wchar-t"))
 
@@ -177,7 +169,8 @@
 
 
 (defmethod parse-form (form (tag (eql :__locale_t)))
-  ;; just skipping it
+  (declare (ignore tag form))
+  ;; just skip it
   )
 
 
@@ -217,13 +210,16 @@
 ;;;
 ;;; RESECT
 ;;;
-(defun process-primitive-type (type)
+(defun register-primitive-resect-type (kind type)
   (flet ((register-primitive-type (tag)
-           (register-primitive-type tag *location* *bit-size* *bit-alignment*)))
-    (case (claw.resect:resect-type-kind type)
+           (register-primitive-type tag nil
+                                    (* 8 (%resect:type-size type))
+                                    (* 8 (%resect:type-alignment type)))))
+    (ecase kind
       (:void (register-primitive-type "void"))
       (:bool (register-primitive-type "bool"))
       (:unsigned-char (register-primitive-type "unsigned char"))
+      (:char (register-primitive-type "char"))
       (:char16 (register-primitive-type "char16"))
       (:char32 (register-primitive-type "char32"))
       (:unsigned-short (register-primitive-type "unsigned short"))
@@ -231,7 +227,8 @@
       (:unsigned-long (register-primitive-type "unsigned long"))
       (:unsigned-long-long (register-primitive-type "unsigned long long"))
       (:unsigned-int128 (register-primitive-type "uint128"))
-      (:schar (register-primitive-type "schar"))
+      (:char-s (register-primitive-type "char"))
+      (:char-u (register-primitive-type "unsigned char"))
       (:wchar (register-primitive-type "wchar"))
       (:short (register-primitive-type "short"))
       (:int (register-primitive-type "int"))
@@ -244,5 +241,14 @@
       (:nullptr (register-primitive-type "nullptr"))
       (:float128 (register-primitive-type "float128"))
       (:half (register-primitive-type "half"))
-      (:float16 (register-primitive-type "float16"))
-      (:pointer (register-primitive-type "pointer")))))
+      (:float16 (register-primitive-type "float16")))))
+
+
+(defmethod parse-type ((category (eql :arithmetic)) kind type)
+  (declare (ignore category))
+  (register-primitive-resect-type kind type))
+
+
+(defmethod parse-type ((category (eql :aux)) kind type)
+  (declare (ignore category))
+  (register-primitive-resect-type kind type))

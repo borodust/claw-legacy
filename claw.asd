@@ -15,16 +15,16 @@
   :author "Pavel Korolev"
   :license "BSD-2-Clause"
   :version "1.0"
-  :depends-on (:uiop :alexandria :claw-support :claw/resect :claw/util :cl-json)
+  :depends-on (:uiop :alexandria :claw-support :cl-resect :claw/util :cl-json)
   :pathname "src/spec/"
   :serial t
   :components ((:file "packages")
                (:file "util")
                (:file "json")
-               (:file "c2ffi")
+               #++(:file "c2ffi")
                (:file "inclusion")
-               (:file "specification")
                (:file "resect")
+               (:file "specification")
                (:module entity
                 :serial t
                 :components ((:file "entity")
@@ -43,24 +43,12 @@
                              (:file "thread")))))
 
 
-(asdf:defsystem :claw/resect
-  :description ""
-  :author "Pavel Korolev"
-  :license "BSD-2-Clause"
-  :version "1.0"
-  :depends-on (:uiop :alexandria :claw-support :claw/util :cffi)
-  :pathname "src/resect/"
-  :serial t
-  :components ((:file "packages")
-               (:file "resect")))
-
-
 (asdf:defsystem :claw/wrapper
     :description "Wrapper definition interface for CLAW"
     :author "Pavel Korolev"
     :license "BSD-2-Clause"
     :version "1.0"
-    :depends-on (:uiop :alexandria :cl-ppcre :sha1 :claw/util :claw/spec :claw/resect)
+    :depends-on (:uiop :alexandria :cl-ppcre :sha1 :claw/util :claw/spec)
     :pathname "src/wrapper/"
     :serial t
     :components ((:file "packages")

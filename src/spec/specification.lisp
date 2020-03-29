@@ -209,15 +209,16 @@
                    (list (local-platform))
                    (remove-if #'arch-excluded-p (or arch-includes +known-platforms+))))
              (generate-and-add-missing-specs (missing-arches)
-               (do-encoded-library-specifications ((stream arch) headers
-                                                   :arch-includes missing-arches
-                                                   :includes includes
-                                                   :framework-includes framework-includes
-                                                   :language language
-                                                   :standard standard)
-                 (let ((spec (read-spec stream)))
-                   (add-library-specification spec-container arch spec)
-                   (write-spec arch spec)))))
+               (loop with *library-specification* = (make-instance 'library-specification)
+                     for arch in missing-arches
+                     do (build-library-specification headers
+                                                     :includes includes
+                                                     :frameworks framework-includes
+                                                     :language language
+                                                     :standard standard
+                                                     :target arch)
+                        (add-library-specification spec-container arch *library-specification*)
+                        (write-spec arch *library-specification*))))
       (loop for arch in (list-arches)
             for spec-path = (probe-file (spec-path arch))
             if (and (not (uiop:featurep :claw-rebuild-spec)) spec-path)

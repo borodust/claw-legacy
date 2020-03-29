@@ -15,7 +15,9 @@ by ID."
   (loop for value in value-list
         do (assert (and (stringp (car value))
                         (integerp (cdr value)))))
-  (let ((enum-type (list :enum (if (> id 0) id name))))
+  (let ((enum-type (list :enum (if (emptyp name)
+                                   id
+                                   name))))
     (register-foreign-entity enum-type
                              (make-instance 'foreign-enum :id id
                                                           :name name
@@ -70,29 +72,17 @@ by ID."
 ;;;
 ;;; RESECT
 ;;;
-(defclass enum-builder ()
-  ((values :initform nil)
-   (id :initarg :id)
-   (name :initarg :name)
-   (location :initarg :location)))
+(defmethod parse-declaration ((type (eql :enum)) decl)
+  (let (value-list)
+    (resect:docollection (decl (%resect:enum-constants decl))
+      (push (cons (%resect:declaration-name decl) (%resect:enum-constant-value decl)) value-list))
+    (foreign-entity-type
+     (register-foreign-enum (%resect:declaration-id decl)
+                            (%resect:declaration-name decl)
+                            (format-declaration-location decl)
+                            (nreverse value-list)))))
 
 
-(defmethod make-builder ((this foreign-entity-stream-parser) (kind (eql :enum)))
-  (make-instance 'enum-builder
-                 :id 0
-                 :name (claw.resect:cursor-name *cursor*)
-                 :location *location*))
-
-
-(defmethod consume-cursor ((this enum-builder)
-                           (kind (eql :enum-constant)))
-  (with-entity-builder (builder enum-builder) this
-    (with-slots (values) builder
-      (push (cons (claw.resect:cursor-name *cursor*)
-                  (claw.resect:cursor-value *cursor*))
-            values))))
-
-
-(defmethod build-foreign-entity ((this enum-builder))
-  (with-slots (id name location values) this
-    (register-foreign-enum id name location values)))
+(defmethod parse-type (category (kind (eql :enum)) type)
+  (declare (ignore category kind))
+  (parse-declaration-by-kind (%resect:type-declaration type)))

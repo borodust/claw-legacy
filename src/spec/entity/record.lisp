@@ -44,9 +44,8 @@ appropriate."
                             :name name
                             :location location
                             :type type
-                            :bit-size (unless (zerop bit-size) bit-size)
-                            :bit-alignment (unless (zerop bit-alignment)
-                                             bit-alignment)
+                            :bit-size bit-size
+                            :bit-alignment bit-alignment
                             :fields field-list)))
       (if record
           record
@@ -224,67 +223,41 @@ appropriate."
 ;;;
 ;;; RESECT
 ;;;
-(defclass record-builder (entity-builder)
-  ((fields :initform nil)
-   (bit-size :initarg :bit-size)
-   (bit-alignment :initarg :bit-alignment)))
+(defun parse-record-declaration (decl record-type field-decls)
+  (let (fields)
+    (resect:docollection (field-decl field-decls)
+      (let* ((field-type (%resect:declaration-type field-decl)))
+        (push (make-instance 'foreign-record-field
+                             :name (%resect:declaration-name field-decl)
+                             :type (parse-type-by-category field-type)
+                             :bit-size (* 8 (%resect:type-size field-type))
+                             :bit-alignment (* 8 (%resect:type-alignment field-type))
+                             :bit-offset (* 8 (%resect:field-offset field-decl))
+                             :bitfield-p (%resect:field-bitfield-p field-decl)
+                             :bit-width (%resect:field-width field-decl))
+              fields)))
+    (foreign-entity-type
+     (register-foreign-record (%resect:declaration-id decl)
+                              (%resect:declaration-name decl)
+                              (format-declaration-location decl)
+                              (record-type record-type
+                                           (%resect:declaration-id decl)
+                                           (%resect:declaration-name decl))
+                              (* 8 (%resect:type-size (%resect:declaration-type decl)))
+                              (* 8 (%resect:type-alignment (%resect:declaration-type decl)))
+                              (nreverse fields)))))
 
 
-(defclass struct-builder (record-builder) ())
+(defmethod parse-declaration ((type (eql :struct)) decl)
+  (parse-record-declaration decl type (%resect:struct-fields decl)))
 
+(defmethod parse-declaration ((type (eql :union)) decl)
+  (parse-record-declaration decl type (%resect:union-fields decl)))
 
-(defmethod build-foreign-entity ((this struct-builder))
-  (with-slots (fields bit-size bit-alignment) this
-    (register-foreign-record (id-of this)
-                             (name-of this)
-                             (location-of this)
-                             (list :struct (if (emptyp (name-of this))
-                                               (id-of this)
-                                               (name-of this)))
-                             bit-size
-                             bit-alignment
-                             fields)))
+(defmethod parse-type (category (kind (eql :struct)) type)
+  (declare (ignore category kind))
+  (parse-declaration-by-kind (%resect:type-declaration type)))
 
-
-(defmethod make-entity-builder ((kind (eql :struct)))
-  (make-instance 'struct-builder
-                 :id (claw.resect:cursor-id *cursor*)
-                 :name (claw.resect:cursor-name *cursor*)
-                 :location *location*
-                 :bit-size 0
-                 :bit-alignment 0))
-
-
-(defmethod consume-cursor ((this struct-builder) (kind (eql :field)))
-  (with-slots (fields) this
-    (push (claw.resect:cursor-name *cursor*) fields)))
-
-
-(defclass union-builder (record-builder) ())
-
-
-(defmethod build-foreign-entity ((this union-builder))
-  (with-slots (fields bit-size bit-alignment) this
-    (register-foreign-record (id-of this)
-                             (name-of this)
-                             (location-of this)
-                             (list :union (if (emptyp (name-of this))
-                                              (id-of this)
-                                              (name-of this)))
-                             bit-size
-                             bit-alignment
-                             fields)))
-
-
-(defmethod make-entity-builder ((kind (eql :union)))
-  (make-instance 'union-builder
-                 :id (claw.resect:cursor-id *cursor*)
-                 :name (claw.resect:cursor-name *cursor*)
-                 :location *location*
-                 :bit-size 0
-                 :bit-alignment 0))
-
-
-(defmethod consume-cursor ((this union-builder) (kind (eql :field)))
-  (with-slots (fields) this
-    (push (claw.resect:cursor-name *cursor*) fields)))
+(defmethod parse-type (category (kind (eql :record)) type)
+  (declare (ignore category kind))
+  (parse-declaration-by-kind (%resect:type-declaration type)))

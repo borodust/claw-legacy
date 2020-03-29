@@ -165,7 +165,17 @@
 ;;;
 ;;; RESECT
 ;;;
-(defclass entity-builder ()
-  ((id :initarg :id :initform (error ":id missing") :reader id-of)
-   (name :initarg :name :initform (error ":name missing") :reader name-of)
-   (location :initarg :location :initform (error ":location missing") :reader location-of)))
+(defun format-declaration-location (declaration)
+  (let ((location (%resect:declaration-location declaration)))
+    (format nil "~A:~A:~A"
+            (%resect:location-name location)
+            (%resect:location-line location)
+            (%resect:location-column location))))
+
+
+(defun parse-declaration-by-kind (decl)
+  (parse-declaration (%resect:declaration-kind decl) decl))
+
+
+(defun parse-type-by-category (type)
+  (parse-type (%resect:type-category type) (%resect:type-kind type) type))

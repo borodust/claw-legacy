@@ -13,3 +13,13 @@
     (alist :tag ":array"
            :size size
            :type (compose-reference type))))
+
+;;;
+;;; RESECT
+;;;
+(defmethod parse-type ((category (eql :array)) kind type)
+  (declare (ignore category kind))
+  `(:array ,(parse-type-by-category (%resect:array-element-type type))
+           ,@(let ((size (%resect:array-size type)))
+               (when (>= size 0)
+                 (list size)))))

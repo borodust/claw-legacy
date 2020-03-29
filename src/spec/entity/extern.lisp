@@ -1,7 +1,6 @@
 (cl:in-package :claw.spec)
 
 
-
 ;;;
 ;;;
 ;;;
