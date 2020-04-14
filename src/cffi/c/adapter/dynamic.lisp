@@ -19,7 +19,7 @@
 (defun library-loader-name (library-name)
   (let* ((library-string (symbol-name library-name))
          (c-name (ppcre:regex-replace-all "[^_\\w]+" library-string "_"))
-         (hex (sha1:sha1-hex
+         (hex (claw-sha1:sha1-hex
                (concatenate 'string
                             (if-let ((package (symbol-package library-name)))
                               (package-name package)

@@ -6,7 +6,8 @@
   :depends-on (:uiop :alexandria :cl-ppcre :local-time)
   :pathname "src/"
   :serial t
-  :components ((:file "util")))
+  :components ((:file "sha1")
+               (:file "util")))
 
 
 (asdf:defsystem :claw/spec
@@ -41,7 +42,7 @@
   :author "Pavel Korolev"
   :license "BSD-2-Clause"
   :version "1.0"
-  :depends-on (:uiop :alexandria :cl-ppcre :sha1 :claw/util :claw/spec)
+  :depends-on (:uiop :alexandria :cl-ppcre :claw/util :claw/spec)
   :pathname "src/wrapper/"
   :serial t
   :components ((:file "packages")
