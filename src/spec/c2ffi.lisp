@@ -44,7 +44,7 @@ doesn't exist, we will get a return code other than 0."
                         :keep (uiop:featurep :claw-trace-c2ffi))
     (let* ((output-spec (namestring output-basename))
            (arch (when arch (list "-A" arch)))
-           (includes (prepare-includes includes "-I"))
+           (includes (prepare-includes includes "-i"))
            (framework-includes (prepare-includes framework-includes "-F"))
            (common-arg-list (append (when language
                                       (list "--lang" (string-downcase

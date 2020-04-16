@@ -102,9 +102,9 @@
 ;;;
 ;;; INCLUDE PATHS
 ;;;
-(defun dump-gcc-include-paths (lang)
+(defun dump-gcc-include-paths (lang &optional (executable "gcc"))
   (handler-case
-      (let* ((command (format nil "echo | gcc -x~A -E -v -" lang))
+      (let* ((command (format nil "echo | ~A -x~A -E -v -" executable lang))
              (paths (with-output-to-string (out)
                       (uiop:run-program command
                                         :output out :error-output out)))
@@ -112,7 +112,7 @@
         (when bounds
           (ppcre:split "(\\r|\\n)+\\s*" (subseq paths (aref bounds 0) (aref bounds 1)))))
     (t ()
-      (warn "Failed to obtain GCC search paths for language ~A" lang)
+      (warn "Failed to obtain `~A` search paths for language ~A" executable lang)
       nil)))
 
 
@@ -120,29 +120,35 @@
   (ends-with-subseq +stupid-darwin-framework-postfix+ path :test #'equal))
 
 
+(defun list-all-known-paths ()
+  (remove-duplicates
+   (append (unless (emptyp (dump-gcc-version "clang"))
+             (dump-gcc-include-paths "c" "clang"))
+           (unless (emptyp (dump-gcc-version "clang++"))
+             (dump-gcc-include-paths "c++" "clang++"))
+           (unless (emptyp (dump-gcc-version))
+             (append (dump-gcc-include-paths "c")
+                     (dump-gcc-include-paths "c++"))))
+   :test #'equal
+   :from-end t))
+
+
 (defun list-all-known-include-paths ()
-  (remove-duplicates (remove-if #'%darwin-framework-path-p
-                                (append (dump-gcc-include-paths "c")
-                                        (dump-gcc-include-paths "c++")))
-                     :test #'equal))
+  (remove-if #'%darwin-framework-path-p (list-all-known-paths)))
 
 
 (defun list-all-known-framework-paths ()
   (flet ((cut-darwin-postfix (path)
            (subseq path 0 (- (length path) (length +stupid-darwin-framework-postfix+)))))
-    (remove-duplicates
-     (mapcar #'cut-darwin-postfix
-             (remove-if (complement #'%darwin-framework-path-p)
-                        (append (dump-gcc-include-paths "c")
-                                (dump-gcc-include-paths "c++"))))
-     :test #'equal)))
+    (mapcar #'cut-darwin-postfix
+            (remove-if (complement #'%darwin-framework-path-p) (list-all-known-paths)))))
 
 
-(defun dump-gcc-version ()
+(defun dump-gcc-version (&optional (executable "gcc"))
   (handler-case
       (string-trim '(#\Tab #\Space #\Newline)
                    (with-output-to-string (out)
-                     (uiop:run-program "gcc -dumpversion" :output out)))
+                     (uiop:run-program (format nil "~A -dumpversion" executable) :output out)))
     (t () "")))
 
 ;;;
