@@ -1,4 +1,4 @@
-(cl:in-package :claw.cffi.c)
+(cl:in-package :claw.generator.common)
 
 
 (defgeneric generate-binding (entity &key &allow-other-keys))
@@ -14,10 +14,7 @@
           finally (return override-table))))
 
 
-(defmethod claw.wrapper:expand-library-definition ((generator (eql :claw/cffi))
-                                                   (language (eql :c))
-                                                   wrapper
-                                                   configuration)
+(defun explode-library-definition (generator language wrapper configuration)
   (let ((*spec* (claw.spec:find-specification-for-current-platform
                  (claw.wrapper:wrapper-specification wrapper))))
     (unless *spec*

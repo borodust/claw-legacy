@@ -1,4 +1,4 @@
-(cl:in-package :claw.cffi.c)
+(cl:in-package :claw.generator.common)
 
 
 (defclass static-adapter (adapter) ())
@@ -10,7 +10,7 @@
 
 (defun load-static-adapter-template ()
   (alexandria:read-file-into-string
-   (asdf:system-relative-pathname :claw/cffi "src/cffi/c/adapter/template/static.c")))
+   (asdf:system-relative-pathname :claw/cffi "src/gen/common/adapter/template/static.c")))
 
 
 (defun preprocess-static-adapter-template (header-file function-definitions)

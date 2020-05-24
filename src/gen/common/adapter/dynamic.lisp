@@ -1,4 +1,4 @@
-(cl:in-package :claw.cffi.c)
+(cl:in-package :claw.generator.common)
 
 
 (defgeneric initialize-adapter (library-name))
@@ -13,7 +13,7 @@
 
 (defun load-dynamic-adapter-template ()
   (alexandria:read-file-into-string
-   (asdf:system-relative-pathname :claw/cffi "src/cffi/c/adapter/template/dynamic.c")))
+   (asdf:system-relative-pathname :claw/cffi "src/gen/common/adapter/template/dynamic.c")))
 
 
 (defun library-loader-name (library-name)

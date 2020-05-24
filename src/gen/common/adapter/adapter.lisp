@@ -1,4 +1,4 @@
-(cl:in-package :claw.cffi.c)
+(cl:in-package :claw.generator.common)
 
 
 (defgeneric generate-adapter-file (adapter))
