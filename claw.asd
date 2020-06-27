@@ -4,7 +4,7 @@
   :license "MIT"
   :version "1.0"
   :depends-on (:uiop :alexandria :cl-ppcre :local-time)
-  :pathname "src/"
+  :pathname "src/util/"
   :serial t
   :components ((:file "sha1")
                (:file "util")))
@@ -18,58 +18,7 @@
   :depends-on (:uiop :alexandria :claw-support :claw/util)
   :pathname "src/spec/"
   :serial t
-  :components ((:file "packages")
-               (:file "util")
-               (:file "inclusion")
-               (:file "resect")
-               (:file "specification")
-               (:module entity
-                :serial t
-                :components ((:file "entity")
-                             (:file "primitive")
-                             (:file "alias")
-                             (:file "pointer")
-                             (:file "array")
-                             (:file "enum")
-                             (:file "record")
-                             (:file "function")
-                             (:file "extern")
-                             (:file "namespace")
-                             (:file "reference")
-                             (:file "class")
-                             (:file "template")
-                             (:file "thread")))))
-
-
-(asdf:defsystem :claw/spec/resect
-  :description "Spec generation support using libresect"
-  :author "Pavel Korolev"
-  :license "MIT"
-  :version "1.0"
-  :depends-on (:uiop :alexandria :claw-support :cl-resect :claw/util)
-  :pathname "src/resect/"
-  :serial t
-  :components ((:file "packages")
-               (:file "util")
-               (:file "inclusion")
-               (:file "resect")
-               (:file "specification")
-               (:module entity
-                :serial t
-                :components ((:file "entity")
-                             (:file "primitive")
-                             (:file "alias")
-                             (:file "pointer")
-                             (:file "array")
-                             (:file "enum")
-                             (:file "record")
-                             (:file "function")
-                             (:file "extern")
-                             (:file "namespace")
-                             (:file "reference")
-                             (:file "class")
-                             (:file "template")
-                             (:file "thread")))))
+  :components ((:file "entity")))
 
 
 (asdf:defsystem :claw/wrapper
@@ -77,12 +26,24 @@
   :author "Pavel Korolev"
   :license "MIT"
   :version "1.0"
-  :depends-on (:uiop :alexandria :cl-ppcre :sha1 :claw/util :claw/spec)
+  :depends-on (:uiop :alexandria :cl-ppcre :claw/util)
   :pathname "src/wrap/"
   :serial t
   :components ((:file "packages")
                (:file "library")
+               (:file "filtering")
                (:file "wrapper")))
+
+
+(asdf:defsystem :claw/resect
+  :description "Spec generation support using libresect"
+  :author "Pavel Korolev"
+  :license "MIT"
+  :version "1.0"
+  :depends-on (:uiop :alexandria :claw-support :cl-resect :claw/util :claw/spec :claw/wrapper)
+  :pathname "src/resect/"
+  :serial t
+  :components ((:file "resect")))
 
 
 (asdf:defsystem :claw/generator/common
@@ -92,13 +53,20 @@
   :version "1.0"
   :depends-on (:uiop :alexandria :cffi :cl-ppcre
                :trivial-features :claw/util
-               :claw/spec :claw/wrapper)
+               :claw/spec)
   :pathname "src/gen/common/"
   :serial t
   :components ((:file "packages")
                (:file "util")
                (:file "library")
-               (:module adapter
+               (:module "generator"
+                :serial t
+                :components ((:file "primitive")
+                             (:file "enum")
+                             (:file "alias")
+                             (:file "record")
+                             (:file "function")))
+               (:module "adapter"
                 :serial t
                 :components ((:file "adapter")
                              (:static-file "template/dynamic.c")
@@ -107,47 +75,54 @@
                              (:file "static")))))
 
 
-(asdf:defsystem :claw/cffi
+(asdf:defsystem :claw/generator/cffi
   :description "CFFI generator for CLAW"
   :author "Pavel Korolev"
   :license "MIT"
   :version "1.0"
-  :depends-on (:claw/generator/common)
+  :depends-on (:claw/wrapper :claw/generator/common)
   :pathname "src/gen/cffi/c/"
   :serial t
   :components ((:file "packages")
                (:file "util")
+               (:file "library")
                (:module generator
                 :serial t
                 :components ((:file "type")
-                             (:file "primitive")
-                             (:file "extern")
                              (:file "constant")
                              (:file "typedef")
                              (:file "enum")
                              (:file "struct")
-                             (:file "function")))
-               (:file "library")))
+                             (:file "function")))))
 
 
 (asdf:defsystem :claw/iffi
+  :description "Intricate foreign function interface"
+  :author "Pavel Korolev"
+  :license "MIT"
+  :version "1.0"
+  :depends-on (:alexandria :cffi)
+  :pathname "src/iffi/"
+  :serial t
+  :components ((:file "packages")
+               (:file "iffi")))
+
+
+(asdf:defsystem :claw/generator/iffi
   :description "Intricate foreign function interface generator for CLAW"
   :author "Pavel Korolev"
   :license "MIT"
   :version "1.0"
-  :depends-on (:claw/generator/common)
+  :depends-on (:claw/wrapper :claw/generator/common :claw/iffi)
   :pathname "src/gen/iffi/cxx/"
   :serial t
   :components ((:file "packages")
                (:file "util")
                (:file "library")
-               (:module "ffi"
-                :serial t
-                :components ((:file "class")
-                             (:file "funcall")))
                (:module "generator"
                 :serial t
-                :components ((:file "function")
+                :components ((:file "type")
+                             (:file "function")
                              (:file "class")))))
 
 
@@ -156,7 +131,7 @@
   :author "Pavel Korolev"
   :license "MIT"
   :version "1.0"
-  :depends-on (:cffi :claw/wrapper :claw/cffi :claw/iffi)
+  :depends-on (:cffi :claw/wrapper :claw/resect :claw/generator/cffi :claw/generator/iffi)
   :pathname "src/"
   :serial t
   :components ((:file "packages")))

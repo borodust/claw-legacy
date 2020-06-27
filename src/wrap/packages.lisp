@@ -1,12 +1,25 @@
 (uiop:define-package :claw.wrapper
   (:use #:cl #:alexandria #:claw.util)
   (:export #:defwrapper
+           #:include
+
            #:wrapper-name
-           #:wrapper-specification
-           #:wrapper-headers
-           #:wrapper-standard
-           #:wrapper-includes
-           #:wrapper-last-update-time
+           #:wrapper-options
+           #:wrapper-configuration
+           #:wrapper-entities
+
+           #:wrapper-options-headers
+           #:wrapper-options-includes
+           #:wrapper-options-standard
+
            #:merge-wrapper-pathname
 
-           #:expand-library-definition))
+           #:generate-bindings
+
+           #:describe-foreign-library
+           #:foreign-library-entities
+           #:foreign-library-language))
+
+
+(uiop:define-package :%claw.wrapper.pristine
+  (:use))

@@ -1,9 +1,10 @@
-(cl:in-package :claw.cffi.c)
+(cl:in-package :claw.generator.common)
 
 
 (define-constant +emulated-primitives+ '("long double"
                                          "int128"
-                                         "uint128")
+                                         "uint128"
+                                         "float128")
   :test 'equal)
 
 
@@ -14,6 +15,9 @@
     (export-symbol name)
     `((cffi:defcstruct (,name :size ,size)
         (data :unsigned-char :count ,size))
+      (defmethod cffi:foreign-type-alignment ((this ,name))
+        (declare (ignore this))
+        ,(/ (claw.spec:foreign-entity-bit-alignment type) +byte-size+))
       (cffi:defctype ,name (:struct ,name)))))
 
 
@@ -22,7 +26,7 @@
        (member (claw.spec:foreign-entity-name entity) +emulated-primitives+ :test #'string=)))
 
 
-(defmethod generate-binding ((generator cffi-generator) (type claw.spec:foreign-primitive) &key)
+(defmethod generate-binding ((generator generator) (type claw.spec:foreign-primitive) &key)
   (when (emulated-primitive-p type)
     (generate-primitive-byte-holder type)))
 

@@ -14,10 +14,6 @@
 #  endif
 #endif
 
-#if defined(__cplusplus)
-extern C {
-#endif
-
 #ifdef _WIN32
 #  include <windows.h>
 static HMODULE ___claw_module;

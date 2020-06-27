@@ -19,11 +19,11 @@
 
 ;;;;
 ;;;; CHANGES TO THE ORIGINAL
-;;;; * package is changed from :sha1 to :claw-sha1 to avoid clashes
+;;;; * package is changed from :sha1 to :claw.sha1 to avoid clashes
 ;;;; * base64 dependency is removed
 ;;;;
 
-(defpackage :claw-sha1
+(defpackage :claw.sha1
   (:use :cl)
   (:export
    #:sha1-digest
@@ -33,7 +33,7 @@
    #:hmac-sha1-digest
    #:hmac-sha1-hex))
 
-(in-package :claw-sha1)
+(in-package :claw.sha1)
 
 ;;; ----------------------------------------------------
 

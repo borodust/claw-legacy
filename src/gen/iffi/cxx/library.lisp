@@ -1,11 +1,11 @@
 (cl:in-package :claw.iffi.cxx)
 
 
-(defclass genetaror () ())
+(defclass iffi-generator (generator) ())
 
 
-(defmethod claw.wrapper:expand-library-definition ((generator (eql :claw/iffi))
-                                                   (language (eql :c++))
-                                                   wrapper
-                                                   configuration)
-  (explode-library-definition (make-instance 'generator) language wrapper configuration))
+(defmethod claw.wrapper:generate-bindings ((generator (eql :claw/iffi))
+                                           (language (eql :c++))
+                                           wrapper
+                                           configuration)
+  (explode-library-definition (make-instance 'iffi-generator) language wrapper configuration))

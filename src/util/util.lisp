@@ -242,7 +242,7 @@
                        (nsubstitute #\% #\_ string :end position))
                      string))
          (string (nsubstitute #\- #\_ string)))
-    (format-symbol package (uiop:standard-case-symbol-name string))))
+    (format-symbol package "~A" (uiop:standard-case-symbol-name string))))
 
 
 ;;;

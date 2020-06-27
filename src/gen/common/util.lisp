@@ -9,6 +9,7 @@
                   *trim-enum-prefix-p*
                   *adapter*
                   *export-table*
+                  *entity-table*
                   *pointer-type*
                   *recognize-strings-p*
                   *recognize-bitfields-p*
@@ -24,10 +25,10 @@
   :test #'string=)
 
 
-(defgeneric adapted-function-name (function &optional stream))
-(defgeneric adapted-function-definition (function adapted-name original-name
-                                         &optional stream))
-(defgeneric adapted-function-original-type (function name &optional stream))
+(defgeneric adapted-function-name (function))
+(defgeneric adapted-function-parameters (function))
+(defgeneric adapted-function-return-type (function))
+(defgeneric adapted-function-body (function))
 
 
 (defun export-symbol (symbol)
@@ -38,8 +39,22 @@
   (gethash type *override-table* type))
 
 
-(defun primitive->c (name)
-  (switch (name :test #'equal)
+(defun adapter ()
+  *adapter*)
+
+
+(defun register-adapted-function (function))
+
+
+(defun expand-constant (name value)
+  (let ((name (format-symbol (or (package-name (symbol-package name))
+                                 *package*) "+~A+" name)))
+    (export-symbol name)
+    `((defparameter ,name ,value))))
+
+
+(defun name->cffi-type (name)
+  (switch (name :test #'string=)
     ("char" :char)
     ("signed char" :char)
     ("unsigned char" :unsigned-char)
@@ -58,24 +73,31 @@
     (t (c-name->lisp name :type))))
 
 
-(defun entity-typespec->cffi (typespec)
-  (if (listp typespec)
-      (let ((kind (first typespec))
-            (type (second typespec)))
-        (case kind
-          ((or :pointer :array)
-           (if (and *recognize-strings-p* (equal type "char"))
-               (get-overriden-type :string)
-               (if (and (eq kind :array) *recognize-arrays-p*)
-                   (list* (get-overriden-type :array)
-                          (entity-typespec->cffi type)
-                          (cddr typespec))
-                   (list (get-overriden-type :pointer)
-                         (entity-typespec->cffi type)))))
-          (:enum (entity-typespec->cffi type))
-          (t (list (get-overriden-type kind) (c-name->lisp type :type)))))
-      (get-overriden-type (primitive->c typespec))))
-
-
-(defun entity-type->cffi (entity)
-  (entity-typespec->cffi (claw.spec:foreign-entity-type entity)))
+(defun entity->cffi-type (entity)
+  (labels ((%enveloped-entity ()
+             (claw.spec:foreign-enveloped-entity entity))
+           (%enveloped-char-p ()
+             (and (typep (%enveloped-entity) 'claw.spec:named)
+                  (string= "char" (claw.spec:foreign-entity-name (%enveloped-entity)))))
+           (%lisp-name ()
+             (get-overriden-type
+              (name->cffi-type (or (claw.spec:foreign-entity-name entity)
+                                   (claw.spec:foreign-entity-id entity))))))
+    (typecase entity
+      (claw.spec:foreign-pointer (if (%enveloped-char-p)
+                                     (get-overriden-type :string)
+                                     (list :pointer (entity->cffi-type (%enveloped-entity)))))
+      (claw.spec:foreign-reference (list :reference (entity->cffi-type (%enveloped-entity))))
+      (claw.spec:foreign-array (let ((dimensions (claw.spec:foreign-array-dimensions entity)))
+                                 (cond
+                                   ((and (= (length dimensions) 1) (%enveloped-char-p))
+                                    (get-overriden-type :string))
+                                   (dimensions
+                                    (list :array (entity->cffi-type (%enveloped-entity))
+                                          (apply #'* dimensions)))
+                                   (t
+                                    (list :pointer (entity->cffi-type (%enveloped-entity)))))))
+      (claw.spec:foreign-struct (list :struct (%lisp-name)))
+      (claw.spec:foreign-union (list :union (%lisp-name)))
+      (claw.spec:foreign-class (list :struct (%lisp-name)))
+      (t (%lisp-name)))))

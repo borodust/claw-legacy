@@ -1,4 +1,4 @@
-(cl:in-package :claw.cffi.c)
+(cl:in-package :claw.generator.common)
 
 
 (declaim (special *anonymous-field-number*))
@@ -71,13 +71,23 @@
 ;;;
 ;;; STRUCT
 ;;;
-(defmethod generate-binding ((generator cffi-generator) (entity claw.spec:foreign-struct) &key name)
+(defmethod generate-binding ((generator generator) (entity claw.spec:foreign-struct) &key name)
   (generate-record-binding 'cffi:defcstruct entity name
                            (generate-c-fields :struct entity)))
 
 
-(defmethod generate-forward-declaration ((generator cffi-generator)
+(defmethod generate-binding ((generator generator) (entity claw.spec:foreign-class) &key name)
+  (generate-record-binding 'cffi:defcstruct entity name
+                           (generate-c-fields :struct entity)))
+
+
+(defmethod generate-forward-declaration ((generator generator)
                                          (entity claw.spec:foreign-struct) &key name)
+  (generate-record-binding 'cffi:defcstruct entity name nil))
+
+
+(defmethod generate-forward-declaration ((generator generator)
+                                         (entity claw.spec:foreign-class) &key name)
   (generate-record-binding 'cffi:defcstruct entity name nil))
 
 
@@ -90,12 +100,12 @@
 ;;;
 ;;; UNION
 ;;;
-(defmethod generate-binding ((generator cffi-generator) (entity claw.spec:foreign-union) &key name)
+(defmethod generate-binding ((generator generator) (entity claw.spec:foreign-union) &key name)
   (generate-record-binding 'cffi:defcunion entity name
                            (generate-c-fields :union entity)))
 
 
-(defmethod generate-forward-declaration ((generator cffi-generator)
+(defmethod generate-forward-declaration ((generator generator)
                                          (entity claw.spec:foreign-union) &key name)
   (generate-record-binding 'cffi:defcunion entity name nil))
 
