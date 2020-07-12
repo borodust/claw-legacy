@@ -3,7 +3,8 @@
 
 (defun %generate-typedef-binding (entity)
   (let* ((id (entity->cffi-type entity))
-         (aliased-type (entity->cffi-type (claw.spec:foreign-enveloped-entity entity))))
+         (aliased-type (entity->cffi-type (check-entity-known
+                                           (claw.spec:foreign-enveloped-entity entity)))))
     (export-symbol id)
     `((cffi:defctype ,id ,aliased-type))))
 

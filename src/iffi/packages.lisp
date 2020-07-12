@@ -1,3 +1,8 @@
 (cl:defpackage :claw.iffi
   (:use :cl :alexandria)
-  (:export #:defifun))
+  (:export #:defifun
+           #:defistruct
+           #:defiunion
+           #:deficlass
+
+           #:intricate-function-pointer))

@@ -7,13 +7,14 @@
 (defclass dynamic-adapter (adapter) ())
 
 
-(defun make-dynamic-adapter (wrapper path)
-  (make-instance 'dynamic-adapter :wrapper wrapper :path path))
+(defun make-dynamic-adapter (wrapper path extract-pointers)
+  (make-instance 'dynamic-adapter :wrapper wrapper :path path :extract-pointers extract-pointers))
 
 
 (defun load-dynamic-adapter-template ()
   (alexandria:read-file-into-string
-   (asdf:system-relative-pathname :claw/cffi "src/gen/common/adapter/template/dynamic.c")))
+   (asdf:system-relative-pathname :claw/generator/common
+                                  "src/gen/common/adapter/template/dynamic.c")))
 
 
 (defun library-loader-name (library-name)
@@ -30,7 +31,8 @@
     (subseq full-name 0 (min (length full-name) 64))))
 
 
-(defun preprocess-dynamic-adapter-template (includes
+(defun preprocess-dynamic-adapter-template (defines
+                                            includes
                                             loader-name
                                             function-types
                                             function-pointers
@@ -38,6 +40,7 @@
                                             function-definitions)
   (preprocess-template (load-dynamic-adapter-template)
                        "timestamp" (get-timestamp)
+                       "defines"defines
                        "includes" includes
                        "loader-name" loader-name
                        "function-types" function-types
@@ -68,12 +71,11 @@
                  (with-output-to-string (out)
                    (loop for function in functions
                          do (format out "~&")
-                            (%generate-function-variable-init function out))))
-               (header-files ()
-                 (format nil "~{#include \"~A\"~^~%~}" (headers-of this))))
+                            (%generate-function-variable-init function out)))))
           (format output "~A"
                   (preprocess-dynamic-adapter-template
-                   (header-files)
+                   (format-defines this)
+                   (format-includes this)
                    (library-loader-name (wrapper-name-of this))
                    (function-types)
                    (function-variables)
@@ -81,19 +83,8 @@
                    definitions)))))))
 
 
-(defun build-dynamic-adapter (standard adapter-file includes target-file &key pedantic)
-  (uiop:run-program (append (list "gcc" "-shared" (namestring adapter-file))
-                            (when standard
-                              (list (format nil "-std=~A" standard)))
-                            (when pedantic
-                              (list "-pedantic"))
-                            (list "-O2" "-fPIC")
-                            (loop for directory in includes
-                                  collect (format nil "-I~A"
-                                                  (namestring directory)))
-                            (list "-o" (namestring target-file)))
-                    :output *standard-output*
-                    :error-output *debug-io*))
+(defun build-dynamic-adapter (standard adapter-file includes target-file &key pedantic compiler)
+  (%build-adapter standard adapter-file includes target-file :pedantic pedantic :compiler compiler))
 
 
 (defun %verify-adapter-initialization (result)
@@ -119,14 +110,16 @@
 (defmethod expand-adapter-routines ((this dynamic-adapter) wrapper)
   (let ((name (wrapper-name-of this))
         (shared-library-name (default-shared-adapter-library-name)))
-    `((defmethod build-adapter ((wrapper-name (eql ',name)) &optional target)
+    `((defmethod build-adapter ((wrapper-name (eql ',name)) &key target dependencies compiler)
         (declare (ignore wrapper-name))
         (build-dynamic-adapter ,(standard-of this)
                                ,(adapter-file-of this)
                                (list ,@(includes-of this))
                                (merge-pathnames (or target ,shared-library-name)
                                                 ,(claw.wrapper:merge-wrapper-pathname
-                                                  "" wrapper))))
+                                                  "" wrapper))
+                               :dependencies dependencies
+                               :compiler compiler))
       (defmethod initialize-adapter ((wrapper-name (eql ',name)))
         (declare (ignore wrapper-name))
         (%verify-adapter-initialization

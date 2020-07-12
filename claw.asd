@@ -31,7 +31,6 @@
   :serial t
   :components ((:file "packages")
                (:file "library")
-               (:file "filtering")
                (:file "wrapper")))
 
 
@@ -43,7 +42,11 @@
   :depends-on (:uiop :alexandria :claw-support :cl-resect :claw/util :claw/spec :claw/wrapper)
   :pathname "src/resect/"
   :serial t
-  :components ((:file "resect")))
+  :components ((:file "packages")
+               (:file "inclusion")
+               (:file "filtering")
+               #++(:file "optimization")
+               (:file "resect")))
 
 
 (asdf:defsystem :claw/generator/common
@@ -61,7 +64,8 @@
                (:file "library")
                (:module "generator"
                 :serial t
-                :components ((:file "primitive")
+                :components ((:file "type")
+                             (:file "primitive")
                              (:file "enum")
                              (:file "alias")
                              (:file "record")
@@ -123,7 +127,8 @@
                 :serial t
                 :components ((:file "type")
                              (:file "function")
-                             (:file "class")))))
+                             (:file "class")
+                             (:file "template")))))
 
 
 (asdf:defsystem :claw

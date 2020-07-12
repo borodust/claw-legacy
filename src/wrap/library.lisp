@@ -16,6 +16,12 @@
                                         language
                                         standard
                                         target
+                                        defines
+
+                                        include-definitions
+                                        include-sources
+                                        exclude-definitions
+                                        exclude-sources
                                       &allow-other-keys))
 
 (defgeneric foreign-library-entities (library))

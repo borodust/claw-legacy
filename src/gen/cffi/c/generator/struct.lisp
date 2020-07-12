@@ -63,7 +63,7 @@
   (mapcar #'claw.spec:foreign-enveloped-entity (claw.spec:foreign-record-fields entity)))
 
 
-(defmethod dependable-p ((entity claw.spec:foreign-record))
+(defmethod dependablep ((entity claw.spec:foreign-record))
   (declare (ignore entity))
   t)
 

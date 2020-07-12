@@ -20,6 +20,7 @@
   includes
   framework-includes
   targets
+  defines
 
   include-sources
   include-definitions
@@ -35,8 +36,7 @@
 
 
 (defun merge-wrapper-pathname (pathname wrapper)
-  (let ((*path-mapper* (wrapper-options-base-path (wrapper-options wrapper))))
-    (map-path pathname)))
+  (map-path pathname))
 
 
 (defun predefined-targets (&key (linux "gnu") (windows "msvc") (darwin "gnu"))
@@ -69,6 +69,7 @@
                          includes
                          framework-includes
                          (targets '(:native))
+                         defines
 
                          include-sources include-definitions
                          exclude-sources exclude-definitions)
@@ -85,7 +86,8 @@
                              include-sources
                              include-definitions
                              exclude-sources
-                             exclude-definitions)
+                             exclude-definitions
+                             defines)
         (let* ((system (or (first system) (when (asdf:find-system name nil) name)))
                (base-path (when base-path
                             (find-path base-path :system system)))
@@ -130,7 +132,8 @@
                                 :include-sources include-sources
                                 :include-definitions include-definitions
                                 :exclude-sources exclude-sources
-                                :exclude-definitions exclude-definitions))))))
+                                :exclude-definitions exclude-definitions
+                                :defines defines))))))
 
 
 (defun make-bindings-table (name opts configuration)
@@ -143,18 +146,19 @@
                        :standard (wrapper-options-standard opts)
                        :includes (wrapper-options-includes opts)
                        :framework-includes (wrapper-options-framework-includes opts)
-                       :target target)
+                       :target target
+                       :defines (wrapper-options-defines opts)
+                       :include-sources (wrapper-options-include-sources opts)
+                       :include-definitions (wrapper-options-include-definitions opts)
+                       :exclude-sources (wrapper-options-exclude-sources opts)
+                       :exclude-definitions (wrapper-options-exclude-definitions opts))
         for selected-language = (or (wrapper-options-language opts)
                                     (foreign-library-language library))
         for selected-generator = (or (wrapper-options-generator opts)
                                      (ecase selected-language
                                        (:c :claw/cffi)
                                        (:c++ :claw/iffi)))
-        for entities = (filter-library-entities (foreign-library-entities library)
-                                                (wrapper-options-include-definitions opts)
-                                                (wrapper-options-include-sources opts)
-                                                (wrapper-options-exclude-definitions opts)
-                                                (wrapper-options-exclude-sources opts))
+        for entities = (foreign-library-entities library)
         do (setf (gethash target table) (generate-bindings selected-generator
                                                            selected-language
                                                            (make-wrapper :name name

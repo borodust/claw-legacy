@@ -25,14 +25,27 @@
   :test #'string=)
 
 
+(defvar *void-pointer*
+  (make-instance 'claw.spec:foreign-pointer
+                 :enveloped (make-instance 'claw.spec:foreign-primitive
+                                           :id "void"
+                                           :name "void"
+                                           :bit-size 0
+                                           :bit-alignment 0)))
+
+
 (defgeneric adapted-function-name (function))
 (defgeneric adapted-function-parameters (function))
-(defgeneric adapted-function-return-type (function))
+(defgeneric adapted-function-result-type (function))
 (defgeneric adapted-function-body (function))
 
 
 (defun export-symbol (symbol)
   (setf (gethash symbol *export-table*) symbol))
+
+
+(defun unexport-symbol (symbol)
+  (remhash symbol *export-table*))
 
 
 (defun get-overriden-type (type)
@@ -41,9 +54,6 @@
 
 (defun adapter ()
   *adapter*)
-
-
-(defun register-adapted-function (function))
 
 
 (defun expand-constant (name value)
@@ -55,6 +65,7 @@
 
 (defun name->cffi-type (name)
   (switch (name :test #'string=)
+    ("bool" :bool)
     ("char" :char)
     ("signed char" :char)
     ("unsigned char" :unsigned-char)
@@ -77,11 +88,11 @@
   (labels ((%enveloped-entity ()
              (claw.spec:foreign-enveloped-entity entity))
            (%enveloped-char-p ()
-             (and (typep (%enveloped-entity) 'claw.spec:named)
+             (and (claw.spec:foreign-named-p (%enveloped-entity))
                   (string= "char" (claw.spec:foreign-entity-name (%enveloped-entity)))))
            (%lisp-name ()
              (get-overriden-type
-              (name->cffi-type (or (claw.spec:foreign-entity-name entity)
+              (name->cffi-type (or (claw.spec:format-full-foreign-entity-name entity)
                                    (claw.spec:foreign-entity-id entity))))))
     (typecase entity
       (claw.spec:foreign-pointer (if (%enveloped-char-p)
@@ -100,4 +111,11 @@
       (claw.spec:foreign-struct (list :struct (%lisp-name)))
       (claw.spec:foreign-union (list :union (%lisp-name)))
       (claw.spec:foreign-class (list :struct (%lisp-name)))
+      (claw.spec:foreign-const-qualifier (entity->cffi-type (%enveloped-entity)))
+      (claw.spec:foreign-entity-specialization (entity->cffi-type (%enveloped-entity)))
+      (claw.spec:foreign-function-prototype :pointer)
       (t (%lisp-name)))))
+
+
+(defun void-pointer ()
+  *void-pointer*)

@@ -8,8 +8,4 @@
                                            (language (eql :c))
                                            wrapper
                                            configuration)
-  (let ((*visit-table* (make-hash-table :test 'equal))
-        (*forward-declaration-table* (make-hash-table :test 'equal))
-        (*export-table* (make-hash-table))
-        (*entity-table* (make-hash-table :test #'equal)))
-    (explode-library-definition (make-instance 'cffi-generator) language wrapper configuration)))
+  (explode-library-definition (make-instance 'cffi-generator) language wrapper configuration))

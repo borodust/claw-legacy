@@ -5,6 +5,6 @@
   (list (claw.spec:foreign-enveloped-entity entity)))
 
 
-(defmethod dependable-p ((entity claw.spec:foreign-alias))
+(defmethod dependablep ((entity claw.spec:foreign-alias))
   (declare (ignore entity))
   t)

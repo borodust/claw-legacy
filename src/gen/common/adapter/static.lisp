@@ -4,18 +4,20 @@
 (defclass static-adapter (adapter) ())
 
 
-(defun make-static-adapter (wrapper path)
-  (make-instance 'static-adapter :wrapper wrapper :path path))
+(defun make-static-adapter (wrapper path extract-pointers)
+  (make-instance 'static-adapter :wrapper wrapper :path path :extract-pointers extract-pointers))
 
 
 (defun load-static-adapter-template ()
   (alexandria:read-file-into-string
-   (asdf:system-relative-pathname :claw/cffi "src/gen/common/adapter/template/static.c")))
+   (asdf:system-relative-pathname :claw/generator/common
+                                  "src/gen/common/adapter/template/static.c")))
 
 
-(defun preprocess-static-adapter-template (header-file function-definitions)
+(defun preprocess-static-adapter-template (defines header-file function-definitions)
   (preprocess-template (load-static-adapter-template)
                        "timestamp" (get-timestamp)
+                       "defines" defines
                        "includes" header-file
                        "function-definitions" function-definitions))
 
@@ -26,18 +28,31 @@
     (with-output-to-file (output (adapter-file-of this) :if-exists :supersede)
       (let* ((functions (functions-of this))
              (definitions (%generate-adapted-function-definitions functions "")))
-        (flet ((header-files ()
-                 (format nil "~{#include \"~A\"~^~%~}" (headers-of this))))
-          (format output "~A"
-                  (preprocess-static-adapter-template
-                   (header-files)
-                   definitions)))))))
+        (format output "~A"
+                (preprocess-static-adapter-template
+                 (format-defines this)
+                 (format-includes this)
+                 definitions))))))
 
 
-(defun build-static-adapter (library-name target-file)
-  (declare (ignore library-name target-file))
-  (error "unimplemented"))
+(defun build-static-adapter (standard adapter-file includes target-file
+                             &key pedantic dependencies compiler)
+  (%build-adapter standard adapter-file includes target-file
+                  :pedantic pedantic
+                  :dependencies dependencies
+                  :compiler compiler))
 
 
 (defmethod expand-adapter-routines ((this static-adapter) wrapper)
-  (declare (ignore this wrapper)))
+  (let ((name (wrapper-name-of this))
+        (shared-library-name (default-shared-adapter-library-name)))
+    `((defmethod build-adapter ((wrapper-name (eql ',name)) &key target dependencies compiler)
+        (declare (ignore wrapper-name))
+        (build-static-adapter ,(standard-of this)
+                              ,(adapter-file-of this)
+                              (list ,@(includes-of this))
+                              (merge-pathnames (or target ,shared-library-name)
+                                               ,(claw.wrapper:merge-wrapper-pathname
+                                                 "" wrapper))
+                              :dependencies dependencies
+                              :compiler compiler)))))

@@ -24,7 +24,7 @@
 (defmethod generate-binding ((generator generator) (entity claw.spec:foreign-enum) &key name)
   (let* ((name (or name
                    (unless (emptyp (claw.spec:foreign-entity-name entity))
-                     (c-name->lisp (claw.spec:foreign-entity-name entity) :type))))
+                     (c-name->lisp (claw.spec:format-full-foreign-entity-name entity) :type))))
          (values (loop for (key . value) in (claw.spec:foreign-enum-values entity)
                        collect (cons (c-name->lisp key :enum) value))))
     (flet ((%generate-enum (name)

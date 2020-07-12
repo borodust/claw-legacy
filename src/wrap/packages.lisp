@@ -11,6 +11,7 @@
            #:wrapper-options-headers
            #:wrapper-options-includes
            #:wrapper-options-standard
+           #:wrapper-options-defines
 
            #:merge-wrapper-pathname
 

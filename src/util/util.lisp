@@ -22,7 +22,11 @@
            #:with-local-environment
            #:with-windows-environment
            #:local-environment
-           #:local-platform))
+           #:local-platform
+
+           #:remove-template-argument-string
+           #:extract-template-argument-string
+           #:split-template-argument-string-into-literals))
 (cl:in-package :claw.util)
 
 
@@ -60,6 +64,24 @@
       "x86_64-unknown-openbsd"
       "arm-pc-linux-gnu")
   :test #'equal)
+
+
+;;;
+;;; TEMPLATE ARGUMENT/PARAMETER MANIPULATION
+;;;
+(defvar *template-arguments-extractor* (ppcre:create-scanner "<.*>"))
+
+(defvar *template-argument-literal-splitter* (ppcre:create-scanner "[<>]|\\s*,\\s*"))
+
+(defun remove-template-argument-string (name)
+  (ppcre:regex-replace-all *template-arguments-extractor* name ""))
+
+
+(defun extract-template-argument-string (name)
+  (ppcre:scan-to-strings *template-arguments-extractor* name))
+
+(defun split-template-argument-string-into-literals (name)
+  (ppcre:split *template-argument-literal-splitter* name))
 
 ;;;
 ;;; PATH SEARCH
@@ -237,6 +259,8 @@
   (let* ((string (ppcre:regex-replace-all "([A-Z]+)([A-Z][a-z])" string "\\1_\\2"))
          (string (ppcre:regex-replace-all "([A-Z]+)([A-Z][a-z])" string "\\1_\\2"))
          (string (ppcre:regex-replace-all "([a-z]+)([A-Z])" string "\\1_\\2"))
+         (string (ppcre:regex-replace-all "\\:\\:|\\s" string "_"))
+         (string (ppcre:regex-replace-all "," string "+"))
          (string (if (ppcre:all-matches "^(:_|_)" string)
                      (let ((position (position #\_ string :test (complement #'equal))))
                        (nsubstitute #\% #\_ string :end position))

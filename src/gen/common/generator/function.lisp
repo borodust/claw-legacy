@@ -8,13 +8,13 @@
 
 
 (defun adaptablep (function)
-  (some #'recordp (list* (claw.spec:foreign-function-return-type function)
+  (some #'recordp (list* (claw.spec:foreign-function-result-type function)
                          (mapcar #'claw.spec:foreign-enveloped-entity
                                  (claw.spec:foreign-function-parameters function)))))
 
 
 (defun returns-struct-p (function)
-  (recordp (claw.spec:foreign-function-return-type function)))
+  (recordp (claw.spec:foreign-function-result-type function)))
 
 
 (defun adapt-record-type (entity)
@@ -23,8 +23,8 @@
                          entity)))
 
 
-(defun adapt-return-type (function)
-  (adapt-record-type (claw.spec:foreign-function-return-type function)))
+(defun adapt-result-type (function)
+  (adapt-record-type (claw.spec:foreign-function-result-type function)))
 
 
 (defun generate-c-parameters (function)
@@ -75,7 +75,7 @@
                                          params))))
          (param-string (format nil "~{~A~^, ~}" parameters)))
     (format stream control-string
-            (typespec->c (claw.spec:foreign-function-return-type function))
+            (typespec->c (claw.spec:foreign-function-result-type function))
             (or name (claw.spec:foreign-entity-name function))
             param-string)))
 
@@ -98,7 +98,7 @@
                    finally (return
                              (if (returns-struct-p this)
                                  (list* (%adapted-typespec->c
-                                         (claw.spec:foreign-function-return-type this))
+                                         (claw.spec:foreign-function-result-type this))
                                         param-types)
                                  param-types))))
            (%to-params ()
@@ -113,13 +113,13 @@
                            collect (if (recordp (claw.spec:foreign-entity-type type))
                                        (format nil "(*arg~A)" i)
                                        (format nil "arg~A" i))))))
-    (let* ((return-type (%adapted-typespec->c
-                         (claw.spec:foreign-function-return-type this)))
-           (void-p (equal return-type "void")))
-      (format stream "~A ~A(~A) {~%  " return-type adapted-name (%to-params))
+    (let* ((result-type (%adapted-typespec->c
+                         (claw.spec:foreign-function-result-type this)))
+           (void-p (equal result-type "void")))
+      (format stream "~A ~A(~A) {~%  " result-type adapted-name (%to-params))
       (unless void-p
         (format stream "~A result = " (typespec->c
-                                       (claw.spec:foreign-function-return-type this))))
+                                       (claw.spec:foreign-function-result-type this))))
       (format stream "~A(~A);" original-name (%to-args))
       (when (returns-struct-p this)
         (format stream "~& (*arg0) = result;"))
@@ -136,12 +136,17 @@
          (c-name (if adaptable-p
                      (adapt-function-name (claw.spec:foreign-entity-name entity))
                      (claw.spec:foreign-entity-name entity)))
-         (return-type (adapt-return-type entity))
+         (result-type (adapt-result-type entity))
          (params (generate-c-parameters entity)))
     (when (and (adapter) adaptable-p)
       (register-adapted-function entity))
     (export-symbol id)
-    `((cffi:defcfun (,c-name ,id) ,return-type
+    `((cffi:defcfun (,c-name ,id) ,result-type
         ,@params
         ,@(when (claw.spec:foreign-function-variadic-p entity)
             (list 'cl:&rest))))))
+
+
+(defmethod foreign-entity-dependencies ((entity claw.spec:foreign-function))
+  (list* (claw.spec:foreign-function-result-type entity)
+         (mapcar #'claw.spec:foreign-enveloped-entity (claw.spec:foreign-function-parameters entity))))
