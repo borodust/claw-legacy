@@ -25,12 +25,15 @@
 (defgeneric parse-type (category kind type))
 
 
+(defun const (entity)
+  (make-instance 'claw.spec:foreign-const-qualifier :enveloped entity))
+
+
 (defmethod parse-type :around (category kind type)
   (declare (ignorable category kind type))
   (let ((result (call-next-method)))
     (when (%resect:type-const-qualified-p type)
-      (setf result (make-instance 'claw.spec:foreign-const-qualifier
-                                  :enveloped result)))
+      (setf result (const result)))
     result))
 
 
@@ -256,11 +259,11 @@
   (with-slots (fields) this
     fields))
 
-(defclass resect-struct (foreign-struct resect-record) ())
+(defclass resect-struct (resect-record foreign-struct) ())
 
-(defclass resect-union (foreign-union resect-record) ())
+(defclass resect-union (resect-record foreign-union) ())
 
-(defclass resect-class (foreign-class resect-record) ())
+(defclass resect-class (resect-record foreign-class) ())
 
 
 (defun collect-entity-parameters (decl)
@@ -403,6 +406,15 @@
   (format nil "~A~@[~A~]" name (method-postfix-of entity)))
 
 
+(defun ensure-const-if-needed (type entity)
+  ;; crazy, maybe a bug in libclang
+  (if (and (typep entity 'claw.spec:foreign-pointer)
+           (starts-with-subseq "const " (%resect:type-name type)))
+      (make-instance 'claw.spec:foreign-pointer
+                     :enveloped (const (claw.spec:foreign-enveloped-entity entity)))
+      entity))
+
+
 (defun parse-record-declaration (record-kind decl from-type)
   (let* ((record-info (make-record-info decl from-type))
          (*template-argument-map-list* (list* record-info *template-argument-map-list*)))
@@ -419,7 +431,9 @@
                        (push (make-instance 'foreign-record-field
                                             :name (%resect:declaration-name field-decl)
                                             :location (make-declaration-location field-decl)
-                                            :enveloped (parse-type-by-category field-type)
+                                            :enveloped (ensure-const-if-needed
+                                                        field-type
+                                                        (parse-type-by-category field-type))
                                             :bit-size (%resect:type-size field-type)
                                             :bit-alignment (%resect:type-alignment field-type)
                                             :bit-offset (%resect:field-offset field-decl)

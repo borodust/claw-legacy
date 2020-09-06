@@ -25,13 +25,23 @@
   :test #'string=)
 
 
+(defvar *void*
+  (make-instance 'claw.spec:foreign-primitive
+                 :id "void"
+                 :name "void"
+                 :bit-size 0
+                 :bit-alignment 0))
+
 (defvar *void-pointer*
   (make-instance 'claw.spec:foreign-pointer
-                 :enveloped (make-instance 'claw.spec:foreign-primitive
-                                           :id "void"
-                                           :name "void"
-                                           :bit-size 0
-                                           :bit-alignment 0)))
+                 :enveloped *void*))
+
+(defvar *unsigned-long-long*
+  (make-instance 'claw.spec:foreign-primitive
+                 :id "unsigned long long"
+                 :name "unsigned long long"
+                 :bit-size (* (cffi:foreign-type-size :unsigned-long-long) 8)
+                 :bit-alignment (* (cffi:foreign-type-alignment :unsigned-long-long) 8)))
 
 
 (defgeneric adapted-function-name (function))
@@ -108,14 +118,26 @@
                                           (apply #'* dimensions)))
                                    (t
                                     (list :pointer (entity->cffi-type (%enveloped-entity)))))))
-      (claw.spec:foreign-struct (list :struct (%lisp-name)))
-      (claw.spec:foreign-union (list :union (%lisp-name)))
-      (claw.spec:foreign-class (list :struct (%lisp-name)))
+      (claw.spec:foreign-struct (%lisp-name))
+      (claw.spec:foreign-union (%lisp-name))
+      (claw.spec:foreign-class (%lisp-name))
       (claw.spec:foreign-const-qualifier (entity->cffi-type (%enveloped-entity)))
       (claw.spec:foreign-entity-specialization (entity->cffi-type (%enveloped-entity)))
       (claw.spec:foreign-function-prototype :pointer)
       (t (%lisp-name)))))
 
 
+(defun void ()
+  *void*)
+
 (defun void-pointer ()
   *void-pointer*)
+
+(defun unsigned-long-long ()
+  *unsigned-long-long*)
+
+(defun pointer (entity)
+  (make-instance 'claw.spec:foreign-pointer :enveloped entity))
+
+(defun parameter (name entity)
+  (make-instance 'claw.spec:foreign-parameter :name name :enveloped entity))

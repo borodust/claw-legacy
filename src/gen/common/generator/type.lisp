@@ -68,7 +68,7 @@
                                 (not (gethash id *forward-declaration-table*))
                                 (member id (rest *dependency-type-list*) :test #'equal))
                        (setf (gethash id *forward-declaration-table*) id)
-                       (apply #'generate-forward-declaration entity args))
+                       (apply #'generate-forward-declaration generator entity args))
                      (progn
                        ;; register a visit
                        (notice-visit id)

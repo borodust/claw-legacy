@@ -55,10 +55,6 @@
     `((,kind (,name :size ,byte-size) ,@fields))))
 
 
-(defun %generate-forward-declaration (kind name)
-  `(,kind ,(c-name->lisp name :type)))
-
-
 (defmethod foreign-entity-dependencies ((entity claw.spec:foreign-record))
   (mapcar #'claw.spec:foreign-enveloped-entity (claw.spec:foreign-record-fields entity)))
 
@@ -91,12 +87,6 @@
   (generate-record-binding 'cffi:defcstruct entity name nil))
 
 
-(defmethod generate-forward-declaration-from-typespec ((kind (eql :struct))
-                                                       &optional name &rest opts)
-  (declare (ignore opts))
-  (%generate-forward-declaration 'cffi:defcstruct name))
-
-
 ;;;
 ;;; UNION
 ;;;
@@ -108,9 +98,3 @@
 (defmethod generate-forward-declaration ((generator generator)
                                          (entity claw.spec:foreign-union) &key name)
   (generate-record-binding 'cffi:defcunion entity name nil))
-
-
-(defmethod generate-forward-declaration-from-typespec ((kind (eql :union))
-                                                       &optional name &rest opts)
-  (declare (ignore opts))
-  (%generate-forward-declaration 'cffi:defcunion name))

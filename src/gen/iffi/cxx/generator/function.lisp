@@ -15,7 +15,6 @@
                          :enveloped (claw.spec:foreign-enveloped-entity this))
           t))
 
-
 (defmethod adapt-type ((this claw.spec:foreign-const-qualifier))
   (multiple-value-bind (type adapted)
       (adapt-type (claw.spec:foreign-enveloped-entity this))
@@ -100,13 +99,15 @@
       (t (format stream "return ~A;" invocation)))))
 
 
-
 (defun unconst-adapted-result-type (adapted-result-type)
-  (let ((result-type (claw.spec:foreign-enveloped-entity adapted-result-type)))
-    (if (typep result-type 'claw.spec:foreign-const-qualifier)
-        (make-instance 'claw.spec:foreign-pointer
-                       :enveloped (claw.spec:foreign-enveloped-entity result-type))
-        adapted-result-type)))
+  (cond
+    ((typep adapted-result-type 'claw.spec:foreign-const-qualifier)
+     (unconst-adapted-result-type (claw.spec:foreign-enveloped-entity adapted-result-type)))
+    ((typep adapted-result-type 'claw.spec:foreign-pointer)
+     (make-instance 'claw.spec:foreign-pointer
+                    :enveloped (unconst-adapted-result-type
+                                (claw.spec:foreign-enveloped-entity adapted-result-type))))
+    (t adapted-result-type)))
 
 
 (defun adapt-function (entity)
@@ -154,7 +155,7 @@
                                :owner (claw.spec:foreign-owner entity)))
          (result (make-instance 'claw.spec:foreign-pointer :enveloped proto)))
     (make-instance 'adapted-function
-                   :name (format nil "~A_claw_ptrextr" mangled-name)
+                   :name (format nil "__claw_ptrextr_~A" mangled-name)
                    :parameters nil
                    :result-type result
                    :body (format nil "return &~A;" full-name))))
@@ -163,7 +164,7 @@
 (defun generate-function-binding (entity)
   (let* ((adapted-function (adapt-function entity))
          (full-name (claw.spec:format-full-foreign-entity-name entity :include-method-owner nil))
-         (name (c-name->lisp (remove-template-argument-string full-name) :type))
+         (name (c-name->lisp full-name :type))
          (result-type (entity->cffi-type
                        (check-entity-known
                         (adapted-function-result-type adapted-function))))
@@ -178,7 +179,7 @@
          (extractor-cname (when (function-pointer-extractor-required-p full-name)
                             (register-adapted-function (adapt-pointer-extractor entity)))))
     (export-symbol name)
-    `((claw.iffi:defifun (,adapted-cname ,name ,@(when extractor-cname
+    `((iffi:defifun (,adapted-cname ,name ,@(when extractor-cname
                                                    `(:pointer-extractor ,extractor-cname)))
           ,result-type
         ,(claw.spec:format-foreign-location (claw.spec:foreign-entity-location entity))
@@ -198,9 +199,12 @@
 ;;; METHOD
 ;;;
 (defmethod generate-binding ((generator iffi-generator) (entity claw.spec:foreign-method) &key)
-  (unless (or (claw.spec:foreign-entity-parameters entity)
-              (claw.spec:foreign-entity-parameters (claw.spec:foreign-owner entity))
-              (and (claw.spec:foreign-record-abstract-p (claw.spec:foreign-owner entity))
-                   (claw.spec:foreign-constructor-p entity))
-              (starts-with-subseq "operator type-parameter" (claw.spec:foreign-entity-name entity)))
-    (generate-function-binding entity)))
+  (let ((name (claw.spec:foreign-entity-name entity)))
+    (unless (or (claw.spec:foreign-entity-parameters entity)
+                (claw.spec:foreign-entity-parameters (claw.spec:foreign-owner entity))
+                (and (claw.spec:foreign-record-abstract-p (claw.spec:foreign-owner entity))
+                     (claw.spec:foreign-constructor-p entity))
+                (starts-with-subseq "operator type-parameter" name)
+                (starts-with-subseq "operator new" name)
+                (starts-with-subseq "operator delete" name))
+      (generate-function-binding entity))))

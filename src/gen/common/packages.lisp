@@ -4,7 +4,6 @@
 
            #:generate-binding
            #:generate-forward-declaration
-           #:generate-forward-declaration-from-typespec
            #:signal-unknown-entity
            #:check-entity-known
 
@@ -34,6 +33,10 @@
            #:emulated-primitive-p
            #:anonymousp
 
+           #:void
+           #:pointer
            #:void-pointer
+           #:unsigned-long-long
+           #:parameter
 
            #:generator))
