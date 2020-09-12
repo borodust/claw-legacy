@@ -95,7 +95,10 @@
         (string= (claw.spec:foreign-entity-name result-type) "void"))
        (format stream "~A;" invocation))
       (result-type-adapted
-       (format stream "*(__claw_result_) = ~A;~%return __claw_result_;" invocation))
+       (format stream "new (__claw_result_) ~A(~A);~%return __claw_result_;"
+               (claw.spec:format-full-foreign-entity-name
+                (claw.spec:foreign-enveloped-entity (unconst-adapted-result-type result-type)))
+               invocation))
       (t (format stream "return ~A;" invocation)))))
 
 
@@ -180,7 +183,7 @@
                             (register-adapted-function (adapt-pointer-extractor entity)))))
     (export-symbol name)
     `((iffi:defifun (,adapted-cname ,name ,@(when extractor-cname
-                                                   `(:pointer-extractor ,extractor-cname)))
+                                              `(:pointer-extractor ,extractor-cname)))
           ,result-type
         ,(claw.spec:format-foreign-location (claw.spec:foreign-entity-location entity))
         ,@params
@@ -190,21 +193,28 @@
 ;;;
 ;;; FUNCTION
 ;;;
+(defun function-parameterized-p (function)
+  (let ((name (claw.spec:foreign-entity-name function)))
+    (or (parameterizedp function)
+        (parameterizedp (claw.spec:foreign-function-result-type function))
+        (loop for param in (claw.spec:foreign-function-parameters function)
+                thereis (parameterizedp (claw.spec:foreign-enveloped-entity param)))
+        (starts-with-subseq "operator type-parameter" name)
+        (starts-with-subseq "operator new" name)
+        (starts-with-subseq "operator delete" name))))
+
+
 (defmethod generate-binding ((generator iffi-generator)
                              (entity claw.spec:foreign-function) &key)
-  (unless (claw.spec:foreign-entity-parameters entity)
+  (unless (function-parameterized-p entity)
     (generate-function-binding entity)))
 
 ;;;
 ;;; METHOD
 ;;;
 (defmethod generate-binding ((generator iffi-generator) (entity claw.spec:foreign-method) &key)
-  (let ((name (claw.spec:foreign-entity-name entity)))
-    (unless (or (claw.spec:foreign-entity-parameters entity)
-                (claw.spec:foreign-entity-parameters (claw.spec:foreign-owner entity))
-                (and (claw.spec:foreign-record-abstract-p (claw.spec:foreign-owner entity))
-                     (claw.spec:foreign-constructor-p entity))
-                (starts-with-subseq "operator type-parameter" name)
-                (starts-with-subseq "operator new" name)
-                (starts-with-subseq "operator delete" name))
-      (generate-function-binding entity))))
+  (unless (or (function-parameterized-p entity)
+              (parameterizedp (claw.spec:foreign-owner entity))
+              (and (claw.spec:foreign-record-abstract-p (claw.spec:foreign-owner entity))
+                   (claw.spec:foreign-constructor-p entity)))
+    (generate-function-binding entity)))

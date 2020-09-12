@@ -21,6 +21,7 @@
   framework-includes
   targets
   defines
+  instantiations
 
   include-sources
   include-definitions
@@ -70,6 +71,7 @@
                          framework-includes
                          (targets '(:native))
                          defines
+                         instantiations
 
                          include-sources include-definitions
                          exclude-sources exclude-definitions)
@@ -87,7 +89,8 @@
                              include-definitions
                              exclude-sources
                              exclude-definitions
-                             defines)
+                             defines
+                             instantiations)
         (let* ((system (or (first system) (when (asdf:find-system name nil) name)))
                (base-path (when base-path
                             (find-path base-path :system system)))
@@ -133,7 +136,8 @@
                                 :include-definitions include-definitions
                                 :exclude-sources exclude-sources
                                 :exclude-definitions exclude-definitions
-                                :defines defines))))))
+                                :defines defines
+                                :instantiations instantiations))))))
 
 
 (defun make-bindings-table (name opts configuration)
@@ -148,6 +152,7 @@
                        :framework-includes (wrapper-options-framework-includes opts)
                        :target target
                        :defines (wrapper-options-defines opts)
+                       :instantiations (wrapper-options-instantiations opts)
                        :include-sources (wrapper-options-include-sources opts)
                        :include-definitions (wrapper-options-include-definitions opts)
                        :exclude-sources (wrapper-options-exclude-sources opts)

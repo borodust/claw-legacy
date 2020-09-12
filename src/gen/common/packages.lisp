@@ -29,7 +29,6 @@
            #:export-symbol
            #:expand-constant
            #:entity->cffi-type
-           #:entity->c-name
            #:emulated-primitive-p
            #:anonymousp
 

@@ -1,6 +1,13 @@
 (cl:in-package :claw.iffi.cxx)
 
 
+(defun parameterizedp (entity)
+  (if (claw.spec:foreign-envelope-p entity)
+      (parameterizedp (claw.spec:foreign-enveloped-entity entity))
+      (when (claw.spec:foreign-parameterizable-p entity)
+        (not (null (claw.spec:foreign-entity-parameters entity))))))
+
+
 (defun anonymous-branch-p (entity)
   (or (when (claw.spec:foreign-envelope-p entity)
         (anonymous-branch-p (claw.spec:foreign-enveloped-entity entity)))
@@ -23,6 +30,9 @@
                  :body (format nil "return ~A(~A);"
                                reporter
                                (claw.spec:format-full-foreign-entity-name entity))))
+
+
+()
 
 
 (defun adapt-setter (record field)
@@ -59,7 +69,7 @@
                        :result-type result-type
                        :body (format nil "return ~@[(~A)~]~@[~A~]__claw_this_->~A;"
                                      (when array-p
-                                       (entity->c-name result-type))
+                                       (claw.spec:format-foreign-entity-c-name result-type))
                                      (when adapted-p
                                        "&")
                                      field-name))))))

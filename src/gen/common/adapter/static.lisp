@@ -5,7 +5,9 @@
 
 
 (defun make-static-adapter (wrapper path extract-pointers)
-  (make-instance 'static-adapter :wrapper wrapper :path path :extract-pointers extract-pointers))
+  (make-instance 'static-adapter :wrapper wrapper
+                                 :path path
+                                 :extract-pointers extract-pointers))
 
 
 (defun load-static-adapter-template ()

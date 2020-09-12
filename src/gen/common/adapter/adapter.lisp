@@ -3,7 +3,6 @@
 
 (defvar *lib-name-regex* (ppcre:create-scanner "^lib(.*)\\..*$"))
 
-
 (defgeneric generate-adapter-file (adapter))
 (defgeneric build-adapter (wrapper-name &key target dependencies compiler))
 (defgeneric expand-adapter-routines (adapter wrapper))
@@ -101,9 +100,6 @@
           (adapted-function-name function)))
 
 
-(defgeneric entity->c-name (entity &key &allow-other-keys))
-
-
 (defun enveloped-function-protoype-p (entity)
   (if (claw.spec:foreign-envelope-p entity)
       (enveloped-function-protoype-p (claw.spec:foreign-enveloped-entity entity))
@@ -113,15 +109,15 @@
 (defun format-function (function stream)
   (let* ((result-type (adapted-function-result-type function))
          (name (format-adapted-function-name (adapted-function-name function)))
-         (params (mapcar #'entity->c-name (adapted-function-parameters function)))
+         (params (mapcar #'claw.spec:format-foreign-entity-c-name (adapted-function-parameters function)))
          (body (adapted-function-body function)))
     (if (enveloped-function-protoype-p result-type)
         (format stream "~A {~%~A~%}"
-                (entity->c-name result-type
+                (claw.spec:format-foreign-entity-c-name result-type
                                 :name (format nil "~A(~{~A~^, ~})" name params))
                 body)
         (format stream "~A ~A(~{~A~^, ~}) {~%~A~%}"
-                (entity->c-name result-type)
+                (claw.spec:format-foreign-entity-c-name result-type)
                 name
                 params
                 body))))
@@ -137,92 +133,6 @@
 (defun %adapter-needs-rebuilding-p (this)
   (or (uiop:featurep :claw-rebuild-adapter)
       (not (probe-file (adapter-file-of this)))))
-
-;;;
-;;; C NAMES
-;;;
-(defun format-default-c-name (tag const-qualified &optional name)
-  (format nil "~@[~A ~]~A~@[ ~A~]" (when const-qualified "const") tag name))
-
-
-(defmethod entity->c-name ((this claw.spec:foreign-primitive) &key const-qualified name)
-  (let ((tag (claw.spec:foreign-entity-name this)))
-    (format-default-c-name
-     (switch (tag :test #'string=)
-       ("int128" "__int128")
-       ("uint128" "__uint128")
-       ("float128" "__float128")
-       (t tag))
-     const-qualified name)))
-
-
-(defmethod entity->c-name ((this claw.spec:foreign-pointer) &key const-qualified name)
-  (let ((enveloped (claw.spec:foreign-enveloped-entity this)))
-    (if (typep enveloped 'claw.spec:foreign-function-prototype)
-        (entity->c-name enveloped :name (format nil "*~@[~A~]" name))
-        (format nil "~A*~@[ ~A~]~@[ ~A~]"
-                (entity->c-name enveloped)
-                (when const-qualified "const")
-                name))))
-
-
-(defmethod entity->c-name ((this claw.spec:foreign-reference) &key const-qualified name)
-  (let ((enveloped (claw.spec:foreign-enveloped-entity this)))
-    (format nil "~@[~A ~]~A&~@[ ~A~]"
-            (when const-qualified "const")
-            (entity->c-name enveloped)
-            name)))
-
-
-(defmethod entity->c-name ((this claw.spec:foreign-function-prototype) &key name)
-  (format nil "~A(~@[~A ~]~@[~A~])(~{~A~^, ~})"
-          (entity->c-name (claw.spec:foreign-function-result-type this))
-          (when-let ((owner (claw.spec:foreign-owner this)))
-            (claw.spec:format-full-foreign-entity-name owner))
-          name
-          (mapcar #'entity->c-name (claw.spec:foreign-function-parameters this))))
-
-
-(defmethod entity->c-name ((this claw.spec:foreign-struct) &key const-qualified name)
-  (format-default-c-name (format nil "struct ~A" (claw.spec:format-full-foreign-entity-name this)) const-qualified name))
-
-
-(defmethod entity->c-name ((this claw.spec:foreign-union) &key const-qualified name)
-  (format-default-c-name (format nil "union ~A" (claw.spec:format-full-foreign-entity-name this)) const-qualified name))
-
-
-(defmethod entity->c-name ((this claw.spec:foreign-enum) &key const-qualified name)
-  (format-default-c-name (format nil "enum ~A" (claw.spec:format-full-foreign-entity-name this)) const-qualified name))
-
-
-(defmethod entity->c-name ((this claw.spec:foreign-class) &key const-qualified name)
-  (format-default-c-name (format nil "~A" (claw.spec:format-full-foreign-entity-name this)) const-qualified name))
-
-
-(defmethod entity->c-name ((this claw.spec:foreign-alias) &key const-qualified name)
-  (format-default-c-name (claw.spec:format-full-foreign-entity-name this) const-qualified name))
-
-
-(defmethod entity->c-name ((this claw.spec:foreign-parameter) &key)
-  (entity->c-name (claw.spec:foreign-enveloped-entity this) :name (claw.spec:foreign-entity-name this)))
-
-
-(defmethod entity->c-name ((this claw.spec:foreign-const-qualifier) &key name)
-  (entity->c-name (claw.spec:foreign-enveloped-entity this) :const-qualified t :name name))
-
-
-(defmethod entity->c-name ((this claw.spec:foreign-entity-specialization) &key const-qualified name)
-  (format-default-c-name
-   (format nil "~A<>" (entity->c-name (claw.spec:foreign-enveloped-entity this)))
-   const-qualified name))
-
-
-(defmethod entity->c-name ((this claw.spec:foreign-array) &key const-qualified name)
-  (format-default-c-name
-   (format nil "~A*"
-           (entity->c-name (claw.spec:foreign-enveloped-entity this)))
-   const-qualified name))
-
 
 ;;;
 ;;; BUILD

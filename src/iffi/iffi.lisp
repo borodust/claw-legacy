@@ -27,7 +27,7 @@
        (byte-size ,size-t-type))))
 
 
-(eval-when (:compile-toplevel :load-toplevel :evaluate)
+(eval-when (:compile-toplevel :load-toplevel :execute)
   (defun find-quoted (value)
     (and (listp value) (eq 'quote (first value)) (second value))))
 

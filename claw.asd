@@ -46,6 +46,8 @@
                (:file "inclusion")
                (:file "filtering")
                #++(:file "optimization")
+               (:file "inspect")
+               (:file "prepare")
                (:file "resect")))
 
 

@@ -72,6 +72,7 @@
            #:foreign-variable
            #:foreign-entity-value
 
+           #:foreign-parameterizable-p
            #:foreign-entity-parameter
            #:foreign-entity-type-parameter
            #:foreign-entity-value-parameter
@@ -84,7 +85,8 @@
 
            #:foreign-constructor-p
            #:format-foreign-location
-           #:format-full-foreign-entity-name))
+           #:format-full-foreign-entity-name
+           #:format-foreign-entity-c-name))
 (cl:in-package :claw.spec)
 
 ;;;
@@ -147,7 +149,6 @@
 (defmethod foreign-owner (entity)
   (declare (ignore entity))
   nil)
-
 
 ;;;
 ;;; LOCATION
@@ -265,6 +266,9 @@
          :reader foreign-entity-parameter-type)))
 
 
+(defun foreign-parameterizable-p (entity)
+  (typep entity 'parameterized))
+
 ;;;
 ;;; RECORD
 ;;;
@@ -376,7 +380,10 @@
 (defclass foreign-variable (named foreign-entity)
   ((value :initarg :value
           :initform (error ":value missing")
-          :reader foreign-entity-value)))
+          :reader foreign-entity-value)
+   (type :initarg :type
+         :initform (error ":type missing")
+         :reader foreing-variable-type)))
 
 
 ;;;
@@ -403,25 +410,28 @@
     nil))
 
 
+(defmethod foreign-entity-unknown-p ((entity envelope))
+  (foreign-entity-unknown-p (foreign-enveloped-entity entity)))
+
 ;;;
 ;;; UTIL
 ;;;
 (defun format-foreign-location (location &optional (print-line-and-column-p t))
   (if (and location
-           (claw.spec:foreign-location-path location))
+           (foreign-location-path location))
       (format nil "~A~@[~A~]"
-              (claw.spec:foreign-location-path location)
+              (foreign-location-path location)
               (when print-line-and-column-p
                 (format nil ":~A:~A"
-                        (claw.spec:foreign-location-line location)
-                        (claw.spec:foreign-location-column location))))
+                        (foreign-location-line location)
+                        (foreign-location-column location))))
       "::"))
 
 
 (defun foreign-constructor-p (entity)
-  (and (typep entity 'claw.spec:foreign-method)
-       (equal (claw.spec:foreign-entity-name (claw.spec:foreign-owner entity))
-              (claw.spec:foreign-entity-name entity))))
+  (and (typep entity 'foreign-method)
+       (equal (foreign-entity-name (foreign-owner entity))
+              (foreign-entity-name entity))))
 
 
 (defun format-full-foreign-entity-name (entity &key (include-method-owner t))
@@ -434,7 +444,99 @@
                            (not (typep entity 'foreign-method)))
                        current-owner)
               (format nil "~{~A~^::~}"
-                      (loop for owner = current-owner then (claw.spec:foreign-owner owner)
+                      (loop for owner = current-owner then (foreign-owner owner)
                             while owner
-                            collect (or (claw.spec:foreign-entity-name owner) ""))))
+                            collect (or (foreign-entity-name owner) ""))))
             (or (foreign-entity-name entity) ""))))
+
+;;;
+;;; C NAMES
+;;;
+(defgeneric format-foreign-entity-c-name (entity &key &allow-other-keys))
+
+
+(defun format-default-c-name (tag const-qualified &optional name)
+  (format nil "~@[~A ~]~A~@[ ~A~]" (when const-qualified "const") tag name))
+
+
+(defmethod format-foreign-entity-c-name ((this foreign-primitive) &key const-qualified name)
+  (let ((tag (foreign-entity-name this)))
+    (format-default-c-name
+     (switch (tag :test #'string=)
+       ("int128" "__int128")
+       ("uint128" "__uint128")
+       ("float128" "__float128")
+       (t tag))
+     const-qualified name)))
+
+
+(defmethod format-foreign-entity-c-name ((this foreign-pointer) &key const-qualified name)
+  (let ((enveloped (foreign-enveloped-entity this)))
+    (if (typep enveloped 'foreign-function-prototype)
+        (format-foreign-entity-c-name enveloped :name (format nil "*~@[~A~]" name))
+        (format nil "~A*~@[ ~A~]~@[ ~A~]"
+                (format-foreign-entity-c-name enveloped)
+                (when const-qualified "const")
+                name))))
+
+
+(defmethod format-foreign-entity-c-name ((this foreign-reference) &key const-qualified name)
+  (let ((enveloped (foreign-enveloped-entity this)))
+    (format nil "~@[~A ~]~A&~@[ ~A~]"
+            (when const-qualified "const")
+            (format-foreign-entity-c-name enveloped)
+            name)))
+
+
+(defmethod format-foreign-entity-c-name ((this foreign-function-prototype) &key name)
+  (format nil "~A(~@[~A ~]~@[~A~])(~{~A~^, ~})"
+          (format-foreign-entity-c-name (foreign-function-result-type this))
+          (when-let ((owner (foreign-owner this)))
+            (format-full-foreign-entity-name owner))
+          name
+          (mapcar #'format-foreign-entity-c-name (foreign-function-parameters this))))
+
+
+(defmethod format-foreign-entity-c-name ((this foreign-struct) &key const-qualified name)
+  (format-default-c-name (format nil "struct ~A" (format-full-foreign-entity-name this)) const-qualified name))
+
+
+(defmethod format-foreign-entity-c-name ((this foreign-union) &key const-qualified name)
+  (format-default-c-name (format nil "union ~A" (format-full-foreign-entity-name this)) const-qualified name))
+
+
+(defmethod format-foreign-entity-c-name ((this foreign-enum) &key const-qualified name)
+  (format-default-c-name (format nil "enum ~A" (format-full-foreign-entity-name this)) const-qualified name))
+
+
+(defmethod format-foreign-entity-c-name ((this foreign-class) &key const-qualified name)
+  (format-default-c-name (format nil "~A" (format-full-foreign-entity-name this)) const-qualified name))
+
+
+(defmethod format-foreign-entity-c-name ((this foreign-alias) &key const-qualified name)
+  (format-default-c-name (format-full-foreign-entity-name this) const-qualified name))
+
+
+(defmethod format-foreign-entity-c-name ((this foreign-parameter) &key)
+  (format-foreign-entity-c-name (foreign-enveloped-entity this) :name (foreign-entity-name this)))
+
+
+(defmethod format-foreign-entity-c-name ((this foreign-const-qualifier) &key name)
+  (format-foreign-entity-c-name (foreign-enveloped-entity this) :const-qualified t :name name))
+
+
+(defmethod format-foreign-entity-c-name ((this foreign-entity-specialization) &key const-qualified name)
+  (format-default-c-name
+   (format nil "~A<>" (format-foreign-entity-c-name (foreign-enveloped-entity this)))
+   const-qualified name))
+
+
+(defmethod format-foreign-entity-c-name ((this foreign-array) &key const-qualified name)
+  (format-default-c-name
+   (format nil "~A*"
+           (format-foreign-entity-c-name (foreign-enveloped-entity this)))
+   const-qualified name))
+
+
+(defmethod format-foreign-entity-c-name ((this foreign-entity-parameter) &key const-qualified name)
+  (format-default-c-name (format-full-foreign-entity-name this) const-qualified name))
