@@ -29,7 +29,9 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun find-quoted (value)
-    (and (listp value) (eq 'quote (first value)) (second value))))
+    (cond
+      ((keywordp value) value)
+      ((and (listp value) (eq 'quote (first value))) (second value)))))
 
 
 (defun (setf intricate-documentation) (docstring name &rest arg-types)
@@ -309,7 +311,7 @@
 (define-compiler-macro intricate-alloc (&whole whole name &optional (count 1))
   (if-let ((quoted (find-quoted name)))
     (if-let ((intricate (gethash quoted *record-table*)))
-      `(aligned-alloc ,(intricate-alignment quoted) (* ,(intricate-size quoted) ,count))
+      `(aligned-alloc (intricate-alignment ,name) (* (intricate-size ,name) ,count))
       whole)
     whole))
 

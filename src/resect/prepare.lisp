@@ -49,14 +49,13 @@
     (format out "#ifndef  __CLAW_PREPARED~%#define __CLAW_PREPARED 1~%")
     (format out "~%#include \"~A\"~%" (uiop:native-namestring uber-path))
 
-    (loop for (namespace name) being the hash-value of *instantiated* using (hash-key id)
+
+    (loop for name in (sort (hash-table-values *instantiated*) #'string<)
           for counter from 0
-          do (format out "~%~A::~A~A ~A~A;"
-                     namespace
-                     name
-                     (extract-template-argument-string id)
-                     +instantiation-prefix+
-                     counter))
+          collect (format out "~%~A ~A~A;"
+                          name
+                          +instantiation-prefix+
+                          counter))
     (format out "~&~%#endif")))
 
 
@@ -81,16 +80,6 @@
     (prepare-header uber-path prepared-path)))
 
 
-(defclass template-argument-map ()
-  ((table :initform (make-hash-table :test 'equal))))
-
-
-(defmethod template-argument ((this template-argument-map) name)
-  (with-slots (table) this
-    (gethash name table)))
-
-
-
 (defun format-template-argument-string (argument-literals)
   (format nil "<~{~A~^,~}>" argument-literals))
 
@@ -102,61 +91,18 @@
                (%resect:type-name type)))))
 
 
-(defun fill-template-argument-map (map type)
-  (with-slots (table) map
-    (let (template-arguments
-          template-parameter-names
-          template-literals)
-      ;; template-arguments
-      (resect:docollection (template-arg (%resect:type-template-arguments type))
-        (push template-arg template-arguments))
-      ;; template-parameters
-      (resect:docollection (param (%resect:declaration-template-parameters (%resect:type-declaration type)))
-        (push (%resect:declaration-name param) template-parameter-names))
-      ;; template-literals
-      (setf template-literals (reverse (extract-template-literals type)))
-      (let ((literal-length (length template-literals))
-            (param-length (length template-parameter-names)))
-        (when (< literal-length param-length)
-          (loop repeat (- param-length literal-length)
-                do (push nil template-literals))))
-
-      (loop for arg in template-arguments
-            for param-name in template-parameter-names
-            for literal in template-literals
-            unless (starts-with-subseq "type-parameter" literal)
-              do (let ((value (if (eq (%resect:template-argument-kind arg) :type)
-                                  (%resect:template-argument-type arg)
-                                  (if-let ((existing (find-template-argument literal)))
-                                    existing
-                                    literal))))
-                   (setf (gethash param-name table) value))))))
-
-
-(defun make-template-argument-map (&optional type)
-  (let ((map (make-instance 'template-argument-map)))
-    (when type
-      (fill-template-argument-map map type))
-    map))
-
-
-(defmacro with-next-template-argument-map ((map-name &optional source-type) &body body)
-  `(let* ((,map-name (make-template-argument-map ,source-type))
-          (*template-argument-map-list* (list* ,map-name *template-argument-map-list*)))
-     ,@body))
-
-
 (defun prepare-type (type)
   (let ((type-decl (%resect:type-declaration type)))
     (unless (cffi:null-pointer-p type-decl)
-      (prepare-declaration (%resect:declaration-kind type-decl) type-decl
-                           :from-type type))))
+      (prepare-declaration (%resect:declaration-kind type-decl) type-decl))))
 
 
-(defun prepare-new-record-template-instantiations (id decl)
-  (when (find #\< id)
-    (setf (gethash id *instantiated*) (list (%resect:declaration-namespace decl)
-                                            (%resect:declaration-name decl))))
+(defun prepare-new-record-template-instantiations (decl)
+  (unless (or (cffi:null-pointer-p (%resect:declaration-template decl))
+              (%resect:declaration-partially-specialized-p decl))
+    (setf
+     (gethash (%resect:declaration-id decl) *instantiated*)
+     (%resect:type-name (%resect:declaration-type decl))))
 
   (resect:docollection (parent-decl (%resect:record-parents decl))
     (prepare-declaration (%resect:declaration-kind parent-decl) parent-decl))
@@ -170,49 +116,25 @@
       (prepare-type (%resect:declaration-type param-decl)))))
 
 
-(defun prepare-declaration-id (decl)
-  (let (template-parameter-names)
-    (resect:docollection (param-decl (%resect:declaration-template-parameters decl))
-      (push (%resect:declaration-name param-decl) template-parameter-names))
-    (nreversef template-parameter-names)
-
-    (let ((prepared-template-literals (loop for param-name in template-parameter-names
-                                            for arg = (find-template-argument param-name)
-                                            when arg
-                                              collect (if (stringp arg)
-                                                          arg
-                                                          (%resect:type-name arg)))))
-      (if (and template-parameter-names
-               (= (length prepared-template-literals)
-                  (length template-parameter-names)))
-          (format nil "~A~A"
-                  (%resect:declaration-id decl)
-                  (format-template-argument-string prepared-template-literals))
-          (%resect:declaration-id decl)))))
+(defun prepare-record-template-instantiations (decl)
+  (let* ((id (%resect:declaration-id decl))
+         (prepared (gethash id *prepared-entity-table*)))
+    (if prepared
+        prepared
+        (prog1 (setf (gethash id *prepared-entity-table*) id)
+          (prepare-new-record-template-instantiations decl)))))
 
 
-(defun prepare-record-template-instantiations (decl &optional from-type)
-  (with-next-template-argument-map (arg-map)
-    (when from-type
-      (fill-template-argument-map arg-map from-type))
-    (let* ((id (prepare-declaration-id decl))
-           (prepared (gethash id *prepared-entity-table*)))
-      (if prepared
-          prepared
-          (prog1 (setf (gethash id *prepared-entity-table*) id)
-            (prepare-new-record-template-instantiations id decl))))))
+(defmethod prepare-declaration ((type (eql :struct)) decl &key)
+  (prepare-record-template-instantiations decl))
 
 
-(defmethod prepare-declaration ((type (eql :struct)) decl &key from-type)
-  (prepare-record-template-instantiations decl from-type))
+(defmethod prepare-declaration ((type (eql :union)) decl &key)
+  (prepare-record-template-instantiations decl))
 
 
-(defmethod prepare-declaration ((type (eql :union)) decl &key from-type)
-  (prepare-record-template-instantiations decl from-type))
-
-
-(defmethod prepare-declaration ((type (eql :class)) decl &key from-type)
-  (prepare-record-template-instantiations decl from-type))
+(defmethod prepare-declaration ((type (eql :class)) decl &key)
+  (prepare-record-template-instantiations decl))
 
 
 (defmethod prepare-declaration ((kind (eql :function)) declaration &key)

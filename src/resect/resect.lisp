@@ -1,8 +1,7 @@
 (cl:in-package :claw.resect)
 
 
-(declaim (special *declaration-table*
-                  *instantiation-table*))
+(declaim (special *declaration-table*))
 
 (defvar *parsed-pointers* nil)
 
@@ -28,7 +27,7 @@
   (alexandria:with-output-to-file (out path :if-exists :supersede)
     (format out "#ifndef  __CLAW_UBERHEADER~%#define __CLAW_UBERHEADER 1~%")
     (loop for (name value) on defines by #'cddr
-          do (format out "~%#define ~A~@[~A~]" name value))
+          do (format out "~%#define ~A~@[ ~A~]" name value))
     (loop for header in headers
           do (format out "~%#include \"~A\"" header))
     (format out "~%")
@@ -49,14 +48,8 @@
              :reader claw.wrapper:foreign-library-language)))
 
 
-(defgeneric record-instantiated-p (record)
-  (:method (object)
-    (declare (ignore object))
-    nil))
-
-
 (defun parse-declaration-by-kind (decl &optional from-type)
-  (parse-declaration (%resect:declaration-kind decl) decl :from-type from-type))
+  (parse-declaration (%resect:declaration-kind decl) decl))
 
 
 (defun parse-type-by-category (type)
@@ -72,21 +65,11 @@
     (setf language (case (%resect:translation-unit-language unit)
                      (:c :c)
                      (:c++ :c++)
-                     (:obj-c :objective-c)))
-    (let ((*declaration-table* (make-hash-table :test 'equal)))
-      (resect:docollection (decl (%resect:translation-unit-declarations unit))
-        (when (and (eq (%resect:declaration-kind decl) :variable)
-                   (starts-with-subseq +instantiation-prefix+ (%resect:declaration-name decl)))
-          (parse-declaration-by-kind decl)))
-      (loop for entity being the hash-value of *declaration-table* using (hash-key id)
-            when (record-instantiated-p entity)
-              do (setf (gethash id *instantiation-table*) entity)))))
+                     (:obj-c :objective-c)))))
 
 
 (defmethod inspect-declaration ((this describing-inspector) kind declaration)
-  (unless (starts-with-subseq +instantiation-prefix+
-                              (%resect:declaration-name declaration))
-    (parse-declaration kind declaration)))
+  (parse-declaration kind declaration))
 
 
 (defmethod claw.wrapper:describe-foreign-library ((parser (eql :claw/resect))
@@ -114,8 +97,7 @@
                                language
                                standard
                                target)
-      (let ((*instantiation-table* (make-hash-table :test 'equal))
-            (*declaration-table* (make-hash-table :test 'equal))
+      (let ((*declaration-table* (make-hash-table :test 'equal))
             (inspector (make-instance 'describing-inspector)))
         (inspect-foreign-library inspector
                                  prepared-path
@@ -142,13 +124,10 @@
   (gethash id *declaration-table*))
 
 
-(defun register-entity (entity-class &rest args &key id instantiated &allow-other-keys)
-  (let ((existing (find-entity id)))
-    (if (and existing (or (record-instantiated-p existing) (not instantiated)))
-        (values existing nil)
-        (values (setf (gethash id *declaration-table*) (or (gethash id *instantiation-table*)
-                                                           (apply #'make-instance entity-class args)))
-                t))))
+(defun register-entity (entity-class &rest args &key id &allow-other-keys)
+  (if-let ((existing (find-entity id)))
+    (values existing nil)
+    (values (setf (gethash id *declaration-table*) (apply #'make-instance entity-class args)) t)))
 
 
 (defun make-declaration-location (declaration)
@@ -291,9 +270,7 @@
 ;;; RECORD
 ;;;
 (defclass resect-record ()
-  ((fields :initform nil :accessor fields-of)
-   (method-postfix :initarg :method-postfix :initform nil :reader method-postfix-of)
-   (instantiated-p :initarg :instantiated :initform nil :reader record-instantiated-p)))
+  ((fields :initform nil :accessor fields-of)))
 
 
 (defmethod foreign-record-fields ((this resect-record))
@@ -321,86 +298,6 @@
         (eq :public access-specifier))))
 
 
-(defgeneric id-of (decl))
-(defgeneric name-of (decl))
-(defgeneric bit-size-of (decl))
-(defgeneric bit-alignment-of (decl))
-(defgeneric plain-old-data-p (decl))
-(defgeneric entity-parameters-of (decl))
-(defgeneric method-postfix-of (decl))
-
-
-(defclass record-info ()
-  ((id :initform nil :reader id-of)
-   (name :initform nil :reader name-of)
-   (type :initarg :type :reader handle-of)
-   (method-postfix :initform nil :reader method-postfix-of)))
-
-(defmethod bit-size-of ((this record-info))
-  (%resect:type-size (handle-of this)))
-
-(defmethod bit-alignment-of ((this record-info))
-  (%resect:type-alignment (handle-of this)))
-
-(defmethod plain-old-data-p ((this record-info))
-  (%resect:type-plain-old-data-p (handle-of this)))
-
-(defclass instantiated-record-info (record-info) ())
-
-(defmethod initialize-instance :after ((this instantiated-record-info) &key decl)
-  (with-slots (id type name method-postfix) this
-    (let ((postfix (format-template-argument-string (extract-template-literals type))))
-      (setf id (format nil "~A~A" (%resect:declaration-id decl) postfix)
-            method-postfix postfix
-            name (format nil "~A~A" (%resect:declaration-name decl) postfix)))))
-
-(defmethod entity-parameters-of ((this instantiated-record-info))
-  nil)
-
-(defclass regular-record-info (record-info)
-  ((entity-parameters :initform nil :reader entity-parameters-of)))
-
-
-(defmethod initialize-instance :after ((this regular-record-info) &key decl)
-  (with-slots (id name entity-parameters) this
-    (setf id (%resect:declaration-id decl)
-          entity-parameters (collect-entity-parameters decl)
-          name (%resect:declaration-name decl))))
-
-
-(defun reconstruct-instantiated-id (decl)
-  (let* ((params (collect-entity-parameters decl))
-         (args (loop for param in params
-                     for param-name = (foreign-entity-name param)
-                     for arg = (find-template-argument param-name)
-                     when (and arg (not (equal arg param-name)))
-                       collect (if (stringp arg)
-                                   arg
-                                   (let ((type (parse-type-by-category arg)))
-                                     (unless (foreign-entity-unknown-p type)
-                                       (format-foreign-entity-c-name type)))))))
-    (when (= (length args) (length params))
-      (format nil "~A~A"
-              (%resect:declaration-id decl)
-              (format-template-argument-string args)))))
-
-
-(defun make-record-info (decl from-type)
-  (if (and (when from-type
-             (specializationp from-type))
-           (> (%resect:type-size from-type) 0))
-      (make-instance 'instantiated-record-info
-                     :decl decl
-                     :type from-type)
-      (make-instance 'regular-record-info
-                     :type (%resect:declaration-type decl)
-                     :decl decl)))
-
-
-(defun format-method-postfix (name entity)
-  (format nil "~A~@[~A~]" name (method-postfix-of entity)))
-
-
 (defun ensure-const-if-needed (type entity)
   ;; crazy, maybe a bug in libclang
   (if (and (typep entity 'claw.spec:foreign-pointer)
@@ -410,138 +307,165 @@
       entity))
 
 
-(defun parse-record-declaration (record-kind decl from-type)
-  (with-next-template-argument-map (argument-map from-type)
-    (let ((record-info (make-record-info decl from-type)))
-      (labels ((collect-parents ()
-                 (let (parents)
-                   (resect:docollection (parent-decl (%resect:record-parents decl))
-                     (push (parse-declaration-by-kind parent-decl) parents))
-                   (nreverse parents)))
-               (collect-fields (entity)
-                 (let (fields)
-                   (resect:docollection (field-decl (%resect:record-fields decl))
-                     (when (publicp field-decl)
-                       (let ((field-type (%resect:declaration-type field-decl)))
-                         (push (make-instance 'foreign-record-field
-                                              :name (%resect:declaration-name field-decl)
-                                              :location (make-declaration-location field-decl)
-                                              :enveloped (ensure-const-if-needed
-                                                          field-type
-                                                          (parse-type-by-category field-type))
-                                              :bit-size (%resect:type-size field-type)
-                                              :bit-alignment (%resect:type-alignment field-type)
-                                              :bit-offset (%resect:field-offset field-decl)
-                                              :bitfield-p (%resect:field-bitfield-p field-decl)
-                                              :bit-width (%resect:field-width field-decl))
-                               fields))))
-                   (setf (fields-of entity) (nreverse fields)))))
-        (multiple-value-bind (entity registeredp)
-            (register-entity (ecase record-kind
-                               (:struct 'resect-struct)
-                               (:union 'resect-union)
-                               (:class 'resect-class))
-                             :id (or (reconstruct-instantiated-id decl) (id-of record-info))
-                             :owner (parse-owner decl)
-                             :name (name-of record-info)
-                             :namespace (unless-empty
-                                         (%resect:declaration-namespace decl))
-                             :mangled (%resect:declaration-mangled-name decl)
-                             :location (make-declaration-location decl)
-                             :bit-size (bit-size-of record-info)
-                             :bit-alignment (bit-alignment-of record-info)
-                             :plain-old-data-type (plain-old-data-p record-info)
-                             :parents (collect-parents)
-                             :abstract (%resect:record-abstract-p decl)
-                             :entity-parameters (entity-parameters-of record-info)
+(defun extract-template-arguments (decl)
+  (let (template-arguments
+        template-parameters)
+    ;; template-arguments
+    (resect:docollection (arg (%resect:declaration-template-arguments decl))
+      (push arg template-arguments))
+    ;; template-parameters
+    (resect:docollection (param (%resect:declaration-template-parameters decl))
+      (push param template-parameters))
 
-                             :method-postfix (method-postfix-of record-info)
-                             :instantiated (typep record-info 'instantiated-record-info))
-          (when registeredp
-            (collect-fields entity)
-            (let (destructor-found
-                  constructor-found
-                  pure-virtual-found)
-              (resect:docollection (method-decl (%resect:record-methods decl))
-                (let ((name (%resect:declaration-name method-decl)))
-                  (when (and (not destructor-found)
-                             (starts-with #\~ name :test #'equal))
-                    (setf destructor-found t))
-                  (when (and (not constructor-found)
-                             (string= name (foreign-entity-name entity)))
-                    (setf constructor-found t))
-                  (when (and (not pure-virtual-found)
-                             (%resect:method-pure-virtual-p method-decl))
-                    (setf pure-virtual-found t))))
-              (resect:docollection (method-decl (%resect:record-methods decl))
-                (let* ((pure-name (remove-template-argument-string (%resect:declaration-name method-decl)))
-                       (constructor-p (string= pure-name (remove-template-argument-string
-                                                          (foreign-entity-name entity))))
-                       (name (if constructor-p
-                                 (format-method-postfix pure-name entity)
-                                 pure-name))
-                       (params (parse-parameters (%resect:method-parameters method-decl))))
-                  (when (and (publicp method-decl)
-                             (not (and constructor-p pure-virtual-found)))
-                    (register-entity 'foreign-method
-                                     :id (format-method-postfix
-                                          (%resect:declaration-id method-decl)
-                                          entity)
-                                     :name name
-                                     :owner entity
-                                     :namespace (unless-empty
-                                                 (%resect:declaration-namespace decl))
-                                     :mangled (format-method-postfix
-                                               (ensure-mangled method-decl params)
-                                               entity)
-                                     :location (make-declaration-location method-decl)
-
-                                     :result-type (parse-type-by-category (%resect:method-result-type method-decl))
-                                     :parameters params
-                                     :variadic (%resect:method-variadic-p method-decl)))))
-              (let ((entity-id (claw.spec:foreign-entity-id entity))
-                    (entity-name (claw.spec:foreign-entity-name entity))
-                    (entity-namespace (claw.spec:foreign-entity-namespace entity)))
-                (unless (or (claw.spec:foreign-record-abstract-p entity)
-                            pure-virtual-found
-                            (not entity-name)
-                            (claw.spec:foreign-plain-old-data-type-p entity)
-                            (zerop (claw.spec:foreign-entity-bit-size entity)))
-                  (unless constructor-found
-                    (register-entity 'foreign-method
-                                     :id (format nil "~A_claw_ctor" entity-id)
-                                     :name entity-name
-                                     :owner entity
-                                     :namespace entity-namespace
-                                     :mangled (format nil "~A_claw_ctor" entity-id)
-                                     :location nil
-                                     :result-type (register-void)
-                                     :parameters nil
-                                     :variadic nil))
-                  (unless destructor-found
-                    (register-entity 'foreign-method
-                                     :id (format nil "~A_claw_dtor" entity-id)
-                                     :name (format nil "~~~A" (remove-template-argument-string entity-name))
-                                     :owner entity
-                                     :namespace entity-namespace
-                                     :mangled (format nil "~A_claw_dtor" entity-id)
-                                     :location nil
-                                     :result-type (register-void)
-                                     :parameters nil
-                                     :variadic nil))))))
-          (values entity registeredp))))))
+    (let ((values (loop for arg in template-arguments
+                        for value = (case (%resect:template-argument-kind arg)
+                                      ((:type :declaration :template :template-expansion)
+                                       (%resect:type-name (%resect:template-argument-type arg)))
+                                      ((:integral :expression :pack)
+                                       (%resect:type-name (%resect:template-argument-value arg))))
+                        collect value))
+          (parent (%resect:declaration-template decl)))
+      (if (cffi:null-pointer-p parent)
+          values
+          (append values (extract-template-arguments parent))))))
 
 
-(defmethod parse-declaration ((type (eql :struct)) decl &key from-type)
-  (parse-record-declaration type decl from-type))
+(defun decorate-instantiated-name (decl)
+  (format nil "~A~@[~A~]"
+          (%resect:declaration-name decl)
+          (when (not (cffi:null-pointer-p
+                      (%resect:declaration-template decl)))
+            (if-let ((template-args (extract-template-arguments decl)))
+              (format-template-argument-string template-args)
+              (reformat-template-argument-string
+               (extract-template-argument-string
+                (%resect:type-name (%resect:declaration-type decl))))))))
 
 
-(defmethod parse-declaration ((type (eql :union)) decl &key from-type)
-  (parse-record-declaration type decl from-type))
+(defun parse-record-declaration (record-kind decl)
+  (labels ((collect-parents ()
+             (let (parents)
+               (resect:docollection (parent-decl (%resect:record-parents decl))
+                 (push (parse-declaration-by-kind parent-decl) parents))
+               (nreverse parents)))
+           (collect-fields (entity)
+             (let (fields)
+               (resect:docollection (field-decl (%resect:record-fields decl))
+                 (when (publicp field-decl)
+                   (let ((field-type (%resect:declaration-type field-decl)))
+                     (push (make-instance 'foreign-record-field
+                                          :name (%resect:declaration-name field-decl)
+                                          :location (make-declaration-location field-decl)
+                                          :enveloped (ensure-const-if-needed
+                                                      field-type
+                                                      (parse-type-by-category field-type))
+                                          :bit-size (%resect:type-size field-type)
+                                          :bit-alignment (%resect:type-alignment field-type)
+                                          :bit-offset (%resect:field-offset field-decl)
+                                          :bitfield-p (%resect:field-bitfield-p field-decl)
+                                          :bit-width (%resect:field-width field-decl))
+                           fields))))
+               (setf (fields-of entity) (nreverse fields)))))
+    (multiple-value-bind (entity registeredp)
+        (let ((decl-type (%resect:declaration-type decl)))
+          (register-entity (ecase record-kind
+                             (:struct 'resect-struct)
+                             (:union 'resect-union)
+                             (:class 'resect-class))
+                           :id (%resect:declaration-id decl)
+                           :owner (parse-owner decl)
+                           :name (decorate-instantiated-name decl)
+                           :namespace (unless-empty
+                                       (%resect:declaration-namespace decl))
+                           :mangled (%resect:declaration-mangled-name decl)
+                           :location (make-declaration-location decl)
+                           :bit-size (%resect:type-size decl-type)
+                           :bit-alignment (%resect:type-alignment decl-type)
+                           :plain-old-data-type (%resect:type-plain-old-data-p decl-type)
+                           :parents (collect-parents)
+                           :abstract (%resect:record-abstract-p decl)
+                           :entity-parameters (collect-entity-parameters decl)))
+      (when registeredp
+        (collect-fields entity)
+        (let (destructor-found
+              constructor-found
+              pure-virtual-found)
+          (resect:docollection (method-decl (%resect:record-methods decl))
+            (let ((name (%resect:declaration-name method-decl)))
+              (when (and (not destructor-found)
+                         (starts-with #\~ name :test #'equal))
+                (setf destructor-found t))
+              (when (and (not constructor-found)
+                         (string= name (foreign-entity-name entity)))
+                (setf constructor-found t))
+              (when (and (not pure-virtual-found)
+                         (%resect:method-pure-virtual-p method-decl))
+                (setf pure-virtual-found t))))
+          (resect:docollection (method-decl (%resect:record-methods decl))
+            (let* ((pure-name (remove-template-argument-string (%resect:declaration-name method-decl)))
+                   (constructor-p (string= pure-name (remove-template-argument-string
+                                                      (foreign-entity-name entity))))
+                   (name (if constructor-p
+                             (foreign-entity-name entity)
+                             pure-name))
+                   (params (parse-parameters (%resect:method-parameters method-decl))))
+              (when (and (publicp method-decl)
+                         (not (and constructor-p pure-virtual-found)))
+                (register-entity 'foreign-method
+                                 :id (%resect:declaration-id method-decl)
+                                 :name name
+                                 :owner entity
+                                 :namespace (unless-empty
+                                             (%resect:declaration-namespace decl))
+                                 :mangled (ensure-mangled method-decl params)
+                                 :location (make-declaration-location method-decl)
+
+                                 :result-type (parse-type-by-category (%resect:method-result-type method-decl))
+                                 :parameters params
+                                 :variadic (%resect:method-variadic-p method-decl)))))
+          (let ((entity-id (claw.spec:foreign-entity-id entity))
+                (entity-name (claw.spec:foreign-entity-name entity))
+                (entity-namespace (claw.spec:foreign-entity-namespace entity)))
+            (unless (or (claw.spec:foreign-record-abstract-p entity)
+                        pure-virtual-found
+                        (not entity-name)
+                        (claw.spec:foreign-plain-old-data-type-p entity)
+                        (zerop (claw.spec:foreign-entity-bit-size entity)))
+              (unless constructor-found
+                (register-entity 'foreign-method
+                                 :id (format nil "~A_claw_ctor" entity-id)
+                                 :name entity-name
+                                 :owner entity
+                                 :namespace entity-namespace
+                                 :mangled (format nil "~A_claw_ctor" entity-id)
+                                 :location nil
+                                 :result-type (register-void)
+                                 :parameters nil
+                                 :variadic nil))
+              (unless destructor-found
+                (register-entity 'foreign-method
+                                 :id (format nil "~A_claw_dtor" entity-id)
+                                 :name (format nil "~~~A" (remove-template-argument-string entity-name))
+                                 :owner entity
+                                 :namespace entity-namespace
+                                 :mangled (format nil "~A_claw_dtor" entity-id)
+                                 :location nil
+                                 :result-type (register-void)
+                                 :parameters nil
+                                 :variadic nil))))))
+      (values entity registeredp))))
 
 
-(defmethod parse-declaration ((type (eql :class)) decl &key from-type)
-  (parse-record-declaration type decl from-type))
+(defmethod parse-declaration ((type (eql :struct)) decl &key)
+  (parse-record-declaration type decl))
+
+
+(defmethod parse-declaration ((type (eql :union)) decl &key)
+  (parse-record-declaration type decl))
+
+
+(defmethod parse-declaration ((type (eql :class)) decl &key)
+  (parse-record-declaration type decl))
 
 
 (defmethod parse-type (category (kind (eql :struct)) type)
@@ -606,7 +530,7 @@
         (params (parse-parameters (%resect:function-parameters decl))))
     (register-entity 'foreign-function
                      :id id
-                     :name (%resect:declaration-name decl)
+                     :name (decorate-instantiated-name decl)
                      :namespace (unless-empty
                                  (%resect:declaration-namespace decl))
                      :mangled (ensure-mangled decl params)
@@ -692,12 +616,15 @@
 ;;; VARIABLE
 ;;;
 (defmethod parse-declaration ((kind (eql :variable)) declaration &key)
-  (make-instance 'foreign-variable :value (case (%resect:variable-kind declaration)
-                                            (:int (%resect:variable-to-int declaration))
-                                            (:float (%resect:variable-to-float declaration))
-                                            (:string (%resect:variable-to-string declaration))
-                                            (t nil))
-                                   :type (parse-type-by-category (%resect:variable-type declaration))))
+  (let ((type (parse-type-by-category (%resect:variable-type declaration))))
+    (unless (starts-with-subseq +instantiation-prefix+ (%resect:declaration-name declaration))
+      (make-instance 'foreign-variable
+                     :value (case (%resect:variable-kind declaration)
+                              (:int (%resect:variable-to-int declaration))
+                              (:float (%resect:variable-to-float declaration))
+                              (:string (%resect:variable-to-string declaration))
+                              (t nil))
+                     :type type))))
 
 
 ;;;

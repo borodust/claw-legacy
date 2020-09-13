@@ -26,7 +26,8 @@
 
            #:remove-template-argument-string
            #:extract-template-argument-string
-           #:split-template-argument-string-into-literals))
+           #:split-template-argument-string-into-literals
+           #:reformat-template-argument-string))
 (cl:in-package :claw.util)
 
 
@@ -82,6 +83,18 @@
 
 (defun split-template-argument-string-into-literals (name)
   (ppcre:split *template-argument-literal-splitter* name))
+
+
+(defun reformat-template-argument-string (name)
+  (flet ((trim-around (name char &optional new)
+           (ppcre:regex-replace-all (format nil "\\s*~A\\s*" char) name (or new char))))
+    (let* ((name (ppcre:regex-replace-all "\\s+" name " "))
+           (name (trim-around name ","))
+           (name (trim-around name "\\(" "("))
+           (name (trim-around name "\\)" ")"))
+           (name (trim-around name "\\[" "["))
+           (name (trim-around name "\\]" "]")))
+      name)))
 
 ;;;
 ;;; PATH SEARCH
