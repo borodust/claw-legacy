@@ -1,6 +1,9 @@
 (uiop:define-package :claw.spec
   (:use #:cl #:alexandria #:claw.util)
   (:export #:foreign-entity
+           #:foreign-entity-source
+
+           #:foreign-identified-p
            #:foreign-entity-id
 
            #:foreign-owner
@@ -68,6 +71,7 @@
            #:foreign-function-parameters
 
            #:foreign-method
+           #:foreign-method-static-p
 
            #:foreign-variable
            #:foreign-entity-value
@@ -78,7 +82,10 @@
            #:foreign-entity-value-parameter
            #:foreign-entity-parameters
 
-           #:foreign-entity-specialization
+           #:foreign-entity-argument
+           #:foreign-entity-arguments
+           #:foreign-specialized-p
+
            #:foreign-const-qualifier
 
            #:foreign-entity-unknown-p
@@ -86,7 +93,8 @@
            #:foreign-constructor-p
            #:format-foreign-location
            #:format-full-foreign-entity-name
-           #:format-foreign-entity-c-name))
+           #:format-foreign-entity-c-name
+           #:unqualify-foreign-entity))
 (cl:in-package :claw.spec)
 
 ;;;
@@ -135,6 +143,10 @@
   ((id :initarg :id
        :initform (error ":id missing")
        :reader foreign-entity-id)))
+
+
+(defun foreign-identified-p (entity)
+  (typep entity 'identified))
 
 
 ;;;
@@ -206,7 +218,10 @@
 ;;;
 ;;; ENTITY
 ;;;
-(defclass foreign-entity () ())
+(defclass foreign-entity ()
+  ((source :initarg :source
+           :initform nil
+           :reader foreign-entity-source)))
 
 
 ;;;
@@ -227,7 +242,7 @@
 ;;;
 ;;; CONSTANT
 ;;;
-(defclass foreign-constant (declared ownable named)
+(defclass foreign-constant (declared ownable named identified foreign-entity)
   ((value :initarg :value
           :initform (error ":value missing")
           :reader foreign-constant-value)))
@@ -269,6 +284,39 @@
 (defun foreign-parameterizable-p (entity)
   (typep entity 'parameterized))
 
+
+;;;
+;;; SPECIALIZED
+;;;
+(defclass foreign-entity-argument ()
+  ((parameter :initarg :parameter
+              :initform (error ":parameter missing")
+              :reader foreign-entity-parameter)
+   (value :initarg :value
+          :initform (error ":value missing")
+          :reader foreign-entity-value)))
+
+
+(defclass specializable ()
+  ((entity-arguments :initarg :entity-arguments
+                     :initform nil
+                     :reader foreign-entity-arguments)))
+
+
+(defun foreign-specialized-p (entity)
+  (and (typep entity 'specializable)
+       (foreign-entity-arguments entity)))
+
+
+(defmethod print-object ((o foreign-entity-argument) s)
+  (print-unreadable-object (o s :type t :identity nil)
+    (format s "~A = ~A"
+            (foreign-entity-name (foreign-entity-parameter o))
+            (let ((value (foreign-entity-value o)))
+              (if (foreign-named-p value)
+                  (format-full-foreign-entity-name value)
+                  value)))))
+
 ;;;
 ;;; RECORD
 ;;;
@@ -284,7 +332,7 @@
               :type fixnum)))
 
 
-(defclass foreign-record (declared parameterized ownable foreign-type)
+(defclass foreign-record (declared parameterized specializable ownable foreign-type)
   ((fields :initarg :fields
            :initform nil
            :reader foreign-record-fields)
@@ -333,13 +381,17 @@
                             identified
                             named
                             parameterized
+                            specializable
                             foreign-function-prototype)
   ((storage-class :initarg :storage-class
                   :initform nil
                   :reader foreign-function-storage-class)))
 
 
-(defclass foreign-method (foreign-function) ())
+(defclass foreign-method (foreign-function)
+  ((static-p :initarg :static
+             :initform nil
+             :reader foreign-method-static-p)))
 
 
 ;;;
@@ -387,15 +439,6 @@
 
 
 ;;;
-;;; SPECIALIZATION
-;;;
-(defclass foreign-entity-specialization (foreign-entity envelope)
-  ((args :initarg :arguments
-         :initform (error ":arguments missing")
-         :reader foreign-specialization-arguments)))
-
-
-;;;
 ;;; CONST QUALIFIED
 ;;;
 (defclass foreign-const-qualifier (foreign-entity envelope) ())
@@ -434,20 +477,29 @@
               (foreign-entity-name entity))))
 
 
-(defun format-full-foreign-entity-name (entity &key (include-method-owner t))
-  (let ((current-owner (if (foreign-constructor-p entity)
-                           (foreign-owner (foreign-owner entity))
-                           (foreign-owner entity))))
-    (format nil "~@[~A::~]~@[~A::~]~A"
-            (foreign-entity-namespace entity)
-            (when (and (or include-method-owner
-                           (not (typep entity 'foreign-method)))
-                       current-owner)
-              (format nil "~{~A~^::~}"
-                      (loop for owner = current-owner then (foreign-owner owner)
-                            while owner
-                            collect (or (foreign-entity-name owner) ""))))
-            (or (foreign-entity-name entity) ""))))
+(defun format-full-foreign-entity-name (entity &key (include-method-owner t) (include-name t))
+  (let* ((current-owner (if (foreign-constructor-p entity)
+                            (foreign-owner (foreign-owner entity))
+                            (foreign-owner entity)))
+         (no-anonymous-parent-p (loop for owner = current-owner then (foreign-owner owner)
+                                      while owner
+                                      always (foreign-entity-name owner)))
+         (name (foreign-entity-name entity)))
+    (when (and name no-anonymous-parent-p)
+      (let ((prefix (cond
+                      ((and current-owner
+                            (typep entity 'foreign-method)
+                            (not include-method-owner))
+                       (format-full-foreign-entity-name current-owner :include-name nil))
+                      (current-owner
+                       (format-full-foreign-entity-name current-owner))
+                      (t
+                       (foreign-entity-namespace entity)))))
+        (if include-name
+            (format nil "~@[~A::~]~@[~A~]"
+                    (unless (emptyp prefix) prefix)
+                    name)
+            prefix)))))
 
 ;;;
 ;;; C NAMES
@@ -525,12 +577,6 @@
   (format-foreign-entity-c-name (foreign-enveloped-entity this) :const-qualified t :name name))
 
 
-(defmethod format-foreign-entity-c-name ((this foreign-entity-specialization) &key const-qualified name)
-  (format-default-c-name
-   (format nil "~A<>" (format-foreign-entity-c-name (foreign-enveloped-entity this)))
-   const-qualified name))
-
-
 (defmethod format-foreign-entity-c-name ((this foreign-array) &key const-qualified name)
   (format-default-c-name
    (format nil "~A*"
@@ -540,3 +586,9 @@
 
 (defmethod format-foreign-entity-c-name ((this foreign-entity-parameter) &key const-qualified name)
   (format-default-c-name (format-full-foreign-entity-name this) const-qualified name))
+
+
+(defun unqualify-foreign-entity (entity)
+  (loop for current = entity then (foreign-enveloped-entity current)
+        while (foreign-envelope-p current)
+        finally (return current)))

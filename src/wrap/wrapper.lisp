@@ -23,6 +23,8 @@
   defines
   instantiations
 
+  system-includes
+
   include-sources
   include-definitions
   exclude-sources
@@ -110,8 +112,11 @@
                (includes (mapcar path-mapper
                                  (append
                                   (list nil)
-                                  includes
-                                  (list-all-known-include-paths))))
+                                  includes)))
+               (system-includes (mapcar path-mapper
+                                        (append
+                                         (list nil)
+                                         (list-all-known-include-paths))))
                (framework-includes (mapcar path-mapper
                                            (append
                                             (list nil)
@@ -132,6 +137,8 @@
                                 :framework-includes framework-includes
                                 :targets targets
 
+                                :system-includes system-includes
+
                                 :include-sources include-sources
                                 :include-definitions include-definitions
                                 :exclude-sources exclude-sources
@@ -148,7 +155,8 @@
                        (wrapper-options-headers opts)
                        :language (wrapper-options-language opts)
                        :standard (wrapper-options-standard opts)
-                       :includes (wrapper-options-includes opts)
+                       :includes (append (wrapper-options-includes opts)
+                                         (wrapper-options-system-includes opts))
                        :framework-includes (wrapper-options-framework-includes opts)
                        :target target
                        :defines (wrapper-options-defines opts)
@@ -158,7 +166,8 @@
                        :exclude-sources (wrapper-options-exclude-sources opts)
                        :exclude-definitions (wrapper-options-exclude-definitions opts))
         for selected-language = (or (wrapper-options-language opts)
-                                    (foreign-library-language library))
+                                    (foreign-library-language library)
+                                    :c)
         for selected-generator = (or (wrapper-options-generator opts)
                                      (ecase selected-language
                                        (:c :claw/cffi)

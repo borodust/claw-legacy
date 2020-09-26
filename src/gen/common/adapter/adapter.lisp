@@ -82,19 +82,25 @@
 
 
 (defun %generate-function-type (function out)
-  (format out "typedef ~A;"
-          (adapted-function-original-type function
-                                          (%make-function-type-name function))))
+  (let ((original (adapted-function-entity function)))
+    (format out "typedef ~A (*~A)(~{~A~^,~});"
+            (claw.spec:format-foreign-entity-c-name (claw.spec:foreign-function-result-type original))
+            (%make-function-type-name function)
+            (loop for param in (claw.spec:foreign-function-parameters original)
+                  collect (claw.spec:format-foreign-entity-c-name
+                           (claw.spec:foreign-enveloped-entity param))))))
 
 
 (defun %generate-function-variable (function out)
-  (format out "static ~A ~A;"
+  (format out "static ~A ~A~A;"
           (%make-function-type-name function)
-          (adapt-function-name function)))
+          +adapted-variable-prefix+
+          (adapted-function-name function)))
 
 
 (defun %generate-function-variable-init (function out)
-  (format out "~A = (~A) claw_get_proc_addr(\"~A\");"
+  (format out "~A~A = (~A) claw_get_proc_addr(\"~A\");"
+          +adapted-variable-prefix+
           (adapted-function-name function)
           (%make-function-type-name function)
           (adapted-function-name function)))
@@ -109,12 +115,13 @@
 (defun format-function (function stream)
   (let* ((result-type (adapted-function-result-type function))
          (name (format-adapted-function-name (adapted-function-name function)))
-         (params (mapcar #'claw.spec:format-foreign-entity-c-name (adapted-function-parameters function)))
+         (params (mapcar #'claw.spec:format-foreign-entity-c-name
+                         (adapted-function-parameters function)))
          (body (adapted-function-body function)))
     (if (enveloped-function-protoype-p result-type)
         (format stream "~A {~%~A~%}"
                 (claw.spec:format-foreign-entity-c-name result-type
-                                :name (format nil "~A(~{~A~^, ~})" name params))
+                                                        :name (format nil "~A(~{~A~^, ~})" name params))
                 body)
         (format stream "~A ~A(~{~A~^, ~}) {~%~A~%}"
                 (claw.spec:format-foreign-entity-c-name result-type)
@@ -143,7 +150,7 @@
              (if (emptyp groups)
                  name
                  (aref groups 0)))))
-    (loop for dependency in dependencies
+    (loop for dependency in (ensure-list dependencies)
           for name = (file-namestring dependency)
           for path = (directory-namestring dependency)
           collect path into directories
@@ -154,7 +161,7 @@
 (defun %build-adapter (standard adapter-file includes target-file
                        &key pedantic dependencies compiler)
   (multiple-value-bind (library-directories libraries) (parse-dependencies dependencies)
-    (uiop:run-program (append (list (ecase (or compiler :gcc)
+    (uiop:run-program (append (list (ecase (or compiler :clang)
                                       (:gcc "g++")
                                       (:clang "clang++")))
                               (when (eq compiler :clang)

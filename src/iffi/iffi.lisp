@@ -118,6 +118,7 @@
              (intricately-defined (gethash name *intricate-table*))
              (cfun-name (format-symbol (symbol-package name) "~A~A$~A" 'iffi-cfun$ name mangled)))
         `(progn
+           (declaim (inline ,cfun-name))
            (cffi:defcfun (,mangled ,cfun-name ,@(nreverse cffi-opts)) ,result-type ,@configuration)
            (setf (intricate-function ',name ,@arg-types) ',cfun-name)
            ,@(when pointer-extractor

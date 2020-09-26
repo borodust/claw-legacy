@@ -3,10 +3,11 @@
   :author "Pavel Korolev"
   :license "MIT"
   :version "1.0"
-  :depends-on (:uiop :alexandria :cl-ppcre :local-time)
+  :depends-on (:uiop :alexandria :cl-ppcre :local-time :named-readtables)
   :pathname "src/util/"
   :serial t
   :components ((:file "sha1")
+               (:file "infix")
                (:file "util")))
 
 
@@ -39,14 +40,17 @@
   :author "Pavel Korolev"
   :license "MIT"
   :version "1.0"
-  :depends-on (:uiop :alexandria :claw-support :cl-resect :claw/util :claw/spec :claw/wrapper)
+  :depends-on (:uiop :alexandria :claw-support :cl-resect :claw/util :claw/spec
+               :claw/wrapper :parse-number)
   :pathname "src/resect/"
   :serial t
   :components ((:file "packages")
                (:file "inclusion")
                (:file "filtering")
                #++(:file "optimization")
+               (:file "template")
                (:file "inspect")
+               (:file "macro")
                (:file "prepare")
                (:file "resect")))
 
@@ -68,10 +72,9 @@
                 :serial t
                 :components ((:file "type")
                              (:file "primitive")
+                             (:file "constant")
                              (:file "enum")
-                             (:file "alias")
-                             (:file "record")
-                             (:file "function")))
+                             (:file "alias")))
                (:module "adapter"
                 :serial t
                 :components ((:file "adapter")
@@ -95,10 +98,8 @@
                (:module generator
                 :serial t
                 :components ((:file "type")
-                             (:file "constant")
                              (:file "typedef")
-                             (:file "enum")
-                             (:file "struct")
+                             (:file "record")
                              (:file "function")))))
 
 

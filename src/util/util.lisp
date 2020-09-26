@@ -17,6 +17,7 @@
            #:with-symbol-renaming
            #:c-name->lisp
            #:string+
+           #:parse-infix
 
            #:with-local-cpu
            #:with-local-environment
@@ -28,6 +29,8 @@
            #:extract-template-argument-string
            #:split-template-argument-string-into-literals
            #:reformat-template-argument-string))
+(uiop:define-package :claw.util.infix
+  (:use))
 (cl:in-package :claw.util)
 
 
@@ -70,16 +73,23 @@
 ;;;
 ;;; TEMPLATE ARGUMENT/PARAMETER MANIPULATION
 ;;;
+(defvar *function-parameter-list-extractor* (ppcre:create-scanner "\\(.*\\("))
+
 (defvar *template-arguments-extractor* (ppcre:create-scanner "<.*>"))
 
 (defvar *template-argument-literal-splitter* (ppcre:create-scanner "[<>]|\\s*,\\s*"))
 
-(defun remove-template-argument-string (name)
-  (ppcre:regex-replace-all *template-arguments-extractor* name ""))
+(defun remove-parameter-list-string (name)
+  (ppcre:regex-replace-all *function-parameter-list-extractor* name ""))
 
+(defun remove-template-argument-string (name)
+  (ppcre:regex-replace-all *template-arguments-extractor*
+                           (remove-parameter-list-string name)
+                           ""))
 
 (defun extract-template-argument-string (name)
-  (ppcre:scan-to-strings *template-arguments-extractor* name))
+  (ppcre:scan-to-strings *template-arguments-extractor*
+                         (remove-parameter-list-string name)))
 
 (defun split-template-argument-string-into-literals (name)
   (ppcre:split *template-argument-literal-splitter* name))
@@ -500,3 +510,61 @@
 
 (defun string+ (&rest strings)
   (apply #'concatenate 'string strings))
+
+
+(defun parse-infix (string &key (case :preserve))
+  (unless (emptyp string)
+    (let ((*readtable* (named-readtables:find-readtable 'claw-infix:infix))
+          (*package* (find-package :claw.util.infix)))
+      (claw-infix:with-reader-case (case)
+        (claw-infix:string->prefix string)))))
+
+
+(defmacro with-temporary-directory ((&key pathname) &body body)
+  (with-gensyms (tmp-file tmp-dir)
+    `(uiop:with-temporary-file (:pathname ,tmp-file)
+       (let* ((,tmp-dir (merge-pathnames (format nil "~A.dir/" (pathname-name ,tmp-file))
+                                         (uiop:pathname-directory-pathname ,tmp-file)))
+              ,@(when pathname
+                  `((,pathname ,tmp-dir))))
+         (unwind-protect
+              (progn
+                (ensure-directories-exist ,tmp-dir)
+                ,@body)
+           (uiop:delete-directory-tree ,tmp-dir :validate (constantly t)))))))
+
+
+
+(defparameter *include-archives* t)
+(defparameter *include-objects* nil)
+
+(defun repack-blob-archives (target &rest libs)
+  (labels ((expand-dirs (file-o-dir pattern)
+             (if (uiop:directory-pathname-p file-o-dir)
+                 (when *include-archives*
+                   (uiop:directory-files file-o-dir pattern))
+                 file-o-dir))
+           (expand-dirs-with-archives (file-o-dir)
+             (expand-dirs file-o-dir "**/*.a"))
+           (expand-dirs-with-objects (file-o-dir)
+             (expand-dirs file-o-dir "**/*.o")))
+    (with-temporary-directory (:pathname path)
+      (loop for lib in (flatten (mapcar #'expand-dirs-with-archives libs))
+            for lib-native = (uiop:native-namestring lib)
+            for lib-tmpe-dir = (merge-pathnames
+                                (uiop:enough-pathname (uiop:ensure-directory-pathname lib) "/")
+                                path)
+            do (ensure-directories-exist lib-tmpe-dir)
+               (uiop:with-current-directory (lib-tmpe-dir)
+                 (uiop:run-program `("ar" "x" ,lib-native)))
+            collect lib-tmpe-dir)
+      (let ((objects (remove-duplicates
+                      (mapcar #'uiop:native-namestring
+                              (append
+                               (when *include-objects*
+                                 (flatten (mapcar #'expand-dirs-with-objects libs)))
+                               (uiop:directory-files path "**/*.o")))
+                      :test #'string=)))
+        (uiop:delete-file-if-exists target)
+        (uiop:run-program `("ar" "rcs" ,(uiop:native-namestring target) ,@objects))
+        objects))))

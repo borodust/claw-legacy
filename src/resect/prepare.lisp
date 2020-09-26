@@ -6,24 +6,11 @@
                   *macros*))
 
 
-(defvar *template-argument-map-list* nil)
-
 (define-constant +instantiation-prefix+ "__claw_instantiated"
   :test #'string=)
 
-
-(defgeneric template-argument (source name)
-  (:method (source name)
-    (declare (ignore source name))
-    nil))
-
-
-(defun find-template-argument (name)
-  (loop for map in *template-argument-map-list*
-        do (multiple-value-bind (value exist)
-               (template-argument map name)
-             (when exist
-               (return (values value t))))))
+(define-constant +macro-prefix+ "__claw_macro_"
+  :test #'string=)
 
 
 (defgeneric prepare-declaration (kind declaration &key &allow-other-keys)
@@ -38,17 +25,10 @@
   (prepare-declaration kind declaration))
 
 
-(defun prepare-macros ()
-  (with-output-to-string (out)
-    (loop for macro being the hash-key of *macros*
-          do (format out "~&auto __claw_macro_~A = ~A;" macro macro))  ))
-
-
 (defun prepare-header (uber-path prepared-path)
   (alexandria:with-output-to-file (out prepared-path :if-exists :supersede)
     (format out "#ifndef  __CLAW_PREPARED~%#define __CLAW_PREPARED 1~%")
     (format out "~%#include \"~A\"~%" (uiop:native-namestring uber-path))
-
 
     (loop for name in (sort (hash-table-values *instantiated*) #'string<)
           for counter from 0
@@ -76,8 +56,9 @@
                              language
                              standard
                              target)
-    (prepare-macros)
-    (prepare-header uber-path prepared-path)))
+    (prepare-header uber-path prepared-path)
+    (loop for macro-name being the hash-key of *macros*
+          collect macro-name)))
 
 
 (defun format-template-argument-string (argument-literals)
@@ -91,21 +72,45 @@
                (%resect:type-name type)))))
 
 
+(defun reformat-template-argument-string-from-type (type)
+  (format-template-argument-string (extract-template-literals type)))
+
+
 (defun prepare-type (type)
   (let ((type-decl (%resect:type-declaration type)))
     (unless (cffi:null-pointer-p type-decl)
       (prepare-declaration (%resect:declaration-kind type-decl) type-decl))))
 
 
+(defun publicp (decl)
+  (let ((access-specifier (%resect:declaration-access-specifier decl)))
+    (or (eq :unknown access-specifier)
+        (eq :public access-specifier))))
+
+
+(defun template-arguments-public-p (decl)
+  (let ((public-p t))
+    (resect:docollection (arg (%resect:type-template-arguments (%resect:declaration-type decl)))
+      (when (eq :type (%resect:template-argument-kind arg))
+        (let ((arg-type-decl (%resect:type-declaration (%resect:template-argument-type arg))))
+          (when (and (not (cffi:null-pointer-p arg-type-decl))
+                     (not (publicp arg-type-decl)))
+            (setf public-p nil)
+            (return)))))
+    public-p))
+
+
 (defun prepare-new-record-template-instantiations (decl)
   (unless (or (cffi:null-pointer-p (%resect:declaration-template decl))
-              (%resect:declaration-partially-specialized-p decl))
+              (%resect:declaration-partially-specialized-p decl)
+              (not (publicp decl))
+              (not (template-arguments-public-p decl)))
     (setf
      (gethash (%resect:declaration-id decl) *instantiated*)
      (%resect:type-name (%resect:declaration-type decl))))
 
-  (resect:docollection (parent-decl (%resect:record-parents decl))
-    (prepare-declaration (%resect:declaration-kind parent-decl) parent-decl))
+  (resect:docollection (parent-type (%resect:record-parents decl))
+    (prepare-type parent-type))
 
   (resect:docollection (field-decl (%resect:record-fields decl))
     (prepare-type (%resect:declaration-type field-decl)))

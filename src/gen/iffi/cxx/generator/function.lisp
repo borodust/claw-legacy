@@ -3,7 +3,9 @@
 
 (defgeneric adapt-type (entity)
   (:method (entity)
-    (values entity nil)))
+    (if (emulated-primitive-p entity)
+        (values (make-instance 'claw.spec:foreign-pointer :enveloped entity) entity)
+        (values entity nil))))
 
 
 (defmethod adapt-type ((this claw.spec:foreign-record))
@@ -82,21 +84,42 @@
     (t adapted-result-type)))
 
 
+(defun decorate-if-instantiated-function (entity name)
+  (format nil "~A~@[<~{~A~^,~}>~]"
+          name
+          (loop for arg in (claw.spec:foreign-entity-arguments entity)
+                for value = (claw.spec:foreign-entity-value arg)
+                collect (cond
+                          ((claw.spec:foreign-named-p value)
+                           (claw.spec:format-full-foreign-entity-name value))
+                          ((eq t value) "true")
+                          ((eq nil value) "false")
+                          (t value)))))
+
+
 (defun format-adapted-body (entity adapted-params result-type result-type-adapted stream)
   (let* ((name (claw.spec:foreign-entity-name entity))
          (param-names (mapcar (lambda (param)
                                 (getf param :value))
                               adapted-params))
          (invocation (if (typep entity 'claw.spec:foreign-method)
-                         (if (claw.spec:foreign-constructor-p entity)
-                             (format nil "new (__claw_this_) ~A(~{~A~^, ~})"
-                                     (claw.spec:format-full-foreign-entity-name entity)
-                                     param-names)
-                             (format nil "__claw_this_->~A(~{~A~^, ~})"
-                                     name
-                                     param-names))
+                         (cond
+                           ((claw.spec:foreign-constructor-p entity)
+                            (format nil "new (__claw_this_) ~A(~{~A~^, ~})"
+                                    (claw.spec:format-full-foreign-entity-name entity)
+                                    param-names))
+                           ((claw.spec:foreign-method-static-p entity)
+                            (format nil "~A(~{~A~^, ~})"
+                                    (claw.spec:format-full-foreign-entity-name entity)
+                                    param-names))
+                           (t
+                            (format nil "__claw_this_->~A(~{~A~^, ~})"
+                                    name
+                                    param-names)))
                          (format nil "~A(~{~A~^, ~})"
-                                 (claw.spec:format-full-foreign-entity-name entity)
+                                 (decorate-if-instantiated-function
+                                  entity
+                                  (claw.spec:format-full-foreign-entity-name entity))
                                  param-names))))
     (format stream "~&// ~A~%" (claw.spec:format-foreign-location
                                 (claw.spec:foreign-entity-location entity)))
@@ -106,13 +129,17 @@
         (string= (claw.spec:foreign-entity-name result-type) "void"))
        (format stream "~A;" invocation))
       (result-type-adapted
-       (if (typep result-type-adapted 'claw.spec:foreign-reference)
-           (format stream "return &~A;" invocation)
-           (format stream "new (__claw_result_) ~A(~A);~%return __claw_result_;"
-                   (claw.spec:format-full-foreign-entity-name
-                    (claw.spec:foreign-enveloped-entity
-                     (unconst-adapted-result-type result-type)))
-                   invocation)))
+       (let* ((unconsted-result-type (unconst-adapted-result-type result-type))
+              (unconsted-result-type-c-name (claw.spec:format-foreign-entity-c-name
+                                             unconsted-result-type)))
+         (if (typep result-type-adapted 'claw.spec:foreign-reference)
+             (format stream "return (~A) &~A;"
+                     unconsted-result-type-c-name
+                     invocation)
+             (format stream "new (__claw_result_) ~A(~A);~%return __claw_result_;"
+                     (claw.spec:format-full-foreign-entity-name
+                      (claw.spec:foreign-enveloped-entity unconsted-result-type))
+                     invocation))))
       (t (format stream "return ~A;" invocation)))))
 
 
@@ -129,7 +156,8 @@
              (params (mapcar (lambda (param)
                                (getf param :adapted))
                              adapted-params))
-             (params (if (typep entity 'claw.spec:foreign-method)
+             (params (if (and (typep entity 'claw.spec:foreign-method)
+                              (not (claw.spec:foreign-method-static-p entity)))
                          (list* (make-instance
                                  'claw.spec:foreign-parameter
                                  :name "__claw_this_"

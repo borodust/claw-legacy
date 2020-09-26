@@ -83,7 +83,7 @@
                   :type)))
 
 
-(defun generate-record-binding (define entity)
+(defun generate-record-binding (define entity &key (with-superclasses t))
   (unless (anonymous-branch-p entity)
     (let ((name (symbolicate-record-name entity))
           sizeof-cname
@@ -94,7 +94,8 @@
               alignof-cname (register-adapted-function (adapt-reporter entity "alignof"))))
       `((,define (,name :size-reporter ,sizeof-cname
                         :alignment-reporter ,alignof-cname)
-            ()
+            ,@(when with-superclasses
+                '(()))
           ,(claw.spec:format-foreign-location (claw.spec:foreign-entity-location entity))
           ,@(unless (claw.spec:foreign-entity-parameters entity)
               (loop for field in (claw.spec:foreign-record-fields entity)
@@ -123,7 +124,7 @@
 
 
 (defmethod generate-binding ((generator iffi-generator) (entity claw.spec:foreign-union) &key)
-  (generate-record-binding 'iffi:defiunion entity))
+  (generate-record-binding 'iffi:defiunion entity :with-superclasses nil))
 
 
 (defmethod generate-forward-declaration ((generator iffi-generator)

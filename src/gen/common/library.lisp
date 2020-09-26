@@ -12,8 +12,7 @@
 
 
 (defun check-entity-known (entity)
-  (when (or (typep entity 'claw.spec:foreign-entity-specialization)
-            (typep entity 'claw.spec:foreign-entity-parameter)
+  (when (or (typep entity 'claw.spec:foreign-entity-parameter)
             (claw.spec:foreign-entity-unknown-p entity))
     (signal-unknown-entity entity))
   (when (claw.spec:foreign-envelope-p entity)
@@ -32,24 +31,15 @@
         finally (return override-table)))
 
 
-(defun find-foreign-entity (id)
-  (gethash id *entity-table*))
-
-
-(defgeneric find-canonical-type (object)
-  (:method (object) object))
-
-
-(defmethod find-canonical-type ((this claw.spec:foreign-alias))
-  (find-canonical-type (claw.spec:foreign-enveloped-entity this)))
-
-
 (defun find-alias-for-entity (entity)
-  (loop for value being the hash-value of *entity-table*
-        when (and (typep value 'claw.spec:foreign-alias)
-                  (and (equal (claw.spec:foreign-entity-id (find-canonical-type value))
-                              (claw.spec:foreign-entity-id entity))))
-          do (return value)))
+  (when (claw.spec:foreign-identified-p entity)
+    (loop with entity-id = (claw.spec:foreign-entity-id (claw.spec:unqualify-foreign-entity entity))
+          for value in *entities*
+          for unqualified = (claw.spec:unqualify-foreign-entity value)
+          when (and (typep value 'claw.spec:foreign-alias)
+                    (claw.spec:foreign-identified-p unqualified)
+                    (equal entity-id (claw.spec:foreign-entity-id unqualified)))
+            do (return value))))
 
 
 (defun %generate-binding (generator entity)
@@ -75,7 +65,8 @@
                            override-types
                            recognize-bitfields
                            recognize-arrays
-                           recognize-strings)
+                           recognize-strings
+                           (ignore-entities (constantly nil)))
         configuration
       (let ((in-package (eval in-package))
             (*trim-enum-prefix-p* (eval trim-enum-prefix))
@@ -94,7 +85,6 @@
                                                                adapter-path
                                                                extract-pointers)))))))
             (*export-table* (make-hash-table))
-            (*entity-table* (make-hash-table :test #'equal))
             (*forward-declaration-table* (make-hash-table :test 'equal))
             (*visit-table* (make-hash-table :test 'equal))
             (*override-table* (parse-overrides override-types))
@@ -102,10 +92,12 @@
             (*recognize-bitfields-p* recognize-bitfields)
             (*recognize-arrays-p* recognize-arrays)
             (rename-symbols (eval (parse-renaming-pipeline symbolicate-names)))
-            (bindings (list)))
+            (bindings (list))
+            (*entities* (remove-if (eval ignore-entities)
+                                   (stable-sort entities #'string<
+                                                :key #'claw.spec:foreign-entity-id))))
         (with-symbol-renaming (in-package rename-symbols)
-          (loop for entity in (stable-sort entities #'string<
-                                           :key #'claw.spec:foreign-entity-id)
+          (loop for entity in *entities*
                 do (let ((*dependency-type-list* nil))
                      (loop for bing in (%generate-binding generator entity)
                            do (push bing bindings))))

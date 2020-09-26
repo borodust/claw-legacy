@@ -1,14 +1,25 @@
 (cl:in-package :claw.resect)
 
 
+(declaim (special *translation-unit*))
+
 (defgeneric inspect-declaration (inspector kind declaration))
 
-(defgeneric prepare-inspector (inspector unit)
-  (:method (inspector unit)
-    (declare (ignore inspector unit))))
+(defgeneric inspect-foreign-library (inspector
+                                     header-path
+                                     includes
+                                     frameworks
+                                     language
+                                     standard
+                                     target
+                                     &key &allow-other-keys))
 
-
-(defun inspect-foreign-library (inspector header-path includes frameworks language standard target)
+(defmethod inspect-foreign-library :around (inspector
+                                            header-path
+                                            includes frameworks
+                                            language standard target
+                                            &key (diagnostics t))
+  (declare (ignore inspector))
   (flet ((%stringify (value)
            (when value
              (if (stringp value)
@@ -19,7 +30,17 @@
                                    :framework-paths frameworks
                                    :language (%stringify language)
                                    :standard (%stringify standard)
-                                   :target (%stringify target))
-      (prepare-inspector inspector unit)
-      (resect:docollection (decl (%resect:translation-unit-declarations unit))
-        (inspect-declaration inspector (%resect:declaration-kind decl) decl)))))
+                                   :target (%stringify target)
+                                   :diagnostics diagnostics)
+      (let ((*translation-unit* unit))
+        (call-next-method)))))
+
+
+(defmethod inspect-foreign-library (inspector
+                                    header-path
+                                    includes frameworks
+                                    language standard target
+                                    &key)
+  (declare (ignore header-path includes frameworks language standard target))
+  (resect:docollection (decl (%resect:translation-unit-declarations *translation-unit*))
+    (inspect-declaration inspector (%resect:declaration-kind decl) decl)))

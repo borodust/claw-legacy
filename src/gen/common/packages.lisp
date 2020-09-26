@@ -10,12 +10,11 @@
            #:dependablep
            #:foreign-entity-dependencies
 
-           #:find-foreign-entity
            #:find-alias-for-entity
-           #:find-canonical-type
 
            #:build-adapter
            #:initialize-adapter
+           #:adapter
 
            #:register-adapted-function
            #:function-pointer-extractor-required-p
@@ -24,7 +23,9 @@
            #:adapted-function-parameters
            #:adapted-function-result-type
            #:adapted-function-body
+           #:adapted-function-entity
 
+           #:*qualify-records*
            #:get-overriden-type
            #:export-symbol
            #:expand-constant

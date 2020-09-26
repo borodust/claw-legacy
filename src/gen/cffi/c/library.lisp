@@ -8,4 +8,5 @@
                                            (language (eql :c))
                                            wrapper
                                            configuration)
-  (explode-library-definition (make-instance 'cffi-generator) language wrapper configuration))
+  (let ((*qualify-records* t))
+    (explode-library-definition (make-instance 'cffi-generator) language wrapper configuration)))

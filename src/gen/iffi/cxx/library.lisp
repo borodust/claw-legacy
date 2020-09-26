@@ -19,4 +19,5 @@
                          (8 :int8)
                          (t :int64))))
      `(iffi:initialize :size-t-type ,size-t-type))
-   (explode-library-definition (make-instance 'iffi-generator) language wrapper configuration)))
+   (let ((*qualify-records* nil))
+     (explode-library-definition (make-instance 'iffi-generator) language wrapper configuration))))

@@ -33,6 +33,7 @@
                      'cffi:defbitfield
                      'cffi:defcenum)
                 (,name ,(entity->cffi-type (claw.spec:foreign-enum-type entity)))
+                ,(claw.spec:format-foreign-location (claw.spec:foreign-entity-location entity))
                 ,@(loop for (key . value) in (if *trim-enum-prefix-p*
                                                  (trim-enum-prefix values)
                                                  values)
@@ -46,6 +47,10 @@
                      append (expand-constant key value))))))))
 
 
-(defmethod dependable-p ((entity claw.spec:foreign-enum))
+(defmethod dependablep ((entity claw.spec:foreign-enum))
   (declare (ignore entity))
   t)
+
+
+(defmethod foreign-entity-dependencies ((entity claw.spec:foreign-enum))
+  (list (claw.spec:foreign-enum-type entity)))
