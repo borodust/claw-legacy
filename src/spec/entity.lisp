@@ -2,6 +2,7 @@
   (:use #:cl #:alexandria #:claw.util)
   (:export #:foreign-entity
            #:foreign-entity-source
+           #:foreign-entity-private-p
 
            #:foreign-identified-p
            #:foreign-entity-id
@@ -38,6 +39,7 @@
 
            #:foreign-pointer
            #:foreign-reference
+           #:foreign-reference-rvalue-p
 
            #:foreign-constant
            #:foreign-constant-value
@@ -224,6 +226,12 @@
            :reader foreign-entity-source)))
 
 
+(defgeneric foreign-entity-private-p (entity)
+  (:method (entity)
+    (declare (ignore entity))
+    nil))
+
+
 ;;;
 ;;; TYPE
 ;;;
@@ -341,7 +349,10 @@
             :reader foreign-record-parents)
    (abstract-p :initarg :abstract
                :initform nil
-               :reader foreign-record-abstract-p)))
+               :reader foreign-record-abstract-p)
+   (private-p :initarg :private
+              :initform nil
+              :reader foreign-entity-private-p)))
 
 
 (defclass foreign-struct (foreign-record) ())
@@ -423,7 +434,10 @@
 ;;;
 ;;; REFERENCE
 ;;;
-(defclass foreign-reference (foreign-entity envelope) ())
+(defclass foreign-reference (foreign-entity envelope)
+  ((rvalue-p :initarg :rvalue
+             :initform nil
+             :reader foreign-reference-rvalue-p)))
 
 
 ;;;

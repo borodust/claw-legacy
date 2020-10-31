@@ -28,16 +28,18 @@
          (values (loop for (key . value) in (claw.spec:foreign-enum-values entity)
                        collect (cons (c-name->lisp key :enum) value))))
     (flet ((%generate-enum (name)
-             (export-symbol name)
-             `((,(if (and *recognize-bitfields-p* (bitfieldp entity))
-                     'cffi:defbitfield
-                     'cffi:defcenum)
-                (,name ,(entity->cffi-type (claw.spec:foreign-enum-type entity)))
-                ,(claw.spec:format-foreign-location (claw.spec:foreign-entity-location entity))
-                ,@(loop for (key . value) in (if *trim-enum-prefix-p*
-                                                 (trim-enum-prefix values)
-                                                 values)
-                        collect (list (make-keyword key) value))))))
+             (let ((enum-type (claw.spec:foreign-enum-type entity)))
+               (check-entity-known enum-type)
+               (export-symbol name)
+               `((,(if (and *recognize-bitfields-p* (bitfieldp entity))
+                       'cffi:defbitfield
+                       'cffi:defcenum)
+                  (,name ,(entity->cffi-type enum-type))
+                  ,(claw.spec:format-foreign-location (claw.spec:foreign-entity-location entity))
+                  ,@(loop for (key . value) in (if *trim-enum-prefix-p*
+                                                   (trim-enum-prefix values)
+                                                   values)
+                          collect (list (make-keyword key) value)))))))
       (cond
         (name
          (%generate-enum name))

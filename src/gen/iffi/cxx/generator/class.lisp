@@ -32,9 +32,6 @@
                                (claw.spec:format-full-foreign-entity-name entity))))
 
 
-()
-
-
 (defun adapt-setter (record field)
   (let ((field-name (claw.spec:foreign-entity-name field)))
     (multiple-value-bind (field-type adapted-p)
@@ -88,8 +85,9 @@
     (let ((name (symbolicate-record-name entity))
           sizeof-cname
           alignof-cname)
-      (when (and (> (claw.spec:foreign-entity-bit-size entity) 0)
-                 (not (anonymous-branch-p entity)))
+      (when (and (not (claw.spec:foreign-entity-private-p entity))
+                 (not (anonymous-branch-p entity))
+                 (> (claw.spec:foreign-entity-bit-size entity) 0))
         (setf sizeof-cname (register-adapted-function (adapt-reporter entity "sizeof"))
               alignof-cname (register-adapted-function (adapt-reporter entity "alignof"))))
       `((,define (,name :size-reporter ,sizeof-cname

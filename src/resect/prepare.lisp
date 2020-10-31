@@ -73,7 +73,9 @@
 
 
 (defun reformat-template-argument-string-from-type (type)
-  (format-template-argument-string (extract-template-literals type)))
+  (reformat-template-argument-string
+   (extract-template-argument-string
+    (%resect:type-name type))))
 
 
 (defun prepare-type (type)

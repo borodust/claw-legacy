@@ -395,23 +395,35 @@
     (signal condi)))
 
 
-(defun make-intricate-instance (name &rest args)
+(defun make-intricate-instance (name constructor &rest args)
   (let ((ptr (intricate-alloc name)))
     (handler-case
-        (apply name `(:pointer ,name) ptr args)
+        (apply constructor `(:pointer ,name) ptr args)
       (serious-condition (condi) (intricate-free ptr) (signal condi)))
     ptr))
 
 
-(define-compiler-macro make-intricate-instance (&whole whole name &rest args)
-  (let ((quoted (find-quoted name)))
-    (if quoted
+(defun make-simple-intricate-instance (name &rest args)
+  (apply #'make-intricate-instance name name args))
+
+
+(define-compiler-macro make-intricate-instance (&whole whole name constructor &rest args)
+  (let ((quoted-name (find-quoted name))
+        (quoted-constructor (find-quoted constructor)))
+    (if (and quoted-name quoted-constructor)
         (with-gensyms (ptr condi)
-          `(let ((,ptr (intricate-alloc ',quoted)))
+          `(let ((,ptr (intricate-alloc ',quoted-name)))
              (handler-case
-                 (,quoted '(:pointer ,quoted) ,ptr ,@args)
+                 (,quoted-constructor '(:pointer ,quoted-name) ,ptr ,@args)
                (serious-condition (,condi) (intricate-free ,ptr) (signal ,condi)))
              ,ptr))
+        whole)))
+
+
+(define-compiler-macro make-simple-intricate-instance (&whole whole name &rest args)
+  (let ((quoted-name (find-quoted name)))
+    (if quoted-name
+        `(make-intricate-instance ,name ,name ,@args)
         whole)))
 
 

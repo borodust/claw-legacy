@@ -117,9 +117,11 @@
                                      (list :pointer (entity->cffi-type
                                                      (%enveloped-entity)
                                                      :qualify-records qualify-records))))
-      (claw.spec:foreign-reference (list :reference (entity->cffi-type
-                                                     (%enveloped-entity)
-                                                     :qualify-records qualify-records)))
+      (claw.spec:foreign-reference `(:reference ,(entity->cffi-type
+                                                  (%enveloped-entity)
+                                                  :qualify-records qualify-records)
+                                                ,@(when (claw.spec:foreign-reference-rvalue-p entity)
+                                                    '(:rvalue t))))
       (claw.spec:foreign-array (let ((dimensions (claw.spec:foreign-array-dimensions entity)))
                                  (cond
                                    ((and (= (length dimensions) 1) (%enveloped-char-p))

@@ -19,4 +19,5 @@
            #:intricate-slot-value
 
            #:make-intricate-instance
+           #:make-simple-intricate-instance
            #:destroy-intricate-instance))

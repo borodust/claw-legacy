@@ -103,7 +103,9 @@
            (name (trim-around name "\\(" "("))
            (name (trim-around name "\\)" ")"))
            (name (trim-around name "\\[" "["))
-           (name (trim-around name "\\]" "]")))
+           (name (trim-around name "\\]" "]"))
+           (name (trim-around name "\\<" "<"))
+           (name (trim-around name "\\>" ">")))
       name)))
 
 ;;;
