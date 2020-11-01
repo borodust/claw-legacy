@@ -80,9 +80,18 @@
                   :type)))
 
 
+(defun symbolicate-function-name (entity)
+  (let* ((owner-needed-p (and (typep entity 'claw.spec:foreign-method)
+                              (claw.spec:foreign-method-static-p entity)))
+         (full-name (claw.spec:format-full-foreign-entity-name entity
+                                                               :include-method-owner owner-needed-p)))
+    (c-name->lisp full-name :type)))
+
+
 (defun generate-record-binding (define entity &key (with-superclasses t))
   (unless (anonymous-branch-p entity)
     (let ((name (symbolicate-record-name entity))
+          (id (claw.spec:foreign-entity-id entity))
           sizeof-cname
           alignof-cname)
       (when (and (not (claw.spec:foreign-entity-private-p entity))
@@ -90,8 +99,13 @@
                  (> (claw.spec:foreign-entity-bit-size entity) 0))
         (setf sizeof-cname (register-adapted-function (adapt-reporter entity "sizeof"))
               alignof-cname (register-adapted-function (adapt-reporter entity "alignof"))))
+      (export-symbol name)
       `((,define (,name :size-reporter ,sizeof-cname
-                        :alignment-reporter ,alignof-cname)
+                        :alignment-reporter ,alignof-cname
+                        ,@(when-let ((ctor (find-constructor id)))
+                            `(:constructor ,(symbolicate-function-name ctor)))
+                        ,@(when-let ((dtor (find-destructor id)))
+                            `(:destructor ,(symbolicate-function-name dtor))))
             ,@(when with-superclasses
                 '(()))
           ,(claw.spec:format-foreign-location (claw.spec:foreign-entity-location entity))

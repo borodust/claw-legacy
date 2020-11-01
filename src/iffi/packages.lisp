@@ -1,7 +1,6 @@
 (cl:defpackage :iffi
   (:use :cl :alexandria)
-  (:export #:initialize
-           #:defifun
+  (:export #:defifun
 
            #:defirecord
            #:defistruct
@@ -19,5 +18,6 @@
            #:intricate-slot-value
 
            #:make-intricate-instance
-           #:make-simple-intricate-instance
-           #:destroy-intricate-instance))
+           #:destroy-intricate-instance
+           #:with-intricate-instance
+           #:with-intricate-instances))

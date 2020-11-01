@@ -108,7 +108,7 @@
   :author "Pavel Korolev"
   :license "MIT"
   :version "1.0"
-  :depends-on (:alexandria :cffi)
+  :depends-on (:alexandria :cffi :trivial-features)
   :pathname "src/iffi/"
   :serial t
   :components ((:file "packages")

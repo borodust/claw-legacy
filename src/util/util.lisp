@@ -553,13 +553,13 @@
     (with-temporary-directory (:pathname path)
       (loop for lib in (flatten (mapcar #'expand-dirs-with-archives libs))
             for lib-native = (uiop:native-namestring lib)
-            for lib-tmpe-dir = (merge-pathnames
-                                (uiop:enough-pathname (uiop:ensure-directory-pathname lib) "/")
-                                path)
-            do (ensure-directories-exist lib-tmpe-dir)
-               (uiop:with-current-directory (lib-tmpe-dir)
+            for lib-tmp-dir = (merge-pathnames
+                               (uiop:enough-pathname (uiop:ensure-directory-pathname lib) "/")
+                               path)
+            do (ensure-directories-exist lib-tmp-dir)
+               (uiop:with-current-directory (lib-tmp-dir)
                  (uiop:run-program `("ar" "x" ,lib-native)))
-            collect lib-tmpe-dir)
+            collect lib-tmp-dir)
       (let ((objects (remove-duplicates
                       (mapcar #'uiop:native-namestring
                               (append

@@ -83,8 +83,11 @@
                    definitions)))))))
 
 
-(defun build-dynamic-adapter (standard adapter-file includes target-file &key pedantic compiler)
-  (%build-adapter standard adapter-file includes target-file :pedantic pedantic :compiler compiler))
+(defun build-dynamic-adapter (standard adapter-file includes target-file &key pedantic compiler flags)
+  (%build-adapter standard adapter-file includes target-file
+                  :pedantic pedantic
+                  :compiler compiler
+                  :flags flags))
 
 
 (defun %verify-adapter-initialization (result)
@@ -110,7 +113,7 @@
 (defmethod expand-adapter-routines ((this dynamic-adapter) wrapper)
   (let ((name (wrapper-name-of this))
         (shared-library-name (default-shared-adapter-library-name)))
-    `((defmethod build-adapter ((wrapper-name (eql ',name)) &key target dependencies compiler)
+    `((defmethod build-adapter ((wrapper-name (eql ',name)) &key target dependencies compiler flags)
         (declare (ignore wrapper-name))
         (build-dynamic-adapter ,(standard-of this)
                                ,(adapter-file-of this)
@@ -119,7 +122,8 @@
                                                 ,(claw.wrapper:merge-wrapper-pathname
                                                   "" wrapper))
                                :dependencies dependencies
-                               :compiler compiler))
+                               :compiler compiler
+                               :flags flags))
       (defmethod initialize-adapter ((wrapper-name (eql ',name)))
         (declare (ignore wrapper-name))
         (%verify-adapter-initialization

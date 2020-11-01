@@ -504,8 +504,10 @@
                       ((and current-owner
                             (typep entity 'foreign-method)
                             (not include-method-owner))
-                       (format-full-foreign-entity-name current-owner :include-name nil))
-                      (current-owner
+                       (format-full-foreign-entity-name current-owner
+                                                        :include-method-owner nil
+                                                        :include-name nil))
+                      ((and current-owner include-method-owner)
                        (format-full-foreign-entity-name current-owner))
                       (t
                        (foreign-entity-namespace entity)))))

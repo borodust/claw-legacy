@@ -4,7 +4,7 @@
 (defvar *lib-name-regex* (ppcre:create-scanner "^lib(.*)\\..*$"))
 
 (defgeneric generate-adapter-file (adapter))
-(defgeneric build-adapter (wrapper-name &key target dependencies compiler))
+(defgeneric build-adapter (wrapper-name &key target dependencies compiler flags))
 (defgeneric expand-adapter-routines (adapter wrapper))
 
 
@@ -159,7 +159,7 @@
 
 
 (defun %build-adapter (standard adapter-file includes target-file
-                       &key pedantic dependencies compiler)
+                       &key pedantic dependencies compiler flags)
   (multiple-value-bind (library-directories libraries) (parse-dependencies dependencies)
     (uiop:run-program (append (list (ecase (or compiler :clang)
                                       (:gcc "g++")
@@ -172,6 +172,8 @@
                               (when pedantic
                                 (list "-pedantic"))
                               (list "-O2" "-fPIC")
+                              (when flags
+                                (ensure-list flags))
                               (loop for directory in includes
                                     collect (format nil "-I~A"
                                                     (namestring directory)))

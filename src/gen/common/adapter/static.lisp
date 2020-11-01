@@ -38,17 +38,18 @@
 
 
 (defun build-static-adapter (standard adapter-file includes target-file
-                             &key pedantic dependencies compiler)
+                             &key pedantic dependencies compiler flags)
   (%build-adapter standard adapter-file includes target-file
                   :pedantic pedantic
                   :dependencies dependencies
-                  :compiler compiler))
+                  :compiler compiler
+                  :flags flags))
 
 
 (defmethod expand-adapter-routines ((this static-adapter) wrapper)
   (let ((name (wrapper-name-of this))
         (shared-library-name (default-shared-adapter-library-name)))
-    `((defmethod build-adapter ((wrapper-name (eql ',name)) &key target dependencies compiler)
+    `((defmethod build-adapter ((wrapper-name (eql ',name)) &key target dependencies compiler flags)
         (declare (ignore wrapper-name))
         (build-static-adapter ,(standard-of this)
                               ,(adapter-file-of this)
@@ -57,4 +58,5 @@
                                                ,(claw.wrapper:merge-wrapper-pathname
                                                  "" wrapper))
                               :dependencies dependencies
-                              :compiler compiler)))))
+                              :compiler compiler
+                              :flags flags)))))

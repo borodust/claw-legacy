@@ -211,8 +211,8 @@
         do (check-entity-known param))
 
   (let* ((adapted-function (adapt-function entity))
-         (full-name (claw.spec:format-full-foreign-entity-name entity :include-method-owner nil))
-         (name (c-name->lisp full-name :type))
+         (full-name (claw.spec:format-full-foreign-entity-name entity))
+         (name (symbolicate-function-name entity))
          (result-type (entity->cffi-type
                        (adapted-function-result-type adapted-function)))
          (params (loop for param in (adapted-function-parameters adapted-function)

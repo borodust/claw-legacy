@@ -4,20 +4,32 @@
 (defclass iffi-generator (generator) ())
 
 
+(defun fill-construction-table (entities)
+  (loop for entity in entities
+        when (typep entity 'claw.spec:foreign-method)
+          do (let* ((owner (claw.spec:foreign-owner entity))
+                    (owner-id (claw.spec:foreign-entity-id owner))
+                    (owner-name (claw.spec:foreign-entity-name owner))
+                    (entity-name (claw.spec:foreign-entity-name entity)))
+               (when (starts-with #\~ entity-name)
+                 (setf (gethash (cons owner-id :dtor) *construction-table*) entity))
+               (when (string= owner-name entity-name)
+                 (setf (gethash (cons owner-id :ctor) *construction-table*) entity)))))
+
+
+(defun find-constructor (owner-id)
+  (gethash (cons owner-id :ctor) *construction-table*))
+
+
+(defun find-destructor (owner-id)
+  (gethash (cons owner-id :dtor) *construction-table*))
+
+
 (defmethod claw.wrapper:generate-bindings ((generator (eql :claw/iffi))
                                            (language (eql :c++))
                                            wrapper
                                            configuration)
-  (list*
-   (let* ((size-t-entity (loop for entity in (claw.wrapper:wrapper-entities wrapper)
-                                 thereis (and (string= "size_t" (claw.spec:foreign-entity-name entity))
-                                              entity)))
-          (size-t-type (case (and size-t-entity (claw.spec:foreign-entity-bit-size size-t-entity))
-                         (64 :int64)
-                         (32 :int32)
-                         (16 :int16)
-                         (8 :int8)
-                         (t :int64))))
-     `(iffi:initialize :size-t-type ,size-t-type))
-   (let ((*qualify-records* nil))
-     (explode-library-definition (make-instance 'iffi-generator) language wrapper configuration))))
+  (let ((*qualify-records* nil)
+        (*construction-table* (make-hash-table :test 'equal)))
+    (fill-construction-table (claw.wrapper:wrapper-entities wrapper))
+    (explode-library-definition (make-instance 'iffi-generator) language wrapper configuration)))

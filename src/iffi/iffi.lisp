@@ -1,12 +1,27 @@
 (cl:in-package :iffi)
 
 
-(defvar *initialized-p* nil)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun find-quoted (value)
+    (cond
+      ((keywordp value) value)
+      ((and (listp value) (eq 'quote (first value))) (second value))))
+
+
+  (defmacro initialize-iffi ()
+    (let ((alloc-name (cond
+                        ((cffi:foreign-symbol-pointer "aligned_alloc") "aligned_alloc")
+                        ((cffi:foreign-symbol-pointer "_aligned_malloc") "_aligned_malloc")
+                        (t (error "Aligned memory allocation function not found. No C std library linked?")))))
+      `(progn
+         (declaim (inline iffi::aligned-alloc))
+         (cffi:defcfun (,alloc-name iffi::aligned-alloc) :pointer
+           (byte-alignment :size)
+           (byte-size :size))))))
 
 
 (define-condition intricate-condition (serious-condition)
   (handle))
-
 
 (defvar *function-table* (make-hash-table :test 'equal))
 
@@ -19,19 +34,7 @@
 (defvar *record-table* (make-hash-table))
 
 
-(defmacro initialize (&key size-t-type)
-  (unless *initialized-p*
-    (setf *initialized-p* t)
-    `(cffi:defcfun ("aligned_alloc" aligned-alloc) :pointer
-       (byte-alignment ,size-t-type)
-       (byte-size ,size-t-type))))
-
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun find-quoted (value)
-    (cond
-      ((keywordp value) value)
-      ((and (listp value) (eq 'quote (first value))) (second value)))))
+(initialize-iffi)
 
 
 (defun (setf intricate-documentation) (docstring name &rest arg-types)
@@ -146,8 +149,10 @@
 
 (defclass intricate-record ()
   ((name :initarg :name :reader name-of)
-   (size-reporter :initarg :size-reporter :initform nil  :accessor size-reporter-of)
-   (alignment-reporter :initarg :alignment-reporter :initform nil :accessor alignment-reporter-of)
+   (size-reporter :initarg :size-reporter :initform nil  :reader size-reporter-of)
+   (alignment-reporter :initarg :alignment-reporter :initform nil :reader alignment-reporter-of)
+   (constructor :initarg :constructor :initform nil :reader constructor-of)
+   (destructor :initarg :destructor :initform nil :reader destructor-of)
    (field-map :initarg :field-map :initform (make-hash-table))))
 
 
@@ -156,6 +161,8 @@
     (list :name (name-of record)
           :size (size-reporter-of record)
           :alignment (alignment-reporter-of record)
+          :constructor (constructor-of record)
+          :destructor (destructor-of record)
           :fields (loop for field being the hash-value of field-map
                         collect (list :name (name-of field)
                                       :getter (getter-of field)
@@ -163,7 +170,7 @@
 
 
 (defun deserialize-intricate-record (record-data)
-  (destructuring-bind (&key name size alignment fields)
+  (destructuring-bind (&key name size alignment constructor destructor fields)
       record-data
     (let ((field-map (loop with map = (make-hash-table)
                            for field in fields
@@ -177,12 +184,9 @@
       (make-instance 'intricate-record :name name
                                        :size-reporter size
                                        :alignment-reporter alignment
+                                       :constructor constructor
+                                       :destructor destructor
                                        :field-map field-map))))
-
-
-(defun register-intricate-field (record field)
-  (with-slots (field-map) record
-    (setf (gethash (name-of field) field-map) field)))
 
 
 (defun find-intricate-field (record field-name)
@@ -195,52 +199,60 @@
     (setf (gethash (name-of record) *record-table*) record)))
 
 
+(defun find-intricate-record (name)
+  (gethash name *record-table*))
+
+
 (defun expand-record-field (record field)
   (destructuring-bind (field-name type &key
                                          setter
                                          getter
-                                         documentation)
+                       &allow-other-keys)
       field
-    (declare (ignore documentation))
-    (let ((name (name-of record))
-          setter-name
-          getter-name)
-      (prog1 (append
-              (when setter
-                (setf setter-name (format-symbol
-                                   (symbol-package field-name)
-                                   "~A$~A$~A"
-                                   'iffi-set name field-name))
-                `((cffi:defcfun (,setter ,setter-name)
-                      :void
-                    (this :pointer)
-                    (value ,type))))
-              (when getter
-                (setf getter-name (format-symbol
-                                   (symbol-package field-name)
-                                   "~A$~A$~A"
-                                   'iffi-get name field-name))
-                `((cffi:defcfun (,getter ,getter-name)
-                      ,type
-                    (this :pointer)))))
-        (register-intricate-field record (make-instance 'intricate-field
-                                                        :name field-name
-                                                        :setter setter-name
-                                                        :getter getter-name))))))
+    (when-let ((record-field (find-intricate-field record field-name)))
+      (append
+       (when setter
+         `((cffi:defcfun (,setter ,(setter-of record-field)) :void
+             (this :pointer)
+             (value ,type))))
+       (when getter
+         `((cffi:defcfun (,getter ,(getter-of record-field)) ,type
+             (this :pointer))))))))
 
 
 (defun expand-record (record size-reporter alignment-reporter fields)
-  (let ((name (name-of record)))
-    (setf (size-reporter-of record) (format-symbol (symbol-package name)
-                                                   "~A$~A" 'iffi-sizeof name)
-          (alignment-reporter-of record) (format-symbol (symbol-package name)
-                                                        "~A$~A" 'iffi-alignof name))
-    `((cffi:defcfun (,size-reporter ,(size-reporter-of record))
-          :unsigned-long-long)
-      (cffi:defcfun (,alignment-reporter ,(alignment-reporter-of record))
-          :unsigned-long-long)
-      ,@(loop for field in fields
-              append (expand-record-field record field)))))
+  `((cffi:defcfun (,size-reporter ,(size-reporter-of record))
+        :unsigned-long-long)
+    (cffi:defcfun (,alignment-reporter ,(alignment-reporter-of record))
+        :unsigned-long-long)
+    ,@(loop for field in fields
+            append (expand-record-field record field))))
+
+
+(defun make-field-map (record-name fields)
+  (loop with table = (make-hash-table)
+        for field in fields
+        do (destructuring-bind (field-name type &key
+                                                  setter
+                                                  getter
+                                                  documentation)
+               field
+             (declare (ignore type documentation))
+             (let ((record-field (make-instance
+                                  'intricate-field
+                                  :name field-name
+                                  :setter (when setter
+                                            (format-symbol
+                                             (symbol-package field-name)
+                                             "~A$~A$~A"
+                                             'iffi-set record-name field-name))
+                                  :getter (when getter
+                                            (format-symbol
+                                             (symbol-package field-name)
+                                             "~A$~A$~A"
+                                             'iffi-get record-name field-name)))))
+               (setf (gethash field-name table) record-field)))
+        finally (return table)))
 
 
 (defmacro defirecord (name-and-opts superclasses &body fields)
@@ -250,16 +262,21 @@
         (if (stringp (first fields))
             (values (first fields) (rest fields))
             (values nil fields))
-      (destructuring-bind (&key size-reporter alignment-reporter)
+      (destructuring-bind (&key size-reporter alignment-reporter constructor destructor)
           opts
-        (let ((record (make-instance 'intricate-record :name name)))
+        (let ((record (make-instance 'intricate-record
+                                     :name name
+                                     :constructor constructor
+                                     :destructor destructor
+                                     :size-reporter (format-symbol (symbol-package name)
+                                                                   "~A$~A" 'iffi-sizeof name)
+                                     :alignment-reporter (format-symbol (symbol-package name)
+                                                                        "~A$~A" 'iffi-alignof name)
+                                     :field-map (make-field-map name fields))))
           (prog1 `(progn
                     (cffi:defctype ,name :void ,doc)
                     ,@(when (and size-reporter alignment-reporter)
-                        (expand-record record
-                                       size-reporter
-                                       alignment-reporter
-                                       fields))
+                        (expand-record record size-reporter alignment-reporter fields))
                     (register-intricate-record ',(serialize-intricate-record record)))))))))
 
 
@@ -276,42 +293,42 @@
 
 
 (defun intricate-size (name)
-  (if-let ((intricate (gethash name *record-table*)))
+  (if-let ((intricate (find-intricate-record name)))
     (funcall (size-reporter-of intricate))
     (cffi:foreign-type-size name)))
 
 
 (define-compiler-macro intricate-size (&whole whole name)
   (if-let (quoted (find-quoted name))
-    (if-let ((intricate (gethash quoted *record-table*)))
+    (if-let ((intricate (find-intricate-record quoted)))
       `(,(size-reporter-of intricate))
       whole)
     whole))
 
 
 (defun intricate-alignment (name)
-  (if-let ((intricate (gethash name *record-table*)))
+  (if-let ((intricate (find-intricate-record name)))
     (funcall (alignment-reporter-of intricate))
     (cffi:foreign-type-size name)))
 
 
 (define-compiler-macro intricate-alignment (&whole whole name)
   (if-let ((quoted (find-quoted name)))
-    (if-let ((intricate (gethash quoted *record-table*)))
+    (if-let ((intricate (find-intricate-record quoted)))
       `(,(alignment-reporter-of intricate))
       whole)
     whole))
 
 
 (defun intricate-alloc (name &optional (count 1))
-  (if-let ((intricate (gethash name *record-table*)))
+  (if-let ((intricate (find-intricate-record name)))
     (aligned-alloc (intricate-alignment name) (* (intricate-size name) count))
     (cffi:foreign-alloc name :count count)))
 
 
 (define-compiler-macro intricate-alloc (&whole whole name &optional (count 1))
   (if-let ((quoted (find-quoted name)))
-    (if-let ((intricate (gethash quoted *record-table*)))
+    (if-let ((intricate (find-intricate-record quoted)))
       `(aligned-alloc (intricate-alignment ,name) (* (intricate-size ,name) ,count))
       whole)
     whole))
@@ -324,7 +341,7 @@
 
 (defmacro with-field-setter ((field-setter type-name slot-name) &body body)
   (with-gensyms (intricate field)
-    `(if-let ((,intricate (gethash ,type-name *record-table*)))
+    `(if-let ((,intricate (find-intricate-record ,type-name)))
        (if-let ((,field (find-intricate-field ,intricate ,slot-name)))
          (if-let ((,field-setter (setter-of ,field)))
            (progn ,@body)
@@ -366,7 +383,7 @@
 
 
 (defun intricate-slot-value (instance type-name slot-name)
-  (if-let ((intricate (gethash type-name *record-table*)))
+  (if-let ((intricate (find-intricate-record type-name)))
     (if-let ((field (find-intricate-field intricate slot-name)))
       (if-let ((getter (getter-of field)))
         (funcall getter instance)
@@ -379,7 +396,7 @@
   (let ((quoted-type-name (find-quoted type-name))
         (quoted-slot-name (find-quoted slot-name)))
     (if (and quoted-type-name quoted-slot-name)
-        (if-let ((intricate (gethash quoted-type-name *record-table*)))
+        (if-let ((intricate (find-intricate-record quoted-type-name)))
           (if-let ((field (find-intricate-field intricate quoted-slot-name)))
             (if-let ((getter (getter-of field)))
               `(,getter ,instance)
@@ -395,49 +412,66 @@
     (signal condi)))
 
 
-(defun make-intricate-instance (name constructor &rest args)
-  (let ((ptr (intricate-alloc name)))
-    (handler-case
-        (apply constructor `(:pointer ,name) ptr args)
-      (serious-condition (condi) (intricate-free ptr) (signal condi)))
+(defun make-intricate-instance (name &rest args)
+  (let* ((record (find-intricate-record name))
+         (ptr (intricate-alloc name)))
+    (unless record
+      (error "Record with name ~A not found" name))
+    (if-let ((ctor (constructor-of record)))
+      (handler-case
+          (apply (constructor-of record) `(:pointer ,name) ptr args)
+        (serious-condition (condi) (intricate-free ptr) (signal condi)))
+      (error "Constructor not found for record ~A" name))
     ptr))
 
 
-(defun make-simple-intricate-instance (name &rest args)
-  (apply #'make-intricate-instance name name args))
-
-
-(define-compiler-macro make-intricate-instance (&whole whole name constructor &rest args)
-  (let ((quoted-name (find-quoted name))
-        (quoted-constructor (find-quoted constructor)))
-    (if (and quoted-name quoted-constructor)
+(define-compiler-macro make-intricate-instance (&whole whole name &rest args)
+  (let* ((quoted-name (find-quoted name))
+         (record (find-intricate-record quoted-name))
+         (ctor (and record (constructor-of record) )))
+    (if ctor
         (with-gensyms (ptr condi)
           `(let ((,ptr (intricate-alloc ',quoted-name)))
              (handler-case
-                 (,quoted-constructor '(:pointer ,quoted-name) ,ptr ,@args)
+                 (,ctor '(:pointer ,quoted-name) ,ptr ,@args)
                (serious-condition (,condi) (intricate-free ,ptr) (signal ,condi)))
              ,ptr))
         whole)))
 
 
-(define-compiler-macro make-simple-intricate-instance (&whole whole name &rest args)
-  (let ((quoted-name (find-quoted name)))
-    (if quoted-name
-        `(make-intricate-instance ,name ,name ,@args)
-        whole)))
-
-
-(defun destroy-intricate-instance (name destructor instance)
-  (funcall destructor `(:pointer ,name) instance)
+(defun destroy-intricate-instance (name instance)
+  (let ((record (find-intricate-record name)))
+    (unless record
+      (error "Record with name ~A not found" name))
+    (if-let ((dtor (destructor-of record)))
+      (funcall dtor `(:pointer ,name) instance)
+      (error "Destructor for record ~A not found" name)))
   (intricate-free instance))
 
 
-(define-compiler-macro destroy-intricate-instance (&whole whole name destructor instance)
-  (let ((quoted-name (find-quoted name))
-        (quoted-destructor (find-quoted destructor)))
-    (if (and quoted-name quoted-destructor)
+(define-compiler-macro destroy-intricate-instance (&whole whole name instance)
+  (let* ((quoted-name (find-quoted name))
+         (record (find-intricate-record quoted-name))
+         (dtor (and record (destructor-of record))))
+    (if dtor
         (once-only (instance)
           `(progn
-             (,quoted-destructor '(:pointer ,quoted-name) ,instance)
+             (,dtor '(:pointer ,quoted-name) ,instance)
              (intricate-free ,instance)))
         whole)))
+
+
+(defmacro with-intricate-instance ((var name &rest constructor-args) &body body)
+  `(let ((,var (make-intricate-instance ',name ,@constructor-args)))
+     (unwind-protect
+          (progn ,@body)
+       (destroy-intricate-instance ',name ,var))))
+
+
+(defmacro with-intricate-instances ((&rest declarations) &body body)
+  (labels ((expand-with-intricate-instances (declarations body)
+             (if declarations
+                 `((with-intricate-instance ,(first declarations)
+                     ,@(expand-with-intricate-instances (rest declarations) body)))
+                 `(,@body))))
+    (first (expand-with-intricate-instances declarations body))))
