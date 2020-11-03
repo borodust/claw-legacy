@@ -832,15 +832,19 @@
   (let ((type (parse-type-by-category (%resect:variable-type declaration)))
         (name (%resect:declaration-name declaration)))
     (unless (starts-with-subseq +instantiation-prefix+ name)
-      (make-instance 'foreign-variable
-                     :name name
-                     :source (%resect:declaration-source declaration)
-                     :value (case (%resect:variable-kind declaration)
-                              (:int (%resect:variable-to-int declaration))
-                              (:float (%resect:variable-to-float declaration))
-                              (:string (%resect:variable-to-string declaration))
-                              (t nil))
-                     :type type))))
+      (register-entity 'foreign-variable
+                       :id (%resect:declaration-id declaration)
+                       :name name
+                       :namespace (unless-empty
+                                   (%resect:declaration-namespace declaration))
+                       :source (%resect:declaration-source declaration)
+                       :value (case (%resect:variable-kind declaration)
+                                (:int (%resect:variable-to-int declaration))
+                                (:float (%resect:variable-to-float declaration))
+                                (:string (%resect:variable-to-string declaration))
+                                (t nil))
+                       :type type
+                       :external (eq :external (%resect:declaration-linkage declaration))))))
 
 
 ;;;

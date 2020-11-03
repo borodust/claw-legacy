@@ -42,7 +42,6 @@
            #:foreign-reference-rvalue-p
 
            #:foreign-constant
-           #:foreign-constant-value
 
            #:foreign-alias
 
@@ -76,7 +75,9 @@
            #:foreign-method-static-p
 
            #:foreign-variable
+           #:foreing-variable-type
            #:foreign-entity-value
+           #:foreing-variable-external-p
 
            #:foreign-parameterizable-p
            #:foreign-entity-parameter
@@ -253,7 +254,7 @@
 (defclass foreign-constant (declared ownable named identified foreign-entity)
   ((value :initarg :value
           :initform (error ":value missing")
-          :reader foreign-constant-value)))
+          :reader foreign-entity-value)))
 
 
 ;;;
@@ -443,13 +444,16 @@
 ;;;
 ;;; VARIABLE
 ;;;
-(defclass foreign-variable (named foreign-entity)
+(defclass foreign-variable (identified named foreign-entity)
   ((value :initarg :value
           :initform (error ":value missing")
           :reader foreign-entity-value)
    (type :initarg :type
          :initform (error ":type missing")
-         :reader foreing-variable-type)))
+         :reader foreing-variable-type)
+   (external-p :initarg :external
+               :initform nil
+               :reader foreing-variable-external-p)))
 
 
 ;;;
