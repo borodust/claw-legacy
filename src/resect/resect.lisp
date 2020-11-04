@@ -563,7 +563,6 @@
     (unless (or (claw.spec:foreign-record-abstract-p entity)
                 pure-virtual-found
                 (not (claw.spec:foreign-entity-name entity))
-                (claw.spec:foreign-plain-old-data-type-p entity)
                 (zerop (claw.spec:foreign-entity-bit-size entity)))
       (register-default-methods entity (not constructor-found) (not destructor-found)))))
 

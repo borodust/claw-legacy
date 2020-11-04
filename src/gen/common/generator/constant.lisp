@@ -9,17 +9,18 @@
 
 (defmethod generate-binding ((generator generator) (entity claw.spec:foreign-variable) &key)
   (let* ((name (c-name->lisp (claw.spec:format-full-foreign-entity-name entity) :variable))
-         (type (entity->cffi-type (check-entity-known (claw.spec:foreing-variable-type entity))))
+         (type (check-entity-known (claw.spec:foreing-variable-type entity)))
          (value (claw.spec:foreign-entity-value entity))
-         (decorated-name (if (claw.spec:foreing-variable-external-p entity)
-                             (format-symbol (symbol-package name) "*~A*" name)
-                             (format-symbol (symbol-package name) "+~A+" name))))
+         (decorated-name (format-symbol (symbol-package name) "*~A*" name)))
     (export-symbol decorated-name)
     (if (claw.spec:foreing-variable-external-p entity)
         `((define-symbol-macro ,decorated-name
-              (cffi:mem-ref
-               (cffi:foreign-symbol-pointer ,(claw.spec:foreign-entity-name entity))
-               ',type)))
+              ,(if (typep type 'claw.spec:foreign-array)
+                   `(cffi:foreign-symbol-pointer ,(claw.spec:foreign-entity-name entity))
+                   (with-gensyms (ptr)
+                     `(let ((,ptr (cffi:foreign-symbol-pointer ,(claw.spec:foreign-entity-name entity))))
+                        (when ,ptr
+                          (cffi:mem-ref ,ptr ',(entity->cffi-type type))))))))
         `((defparameter ,decorated-name ,value)))))
 
 

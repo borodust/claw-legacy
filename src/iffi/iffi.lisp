@@ -87,12 +87,19 @@
           do (error "Odd number of arguments: ~A" args)
         collect (if-let ((actual (find-quoted type)))
                   actual
-                  (return whole))
+                  (progn
+                    (warn "Passing argument types dynamically is discouraged. Invocation: ~A " whole)
+                    (return whole)))
           into arg-types
         collect (first rest) into arg-values
-        finally (return (if-let ((function (apply #'intricate-function (eval name) arg-types)))
-                          `(,function ,@arg-values)
-                          whole))))
+        finally (return
+                  (if-let ((quoted (find-quoted name)))
+                    (if-let ((function (apply #'intricate-function quoted arg-types)))
+                      `(,function ,@arg-values)
+                      (progn
+                        (warn "Function ~A is not defined for parameters ~A " quoted arg-types)
+                        whole))
+                    whole))))
 
 
 (defun expand-intricate-function-body (name arguments)
@@ -428,7 +435,11 @@
 (define-compiler-macro make-intricate-instance (&whole whole name &rest args)
   (let* ((quoted-name (find-quoted name))
          (record (find-intricate-record quoted-name))
-         (ctor (and record (constructor-of record) )))
+         (ctor (and record (constructor-of record))))
+    (when quoted-name
+      (cond
+        ((not record) (warn "Record with name ~A not found" quoted-name))
+        ((not ctor) (warn "Constructor not found for record ~A" quoted-name))))
     (if ctor
         (with-gensyms (ptr condi)
           `(let ((,ptr (intricate-alloc ',quoted-name)))
