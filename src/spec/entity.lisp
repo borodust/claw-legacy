@@ -97,6 +97,9 @@
            #:format-foreign-location
            #:format-full-foreign-entity-name
            #:format-foreign-entity-c-name
+
+           #:unwrap-foreign-entity
+           #:unalias-foreign-entity
            #:unqualify-foreign-entity))
 (cl:in-package :claw.spec)
 
@@ -457,9 +460,14 @@
 
 
 ;;;
+;;; QUALIFIER
+;;;
+(defclass foreign-qualifier (foreign-entity envelope) ())
+
+;;;
 ;;; CONST QUALIFIED
 ;;;
-(defclass foreign-const-qualifier (foreign-entity envelope) ())
+(defclass foreign-const-qualifier (foreign-qualifier) ())
 
 
 ;;;
@@ -608,7 +616,19 @@
   (format-default-c-name (format-full-foreign-entity-name this) const-qualified name))
 
 
-(defun unqualify-foreign-entity (entity)
+(defun unwrap-foreign-entity (entity)
   (loop for current = entity then (foreign-enveloped-entity current)
         while (foreign-envelope-p current)
+        finally (return current)))
+
+
+(defun unqualify-foreign-entity (entity)
+  (loop for current = entity then (foreign-enveloped-entity current)
+        while (typep current 'foreign-qualifier)
+        finally (return current)))
+
+
+(defun unalias-foreign-entity (entity)
+  (loop for current = entity then (foreign-enveloped-entity current)
+        while (typep current 'foreign-alias)
         finally (return current)))

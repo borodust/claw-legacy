@@ -15,7 +15,7 @@
 
 (defmethod generate-forward-declaration ((generator generator)
                                          (entity claw.spec:foreign-alias) &key name)
-  (let ((base-type (claw.spec:unqualify-foreign-entity entity)))
+  (let ((base-type (claw.spec:unwrap-foreign-entity entity)))
     (append (when base-type
               (generate-forward-declaration generator base-type :name name))
             (%generate-typedef-binding entity))))

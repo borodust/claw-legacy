@@ -73,11 +73,9 @@
 ;;;
 ;;; TEMPLATE ARGUMENT/PARAMETER MANIPULATION
 ;;;
-(defvar *function-parameter-list-extractor* (ppcre:create-scanner "\\(.*\\("))
+(defparameter *function-parameter-list-extractor* (ppcre:create-scanner "\\(.*\\("))
 
-(defvar *template-arguments-extractor* (ppcre:create-scanner "<.*>"))
-
-(defvar *template-argument-literal-splitter* (ppcre:create-scanner "[<>]|\\s*,\\s*"))
+(defparameter *template-arguments-extractor* (ppcre:create-scanner "<.*>"))
 
 (defun remove-parameter-list-string (name)
   (ppcre:regex-replace-all *function-parameter-list-extractor* name ""))
@@ -91,8 +89,40 @@
   (ppcre:scan-to-strings *template-arguments-extractor*
                          (remove-parameter-list-string name)))
 
+
 (defun split-template-argument-string-into-literals (name)
-  (ppcre:split *template-argument-literal-splitter* name))
+  (flet ((next-idx (current-idx)
+           (let ((char (aref name current-idx)))
+             (flet ((pos (closing-char)
+                      (loop with depth = 1
+                            for idx from (1+ current-idx) below (length name)
+                            for current-char = (aref name idx)
+                            when (char= current-char char)
+                              do (incf depth)
+                            when (char= current-char closing-char)
+                              do (decf depth)
+                            until (= depth 0)
+                            finally (return idx))))
+               (switch (char :test #'char=)
+                 (#\< (pos #\>))
+                 (#\( (pos #\)))
+                 (#\[ (pos #\]))
+                 (t (1+ current-idx))))))
+         (trimmed-substr (start-idx end-idx)
+           (string-trim '(#\Space #\Tab #\Newline) (subseq name start-idx end-idx))))
+    (loop with args = nil
+          with start-idx = 0
+          with current-idx = 0
+          with len = (length name)
+          while (< current-idx len)
+          for char = (aref name current-idx)
+          if (char= #\, char)
+            do (push (trimmed-substr start-idx current-idx) args)
+               (incf current-idx)
+               (setf start-idx current-idx)
+          else
+            do (setf current-idx (next-idx current-idx))
+          finally (return (nreverse (list* (trimmed-substr start-idx current-idx) args))))))
 
 
 (defun reformat-template-argument-string (name)
@@ -149,17 +179,21 @@
 ;;;
 ;;; INCLUDE PATHS
 ;;;
-(defun dump-gcc-include-paths (lang &optional (executable "gcc"))
+(defun dump-include-paths (lang &optional (executable "gcc"))
   (handler-case
-      (let* ((command (format nil "echo | ~A -x~A -E -v -" executable lang))
+      (let* ((command (format nil "echo | ~A -x~A ~@[~A~] -E -v -"
+                              executable lang
+                              (when (and (string= lang "c++")
+                                         (starts-with-subseq "clang" executable))
+                                "-stdlib=libc++")))
              (paths (with-output-to-string (out)
                       (uiop:run-program command
                                         :output out :error-output out)))
              (bounds (third (multiple-value-list (ppcre:scan +path-search-regex+ paths)))))
         (when bounds
           (ppcre:split "(\\r|\\n)+\\s*" (subseq paths (aref bounds 0) (aref bounds 1)))))
-    (t ()
-      (warn "Failed to obtain `~A` search paths for language ~A" executable lang)
+    (t (c)
+      (warn "Failed to obtain `~A` search paths for language ~A: ~A" executable lang c)
       nil)))
 
 
@@ -170,12 +204,12 @@
 (defun list-all-known-paths ()
   (remove-duplicates
    (append (unless (emptyp (dump-gcc-version "clang"))
-             (dump-gcc-include-paths "c" "clang"))
+             (dump-include-paths "c" "clang"))
            (unless (emptyp (dump-gcc-version "clang++"))
-             (dump-gcc-include-paths "c++" "clang++"))
+             (dump-include-paths "c++" "clang++"))
            (unless (emptyp (dump-gcc-version))
-             (append (dump-gcc-include-paths "c")
-                     (dump-gcc-include-paths "c++"))))
+             (append (dump-include-paths "c")
+                     (dump-include-paths "c++"))))
    :test #'equal
    :from-end t))
 

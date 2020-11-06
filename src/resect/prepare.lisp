@@ -66,10 +66,11 @@
 
 
 (defun extract-template-literals (type)
-  (remove-if #'emptyp
-             (split-template-argument-string-into-literals
-              (extract-template-argument-string
-               (%resect:type-name type)))))
+  (let ((string (extract-template-argument-string (%resect:type-name type))))
+    (unless (emptyp string)
+      (remove-if #'emptyp
+                 (split-template-argument-string-into-literals
+                  (subseq string 1 (1- (length string))))))))
 
 
 (defun reformat-template-argument-string-from-type (type)

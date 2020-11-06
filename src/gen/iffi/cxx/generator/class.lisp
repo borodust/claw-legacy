@@ -33,11 +33,15 @@
 
 
 (defun adapt-setter (record field)
-  (let ((field-name (claw.spec:foreign-entity-name field)))
+  (let* ((field-name (claw.spec:foreign-entity-name field))
+         (original-type (claw.spec:foreign-enveloped-entity field))
+         (unaliased (claw.spec:unalias-foreign-entity original-type)))
     (multiple-value-bind (field-type adapted-p)
-        (adapt-type (claw.spec:foreign-enveloped-entity field))
-      (unless (or (typep field-type 'claw.spec:foreign-array)
-                  (typep field-type 'claw.spec:foreign-const-qualifier))
+        (adapt-type original-type)
+      (unless (or (typep unaliased 'claw.spec:foreign-array)
+                  (typep unaliased 'claw.spec:foreign-const-qualifier))
+        (when (string= "includeName" field-name)
+          (break))
         (make-instance 'adapted-function
                        :name (format nil "set_~A_~A"
                                      (mangle-full-record-name record)
@@ -54,7 +58,8 @@
   (let ((field-name (claw.spec:foreign-entity-name field)))
     (multiple-value-bind (field-type adapted-p)
         (adapt-type (claw.spec:foreign-enveloped-entity field))
-      (let* ((array-p (typep field-type 'claw.spec:foreign-array))
+      (let* ((unaliased (claw.spec:unalias-foreign-entity field-type))
+             (array-p (typep unaliased 'claw.spec:foreign-array))
              (result-type (if array-p
                               (pointer (claw.spec:foreign-enveloped-entity field-type))
                               field-type)))
@@ -65,7 +70,9 @@
                        :parameters (list (parameter "__claw_this_" (pointer record)))
                        :result-type result-type
                        :body (format nil "return ~@[(~A)~]~@[~A~]__claw_this_->~A;"
-                                     (when array-p
+                                     (when (or array-p
+                                               (typep (claw.spec:unqualify-foreign-entity unaliased)
+                                                      'claw.spec:foreign-pointer))
                                        (claw.spec:format-foreign-entity-c-name result-type))
                                      (when adapted-p
                                        "&")

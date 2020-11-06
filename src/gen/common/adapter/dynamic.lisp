@@ -53,7 +53,7 @@
   (when (%adapter-needs-rebuilding-p this)
     (ensure-directories-exist (uiop:pathname-directory-pathname (adapter-file-of this)))
     (with-output-to-file (output (adapter-file-of this) :if-exists :supersede)
-      (let* ((functions (functions-of this))
+      (let* ((functions (adapted-functions))
              (definitions
                (%generate-adapted-function-definitions functions
                                                        +adapted-variable-prefix+)))

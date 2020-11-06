@@ -14,9 +14,12 @@
    (headers :reader headers-of)
    (standard :reader standard-of)
    (includes :reader includes-of)
-   (functions :initform nil :reader functions-of)
    (defines :initform nil :reader defines-of)
    (pointer-extractor-predicate :initform nil :reader pointer-extractor-predicate-of)))
+
+
+(defmethod adapted-functions ()
+  (hash-table-values *adapted-function-table*))
 
 
 (defmethod initialize-instance :after ((this adapter) &key wrapper path extract-pointers)
@@ -56,9 +59,9 @@
 
 (defun register-adapted-function (adapted-function)
   (when-let ((adapter (adapter)))
-    (with-slots (functions) adapter
-      (push adapted-function functions)))
-  (format-adapted-function-name (adapted-function-name adapted-function)))
+    (let ((adapted-name (format-adapted-function-name (adapted-function-name adapted-function))))
+      (setf (gethash adapted-name *adapted-function-table*) adapted-function)
+      adapted-name)))
 
 
 (defun function-pointer-extractor-required-p (name)

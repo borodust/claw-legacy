@@ -178,8 +178,9 @@
                    collect parsed)))
     (let ((args (if (eq :unknown (%resect:type-kind type))
                     (args-for-unknown)
-                    (args-for-known))))
-      (when args
+                    (args-for-known)))
+          (decl (%resect:type-declaration type)))
+      (when (and args (not (cffi:null-pointer-p decl)))
         (format nil "~A~A"
                 (%resect:declaration-id (root-template (%resect:type-declaration type)))
                 (format-template-argument-string args))))))
@@ -464,13 +465,20 @@
       (collect-record-entity-arguments decl)))
 
 
-(defun ensure-const-if-needed (type entity)
-  ;; crazy, maybe a bug in libclang
-  (if (and (typep entity 'claw.spec:foreign-pointer)
-           (starts-with-subseq "const " (%resect:type-name type)))
-      (make-instance 'claw.spec:foreign-pointer
-                     :enveloped (const (claw.spec:foreign-enveloped-entity entity)))
-      entity))
+(defun ensure-const-type-if-needed (type entity &optional decl)
+  (cond
+    ((typep entity 'foreign-const-qualifier) entity)
+    ((or
+      ;; crazy, maybe a bug in libclang
+      (starts-with-subseq "const " (%resect:type-name type))
+      ;; i don't like this at all
+      ;; better to use lexer in resect
+      (and decl (starts-with-subseq "const " (%resect:declaration-source decl))))
+     (if (foreign-envelope-p entity)
+         (make-instance (class-of entity)
+                        :enveloped (const (claw.spec:foreign-enveloped-entity entity)))
+         (const entity)))
+    (t entity)))
 
 
 (defun decorate-if-instantiated-record (decl)
@@ -553,7 +561,7 @@
                              :mangled (postfix-decorate (ensure-mangled method-decl params) postfix)
                              :location (make-declaration-location method-decl)
 
-                             :result-type (ensure-const-if-needed
+                             :result-type (ensure-const-type-if-needed
                                            (%resect:method-result-type method-decl)
                                            (parse-type-by-category
                                             (%resect:method-result-type method-decl)))
@@ -618,9 +626,10 @@
                     (push (make-instance 'foreign-record-field
                                          :name (%resect:declaration-name field-decl)
                                          :location (make-declaration-location field-decl)
-                                         :enveloped (ensure-const-if-needed
+                                         :enveloped (ensure-const-type-if-needed
                                                      field-type
-                                                     (parse-type-by-category field-type))
+                                                     (parse-type-by-category field-type)
+                                                     field-decl)
                                          :bit-size (%resect:type-size field-type)
                                          :bit-alignment (%resect:type-alignment field-type)
                                          :bit-offset (%resect:field-offset field-decl)
@@ -719,7 +728,7 @@
                              :name (unless-empty name)
                              :mangled (%resect:declaration-mangled-name param)
                              :location (make-declaration-location param)
-                             :enveloped (ensure-const-if-needed
+                             :enveloped (ensure-const-type-if-needed
                                          param-type
                                          (parse-type-by-category param-type)))
 
@@ -738,7 +747,7 @@
                                  (%resect:declaration-namespace decl))
                      :mangled (ensure-mangled decl params)
                      :location (make-declaration-location decl)
-                     :result-type (ensure-const-if-needed
+                     :result-type (ensure-const-type-if-needed
                                    (%resect:function-result-type decl)
                                    (parse-type-by-category (%resect:function-result-type decl)))
                      :parameters params

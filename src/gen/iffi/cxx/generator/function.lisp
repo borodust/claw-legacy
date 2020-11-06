@@ -205,7 +205,7 @@
 (defun generate-function-binding (entity)
   (check-entity-known (claw.spec:foreign-function-result-type entity))
   (loop for param in (claw.spec:foreign-function-parameters entity)
-        for unqualified = (claw.spec:unqualify-foreign-entity param)
+        for unqualified = (claw.spec:unwrap-foreign-entity param)
         when (claw.spec:foreign-entity-private-p unqualified)
           do (signal-unknown-entity unqualified)
         do (check-entity-known param))

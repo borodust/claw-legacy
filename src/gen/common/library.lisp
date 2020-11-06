@@ -33,9 +33,9 @@
 
 (defun find-alias-for-entity (entity)
   (when (claw.spec:foreign-identified-p entity)
-    (loop with entity-id = (claw.spec:foreign-entity-id (claw.spec:unqualify-foreign-entity entity))
+    (loop with entity-id = (claw.spec:foreign-entity-id (claw.spec:unwrap-foreign-entity entity))
           for value in *entities*
-          for unqualified = (claw.spec:unqualify-foreign-entity value)
+          for unqualified = (claw.spec:unwrap-foreign-entity value)
           when (and (typep value 'claw.spec:foreign-alias)
                     (claw.spec:foreign-identified-p unqualified)
                     (equal entity-id (claw.spec:foreign-entity-id unqualified)))
@@ -47,13 +47,18 @@
            (warn "Unknown entity found, skipping: ~A" (unknown-entity-of condi))
            (return-from %generate-binding)))
     (handler-bind ((unknown-entity-condition #'return-nil))
-      (let ((local-visit-table (copy-hash-table *visit-table*))
+      ;; this mental code is to avoid polluting global tables
+      ;; when bindings are only partially generated
+      (let ((local-adapted-table (copy-hash-table *adapted-function-table*))
+            (local-visit-table (copy-hash-table *visit-table*))
             (local-export-table (copy-hash-table *export-table*)))
         (prog1 (let ((*visit-table* local-visit-table)
-                     (*export-table* local-export-table))
+                     (*export-table* local-export-table)
+                     (*adapted-function-table* local-adapted-table))
                  (generate-binding generator entity))
           (setf *visit-table* local-visit-table
-                *export-table* local-export-table))))))
+                *export-table* local-export-table
+                *adapted-function-table* local-adapted-table))))))
 
 
 (defun explode-library-definition (generator language wrapper configuration)
@@ -87,6 +92,7 @@
             (*export-table* (make-hash-table))
             (*forward-declaration-table* (make-hash-table :test 'equal))
             (*visit-table* (make-hash-table :test 'equal))
+            (*adapted-function-table* (make-hash-table :test 'equal))
             (*override-table* (parse-overrides override-types))
             (*recognize-strings-p* recognize-strings)
             (*recognize-bitfields-p* recognize-bitfields)
@@ -98,9 +104,12 @@
                                                 :key #'claw.spec:foreign-entity-id))))
         (with-symbol-renaming (in-package rename-symbols)
           (loop for entity in *entities*
-                do (let ((*dependency-type-list* nil))
-                     (loop for bing in (%generate-binding generator entity)
-                           do (push bing bindings))))
+                do (let ((*dependency-type-list* nil)
+                         (generated (%generate-binding generator entity)))
+                     (loop for bing in generated
+                           do (push bing bindings))
+                     #++(when (gethash "c:@N@std@N@__cxx11@S@basic_string>#C#$@N@std@S@char_traits>#C#$@N@std@S@allocator>#C" *visit-table*)
+                          (break "~A" generated))))
           (when *adapter*
             (generate-adapter-file *adapter*))
           `(,@(nreverse bindings)
