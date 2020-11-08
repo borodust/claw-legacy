@@ -2,6 +2,7 @@
   (:use :cl :alexandria)
   (:export #:defifun
 
+           #:defitype
            #:defirecord
            #:defistruct
            #:defiunion

@@ -88,3 +88,12 @@
 
 (defmethod foreign-entity-dependencies ((entity claw.spec:foreign-reference))
   (list (claw.spec:foreign-enveloped-entity entity)))
+
+
+(defmethod foreign-entity-dependencies ((entity claw.spec:foreign-alias))
+  (list (claw.spec:foreign-enveloped-entity entity)))
+
+
+(defmethod dependablep ((entity claw.spec:foreign-alias))
+  (declare (ignore entity))
+  t)

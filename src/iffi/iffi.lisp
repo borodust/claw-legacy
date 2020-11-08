@@ -33,10 +33,29 @@
 
 (defvar *record-table* (make-hash-table))
 
+(defvar *alias-table* (make-hash-table :test 'equal))
 
 (initialize-iffi)
 
 
+;;;
+;;;
+;;;
+(defun find-intricate-aliases (name)
+  (gethash name *alias-table*))
+
+
+(defun register-intricate-alias (new-alias origin)
+  (let ((new-set (union (list new-alias origin)
+                        (union (gethash new-alias *alias-table*)
+                               (gethash origin *alias-table*)))))
+    (loop for alias in new-set
+          do (setf (gethash alias *alias-table*) new-set))))
+
+
+;;;
+;;; FUNCTION
+;;;
 (defun (setf intricate-documentation) (docstring name &rest arg-types)
   (flet ((format-docs ()
            (with-output-to-string (out)
@@ -58,7 +77,19 @@
 
 
 (defun intricate-function (name &rest arg-types)
-  (gethash (list* name arg-types) *function-table*))
+  (labels ((aliases (type)
+             (append
+              (list* type (find-intricate-aliases type))
+              (when (and (listp type)
+                         (eq (first type) :pointer))
+                (loop for pointer-type-alias in (find-intricate-aliases (second type))
+                      collect `(:pointer ,pointer-type-alias)))))
+           (find-intricate-function (types aliases)
+             (if aliases
+                 (loop for alias in (first aliases)
+                         thereis (find-intricate-function (list* alias types) (rest aliases)))
+                 (gethash (list* name (reverse types)) *function-table*))))
+    (find-intricate-function nil (mapcar #'aliases arg-types))))
 
 
 (defun (setf intricate-function-pointer-extractor) (value name &rest arg-types)
@@ -105,7 +136,6 @@
 (defun expand-intricate-function-body (name arguments)
   `(intricate-funcall ',name ,@arguments))
 
-
 (defmacro defifun (name-and-options result-type &body configuration)
   (destructuring-bind (mangled name &rest opts) (ensure-list name-and-options)
     (let (doc
@@ -148,6 +178,9 @@
                `((setf (intricate-documentation ',name ,@arg-types) ,doc))))))))
 
 
+;;;
+;;; RECORD
+;;;
 (defclass intricate-field ()
   ((name :initarg :name :reader name-of)
    (getter :initarg :getter :reader getter-of)
@@ -207,7 +240,8 @@
 
 
 (defun find-intricate-record (name)
-  (gethash name *record-table*))
+  (loop for alias in (list* name (find-intricate-aliases name))
+          thereis (gethash alias *record-table*)))
 
 
 (defun expand-record-field (record field)
@@ -419,6 +453,17 @@
     (signal condi)))
 
 
+;;;
+;;; ALIAS
+;;;
+(defmacro defitype (alias origin)
+  `(progn
+     (cffi:defctype ,alias ,origin)
+     (register-intricate-alias ',alias ',origin)))
+
+;;;
+;;; INSTANCE
+;;;
 (defun make-intricate-instance (name &rest args)
   (let* ((record (find-intricate-record name))
          (ptr (intricate-alloc name)))

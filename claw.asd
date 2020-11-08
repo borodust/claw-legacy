@@ -73,8 +73,7 @@
                 :components ((:file "type")
                              (:file "primitive")
                              (:file "constant")
-                             (:file "enum")
-                             (:file "alias")))
+                             (:file "enum")))
                (:module "adapter"
                 :serial t
                 :components ((:file "adapter")
@@ -131,7 +130,8 @@
                 :components ((:file "type")
                              (:file "function")
                              (:file "class")
-                             (:file "template")))))
+                             (:file "template")
+                             (:file "alias")))))
 
 
 (asdf:defsystem :claw
