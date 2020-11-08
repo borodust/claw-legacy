@@ -13,7 +13,9 @@
 
 (defun check-entity-known (entity)
   (when (or (typep entity 'claw.spec:foreign-entity-parameter)
-            (claw.spec:foreign-entity-unknown-p entity))
+            (claw.spec:foreign-entity-unknown-p entity)
+            (and (claw.spec:foreign-parameterizable-p entity)
+                 (claw.spec:foreign-entity-parameters entity)))
     (signal-unknown-entity entity))
   (when (claw.spec:foreign-envelope-p entity)
     (check-entity-known (claw.spec:foreign-enveloped-entity entity)))

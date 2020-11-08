@@ -75,7 +75,8 @@
                        (let ((deps (%generate-bindings)))
                          (prog1 (append deps (call-next-method))
                            (register-visit entity)))))))))
-    (%generate-depenencies)))
+    (unless (claw.spec:foreign-entity-private-p entity)
+      (%generate-depenencies))))
 
 
 (defmethod foreign-entity-dependencies ((entity claw.spec:foreign-pointer))
