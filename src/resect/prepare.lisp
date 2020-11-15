@@ -1,16 +1,20 @@
 (cl:in-package :claw.resect)
 
 
-(declaim (special *prepared-entity-table*
-                  *instantiated*
-                  *macros*))
+(defun instantiatablep (decl)
+  (when *instantiation-filter*
+    (funcall *instantiation-filter* decl)))
 
 
-(define-constant +instantiation-prefix+ "__claw_instantiated"
-  :test #'string=)
-
-(define-constant +macro-prefix+ "__claw_macro_"
-  :test #'string=)
+(defun register-function-if-instantiable (declaration)
+  (when-let ((template-args (instantiatablep declaration)))
+    (when-let ((reconstructred (apply #'reconstruct-templated-function declaration template-args)))
+      (setf
+       (gethash (format nil "~A~A"
+                        (%resect:declaration-id declaration)
+                        (format-template-argument-string template-args))
+                *instantiated-functions*)
+       (list (%resect:declaration-name declaration) reconstructred)))))
 
 
 (defgeneric prepare-declaration (kind declaration &key &allow-other-keys)
@@ -27,16 +31,25 @@
 
 (defun prepare-header (uber-path prepared-path)
   (alexandria:with-output-to-file (out prepared-path :if-exists :supersede)
-    (format out "#ifndef  __CLAW_PREPARED~%#define __CLAW_PREPARED 1~%")
-    (format out "~%#include \"~A\"~%" (uiop:native-namestring uber-path))
+    (format out "#ifndef  __CLAW_PREPARED~%#define __CLAW_PREPARED 1")
+    (format out "~%~%#include \"~A\"~%~%" (uiop:native-namestring uber-path))
 
-    (loop for name in (sort (hash-table-values *instantiated*) #'string<)
-          for counter from 0
-          collect (format out "~%~A ~A~A;"
-                          name
-                          +instantiation-prefix+
-                          counter))
-    (format out "~&~%#endif")))
+    (when-let ((classes (sort (hash-table-values *instantiated-classes*) #'string<)))
+      (format out "~%~%")
+      (loop for name in classes
+            for counter from 0
+            collect (format out "~%~A ~A~A;"
+                            name
+                            +instantiation-prefix+
+                            counter)))
+    (when-let ((functions (sort (hash-table-values *instantiated-functions*) #'string<
+                                :key #'first)))
+      (format out "~%~%")
+      (loop for (nil formatted) in functions
+            collect (format out "~%~A" formatted)))
+
+    (format out "~%~%")
+    (format out "~%#endif")))
 
 
 (defun prepare-foreign-library (uber-path
@@ -45,9 +58,12 @@
                                 frameworks
                                 language
                                 standard
-                                target)
+                                target
+                                instantiation-filter)
   (let ((*prepared-entity-table* (make-hash-table :test 'equal))
-        (*instantiated* (make-hash-table :test 'equal))
+        (*instantiated-classes* (make-hash-table :test 'equal))
+        (*instantiated-functions* (make-hash-table :test 'equal))
+        (*instantiation-filter* instantiation-filter)
         (*macros* (make-hash-table :test 'equal)))
     (inspect-foreign-library (make-instance 'preparing-inspector)
                              uber-path
@@ -109,7 +125,7 @@
               (not (publicp decl))
               (not (template-arguments-public-p decl)))
     (setf
-     (gethash (%resect:declaration-id decl) *instantiated*)
+     (gethash (%resect:declaration-id decl) *instantiated-classes*)
      (%resect:type-name (%resect:declaration-type decl))))
 
   (resect:docollection (parent-type (%resect:record-parents decl))
@@ -119,6 +135,7 @@
     (prepare-type (%resect:declaration-type field-decl)))
 
   (resect:docollection (method-decl (%resect:record-methods decl))
+    (register-function-if-instantiable method-decl)
     (prepare-type (%resect:method-result-type method-decl))
     (resect:docollection (param-decl (%resect:method-parameters method-decl))
       (prepare-type (%resect:declaration-type param-decl)))))
@@ -146,6 +163,7 @@
 
 
 (defmethod prepare-declaration ((kind (eql :function)) declaration &key)
+  (register-function-if-instantiable declaration)
   (prepare-type (%resect:function-result-type declaration))
   (resect:docollection (param-decl (%resect:function-parameters declaration))
     (prepare-type (%resect:declaration-type param-decl))))

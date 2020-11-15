@@ -21,7 +21,9 @@
   framework-includes
   targets
   defines
-  instantiations
+
+  generated-header
+  instantiation-filter
 
   system-includes
 
@@ -73,7 +75,7 @@
                          framework-includes
                          (targets '(:native))
                          defines
-                         instantiations
+                         instantiate
 
                          include-sources include-definitions
                          exclude-sources exclude-definitions)
@@ -84,15 +86,15 @@
                                parser
                                generator
                                bindings-path
-                               persistent)
+                               persistent
+                               instantiate)
       (with-evaluated-lists (headers
                              includes
                              include-sources
                              include-definitions
                              exclude-sources
                              exclude-definitions
-                             defines
-                             instantiations)
+                             defines)
         (let* ((system (or (first system) (when (asdf:find-system name nil) name)))
                (base-path (when base-path
                             (find-path base-path :system system)))
@@ -144,7 +146,7 @@
                                 :exclude-sources exclude-sources
                                 :exclude-definitions exclude-definitions
                                 :defines defines
-                                :instantiations instantiations))))))
+                                :instantiation-filter instantiate))))))
 
 
 (defun make-bindings-table (name opts configuration)
@@ -160,7 +162,7 @@
                        :framework-includes (wrapper-options-framework-includes opts)
                        :target target
                        :defines (wrapper-options-defines opts)
-                       :instantiations (wrapper-options-instantiations opts)
+                       :instantiation-filter (wrapper-options-instantiation-filter opts)
                        :include-sources (wrapper-options-include-sources opts)
                        :include-definitions (wrapper-options-include-definitions opts)
                        :exclude-sources (wrapper-options-exclude-sources opts)

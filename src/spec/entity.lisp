@@ -83,6 +83,7 @@
            #:foreign-entity-parameter
            #:foreign-entity-type-parameter
            #:foreign-entity-value-parameter
+           #:foreign-entity-parameter-type
            #:foreign-entity-parameters
 
            #:foreign-entity-argument

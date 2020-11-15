@@ -191,7 +191,11 @@
           (*include-sources* (create-scanners include-sources))
           (*exclude-sources* (create-scanners exclude-sources)))
       (loop for entity in entities
-            do (if (entity-explicitly-excluded-p entity)
-                   (mark-excluded (foreign-entity-id entity))
-                   (try-including-entity entity)))
+            for entity-id = (foreign-entity-id entity)
+            do (cond
+                 ((starts-with-subseq +instantiation-prefix+ (foreign-entity-name entity))
+                  (mark-included entity-id t))
+                 ((entity-explicitly-excluded-p entity)
+                  (mark-excluded entity-id))
+                 (t (try-including-entity entity))))
       *inclusion-table*)))

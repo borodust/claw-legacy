@@ -5,5 +5,8 @@
   (let* ((id (entity->cffi-type entity))
          (aliased-type (entity->cffi-type (check-entity-known
                                            (claw.spec:foreign-enveloped-entity entity)))))
+    (when-let (owner (claw.spec:foreign-owner entity))
+      (check-entity-known owner))
     (export-symbol id)
-    `((iffi:defitype ,id ,aliased-type))))
+    (unless (claw.spec:foreign-entity-private-p entity)
+      `((iffi:defitype ,id ,aliased-type)))))

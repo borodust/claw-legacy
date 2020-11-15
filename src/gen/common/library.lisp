@@ -50,7 +50,7 @@
            (return-from %generate-binding)))
     (handler-bind ((unknown-entity-condition #'return-nil))
       ;; this mental code is to avoid polluting global tables
-      ;; when bindings are only partially generated
+      ;; when bindings are only partially generated due to unrecognized entities
       (let ((local-adapted-table (copy-hash-table *adapted-function-table*))
             (local-visit-table (copy-hash-table *visit-table*))
             (local-export-table (copy-hash-table *export-table*)))
@@ -109,9 +109,7 @@
                 do (let ((*dependency-type-list* nil)
                          (generated (%generate-binding generator entity)))
                      (loop for bing in generated
-                           do (push bing bindings))
-                     #++(when (gethash "c:@N@std@N@__cxx11@S@basic_string>#C#$@N@std@S@char_traits>#C#$@N@std@S@allocator>#C" *visit-table*)
-                          (break "~A" generated))))
+                           do (push bing bindings))))
           (when *adapter*
             (generate-adapter-file *adapter*))
           `(,@(nreverse bindings)

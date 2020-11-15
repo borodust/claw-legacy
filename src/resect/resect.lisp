@@ -3,6 +3,7 @@
 
 (declaim (special *declaration-table*
                   *instantiated-table*
+                  *mangled-table*
                   *post-parse-hooks*))
 
 (defvar *parsed-pointers* nil)
@@ -25,20 +26,17 @@
     result))
 
 
-(defun write-uber-header (headers path defines instantiations &optional text)
+(defun write-uber-header (headers path defines &optional text)
   (alexandria:with-output-to-file (out path :if-exists :supersede)
     (format out "#ifndef  __CLAW_UBERHEADER~%#define __CLAW_UBERHEADER 1~%")
     (loop for (name value) on defines by #'cddr
           do (format out "~%#define ~A~@[ ~A~]" name value))
     (loop for header in headers
           do (format out "~%#include \"~A\"" header))
-    (format out "~%")
-    (loop for instantiation in instantiations
-          for counter from 0
-          do (format out "~%~A ~A_explicit_~A;" instantiation +instantiation-prefix+ counter))
     (when text
+      (format out "~%")
       (format out "~A" text))
-    (format out "~&~%#endif")))
+    (format out "~%~%~%#endif")))
 
 
 (defclass foreign-library ()
@@ -107,7 +105,7 @@
                                                             standard
                                                             target
                                                             defines
-                                                            instantiations
+                                                            instantiation-filter
 
                                                             include-definitions
                                                             include-sources
@@ -116,16 +114,18 @@
   (declare (ignore parser))
   (uiop:with-temporary-file (:pathname prepared-path :type "h")
     (uiop:with-temporary-file (:pathname uber-path :type "h")
-      (write-uber-header headers uber-path defines instantiations)
+      (write-uber-header headers uber-path defines)
       (let ((macros (prepare-foreign-library uber-path
                                              prepared-path
                                              includes
                                              frameworks
                                              language
                                              standard
-                                             target))
+                                             target
+                                             instantiation-filter))
             (*declaration-table* (make-hash-table :test 'equal))
             (*instantiated-table* (make-hash-table :test 'equal))
+            (*mangled-table* (make-hash-table :test 'equal))
             (inspector (make-instance 'describing-inspector)))
         (inspect-foreign-library inspector
                                  prepared-path
@@ -261,11 +261,6 @@
       (parse-declaration-by-kind owner))))
 
 
-(defun unless-empty (seq)
-  (unless (emptyp seq)
-    seq))
-
-
 (defun specializationp (type)
   (resect:docollection (template-arg (%resect:type-template-arguments type))
     (declare (ignore template-arg))
@@ -368,14 +363,19 @@
          (arg (eval-template-argument name)))
     (if (and inject-arguments arg (cffi:pointerp arg))
         (parse-type-by-category arg)
-        (make-instance 'foreign-entity-parameter
-                       :id (%resect:declaration-id decl)
-                       :source (%resect:declaration-source decl)
-                       :name name
-                       :namespace (unless-empty
-                                   (%resect:declaration-namespace decl))
-                       :mangled (%resect:declaration-mangled-name decl)
-                       :location (make-declaration-location decl)))))
+        (let ((description (list :id (%resect:declaration-id decl)
+                                 :source (%resect:declaration-source decl)
+                                 :name name
+                                 :namespace (unless-empty
+                                             (%resect:declaration-namespace decl))
+                                 :mangled (%resect:declaration-mangled-name decl)
+                                 :location (make-declaration-location decl))))
+          (apply #'make-instance
+                 (if (eq :non-type (%resect:template-parameter-kind decl))
+                     (list* 'foreign-entity-value-parameter
+                            :type (parse-type-by-category (%resect:declaration-type decl))
+                            description)
+                     (list* 'foreign-entity-type-parameter description)))))))
 
 
 (defmethod parse-type (category (kind (eql :template-parameter)) type)
@@ -437,6 +437,7 @@
     ;; template-arguments
     (resect:docollection (arg (%resect:declaration-template-arguments decl))
       (push arg template-arguments))
+    (nreversef template-arguments)
 
     (let ((values (loop for arg in template-arguments
                         for value = (ecase (%resect:template-argument-kind arg)
@@ -558,7 +559,7 @@
                              :owner entity
                              :namespace (unless-empty
                                          (%resect:declaration-namespace record-decl))
-                             :mangled (postfix-decorate (ensure-mangled method-decl params) postfix)
+                             :mangled (postfix-decorate (ensure-mangled method-decl) postfix)
                              :location (make-declaration-location method-decl)
 
                              :result-type (ensure-const-type-if-needed
@@ -620,7 +621,7 @@
                    (not (foreign-entity-private-p entity)))
           (unless (zerop (foreign-entity-bit-size entity))
             (let (fields)
-              (resect:docollection (field-decl (%resect:record-fields decl))
+              (resect:docollection (field-decl (%resect:type-fields (%resect:declaration-type decl)))
                 (when (publicp field-decl)
                   (let ((field-type (%resect:declaration-type field-decl)))
                     (push (make-instance 'foreign-record-field
@@ -695,30 +696,6 @@
 ;;;
 ;;; FUNCTION
 ;;;
-(defun mangle-id (id)
-  (labels ((encode-non-word (match &rest registers)
-             (declare (ignore registers))
-             (format nil "E~X" (char-code (aref match 0)))))
-    (ppcre:regex-replace-all "\\W"
-                             id
-                             #'encode-non-word
-                             :simple-calls t)))
-
-(defun ensure-mangled (decl params)
-  (let ((name (%resect:declaration-name decl))
-        (mangled (unless-empty (%resect:declaration-mangled-name decl))))
-    ;; hack to extract mangled name from parameter: libclang doesn't mangle some
-    ;; names properly (extern "C++"?)
-    (if (and (string= name mangled) params)
-        (if-let ((param (find-if (complement #'null) params
-                                 :key #'claw.spec:foreign-entity-mangled-name)))
-          (let ((param-name (claw.spec:foreign-entity-name param))
-                (param-mangled (claw.spec:foreign-entity-mangled-name param)))
-            (subseq param-mangled 0 (- (length param-mangled) (length param-name))))
-          (mangle-id (%resect:declaration-id decl)))
-        (or mangled (mangle-id (%resect:declaration-id decl))))))
-
-
 (defun parse-parameters (parameters)
   (let (params)
     (resect:docollection (param parameters)
@@ -736,24 +713,60 @@
     (nreverse params)))
 
 
-(defmethod parse-declaration ((type (eql :function)) decl &key)
+
+(defun parse-result-type (decl)
+  (ensure-const-type-if-needed
+   (%resect:function-result-type decl)
+   (parse-type-by-category (%resect:function-result-type decl))))
+
+
+(defun register-function (decl)
   (let ((id (%resect:declaration-id decl))
+        (name (%resect:declaration-name decl))
+        (mangled-name (ensure-mangled decl))
         (params (parse-parameters (%resect:function-parameters decl))))
-    (register-entity 'foreign-function
-                     :id id
-                     :source (%resect:declaration-source decl)
-                     :name (%resect:declaration-name decl)
-                     :namespace (unless-empty
-                                 (%resect:declaration-namespace decl))
-                     :mangled (ensure-mangled decl params)
-                     :location (make-declaration-location decl)
-                     :result-type (ensure-const-type-if-needed
-                                   (%resect:function-result-type decl)
-                                   (parse-type-by-category (%resect:function-result-type decl)))
-                     :parameters params
-                     :variadic (%resect:function-variadic-p decl)
-                     :entity-parameters (collect-entity-parameters decl)
-                     :entity-arguments (collect-entity-arguments decl))))
+    (multiple-value-bind (entity newp)
+        (register-entity 'foreign-function
+                         :id id
+                         :source (%resect:declaration-source decl)
+                         :name name
+                         :namespace (unless-empty
+                                     (%resect:declaration-namespace decl))
+                         :mangled mangled-name
+                         :location (make-declaration-location decl)
+                         :result-type (parse-result-type decl)
+                         :parameters params
+                         :variadic (%resect:function-variadic-p decl)
+                         :entity-parameters (collect-entity-parameters decl)
+                         :entity-arguments (collect-entity-arguments decl))
+      (when newp
+        (setf (gethash mangled-name *mangled-table*) entity))
+      entity)))
+
+
+(defun register-instantiated-function (template decl)
+  (register-entity 'foreign-function
+                   :id (%resect:declaration-id decl)
+                   :source (foreign-entity-source template)
+                   :name (foreign-entity-name template)
+                   :namespace (foreign-entity-namespace template)
+                   :mangled (ensure-mangled decl)
+                   :location (foreign-entity-location template)
+                   :result-type (parse-result-type decl)
+                   :parameters (parse-parameters (%resect:function-parameters decl))
+                   :variadic (foreign-function-variadic-p template)
+                   :entity-parameters nil
+                   :entity-arguments nil))
+
+
+(defmethod parse-declaration ((type (eql :function)) decl &key)
+  (if (starts-with-subseq +instantiation-prefix+ (%resect:declaration-name decl))
+      (let ((template-mangled-name (subseq (%resect:declaration-name decl)
+                                           (length +instantiation-prefix+))))
+        (if-let ((template (gethash template-mangled-name *mangled-table*)))
+          (register-instantiated-function template decl)
+          (warn "Template with mangled name ~A not found" template-mangled-name)))
+      (register-function decl)))
 
 
 (defmethod parse-type (category (kind (eql :function-prototype)) type)

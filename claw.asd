@@ -45,9 +45,9 @@
   :pathname "src/resect/"
   :serial t
   :components ((:file "packages")
+               (:file "util")
                (:file "inclusion")
                (:file "filtering")
-               #++(:file "optimization")
                (:file "template")
                (:file "inspect")
                (:file "macro")

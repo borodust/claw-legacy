@@ -403,7 +403,7 @@
     (if (and quoted-type-name quoted-slot-name)
         (with-field-setter (field-setter quoted-type-name quoted-slot-name)
           (once-only (value)
-            `(progn ,value (,field-setter ,instance ,value))))
+            `(prog1 ,value (,field-setter ,instance ,value))))
         whole)))
 
 

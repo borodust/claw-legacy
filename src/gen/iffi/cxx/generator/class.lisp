@@ -40,8 +40,6 @@
         (adapt-type original-type)
       (unless (or (typep unaliased 'claw.spec:foreign-array)
                   (typep unaliased 'claw.spec:foreign-const-qualifier))
-        (when (string= "includeName" field-name)
-          (break))
         (make-instance 'adapted-function
                        :name (format nil "set_~A_~A"
                                      (mangle-full-record-name record)

@@ -52,8 +52,6 @@
         (format s "~A ~A ~A ~S" name result-type params body)))))
 
 
-(defun format-move-if-rvalue ())
-
 (defun adapt-parameters (entity)
   (loop for param in (claw.spec:foreign-function-parameters entity)
         for count from 0
@@ -92,8 +90,14 @@
   (format nil "~A~@[<~{~A~^,~}>~]"
           name
           (loop for arg in (claw.spec:foreign-entity-arguments entity)
+                for param = (claw.spec:foreign-entity-parameter arg)
                 for value = (claw.spec:foreign-entity-value arg)
                 collect (cond
+                          ((typep param 'claw.spec:foreign-entity-value-parameter)
+                           (format nil "static_cast<~A>(~A)"
+                                   (claw.spec:format-full-foreign-entity-name
+                                    (claw.spec:foreign-entity-parameter-type param))
+                                   value))
                           ((claw.spec:foreign-named-p value)
                            (claw.spec:format-full-foreign-entity-name value))
                           ((eq t value) "true")
