@@ -14,7 +14,8 @@
                                     includes
                                     frameworks
                                     target
-                                    macros)
+                                    macros
+                                    intrinsics)
   (uiop:with-temporary-file (:pathname macro-helper-path :type "h")
     (alexandria:with-output-to-file (out macro-helper-path :if-exists :supersede)
       (format out "#ifndef  __CLAW_MACRO~%#define __CLAW_MACRO 1~%")
@@ -33,6 +34,7 @@
                                :c++
                                :c++11
                                target
+                               intrinsics
                                :diagnostics nil)
       *macros*)))
 

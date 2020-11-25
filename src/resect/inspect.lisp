@@ -12,12 +12,14 @@
                                      language
                                      standard
                                      target
+                                     intrinsics
                                      &key &allow-other-keys))
 
 (defmethod inspect-foreign-library :around (inspector
                                             header-path
                                             includes frameworks
                                             language standard target
+                                            intrinsics
                                             &key (diagnostics t))
   (declare (ignore inspector))
   (flet ((%stringify (value)
@@ -31,7 +33,8 @@
                                    :language (%stringify language)
                                    :standard (%stringify standard)
                                    :target (%stringify target)
-                                   :diagnostics diagnostics)
+                                   :diagnostics diagnostics
+                                   :intrinsics intrinsics)
       (let ((*translation-unit* unit))
         (call-next-method)))))
 
@@ -40,7 +43,8 @@
                                     header-path
                                     includes frameworks
                                     language standard target
+                                    intrinsics
                                     &key)
-  (declare (ignore header-path includes frameworks language standard target))
+  (declare (ignore header-path includes frameworks language standard target intrinsics))
   (resect:docollection (decl (%resect:translation-unit-declarations *translation-unit*))
     (inspect-declaration inspector (%resect:declaration-kind decl) decl)))

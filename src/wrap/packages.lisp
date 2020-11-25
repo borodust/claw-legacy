@@ -12,6 +12,7 @@
            #:wrapper-options-includes
            #:wrapper-options-standard
            #:wrapper-options-defines
+           #:wrapper-options-intrinsics
 
            #:merge-wrapper-pathname
 

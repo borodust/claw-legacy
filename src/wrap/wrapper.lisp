@@ -21,6 +21,7 @@
   framework-includes
   targets
   defines
+  intrinsics
 
   generated-header
   instantiation-filter
@@ -75,6 +76,7 @@
                          framework-includes
                          (targets '(:native))
                          defines
+                         intrinsics
                          instantiate
 
                          include-sources include-definitions
@@ -94,7 +96,8 @@
                              include-definitions
                              exclude-sources
                              exclude-definitions
-                             defines)
+                             defines
+                             intrinsics)
         (let* ((system (or (first system) (when (asdf:find-system name nil) name)))
                (base-path (when base-path
                             (find-path base-path :system system)))
@@ -146,6 +149,7 @@
                                 :exclude-sources exclude-sources
                                 :exclude-definitions exclude-definitions
                                 :defines defines
+                                :intrinsics intrinsics
                                 :instantiation-filter instantiate))))))
 
 
@@ -162,6 +166,7 @@
                        :framework-includes (wrapper-options-framework-includes opts)
                        :target target
                        :defines (wrapper-options-defines opts)
+                       :intrinsics (wrapper-options-intrinsics opts)
                        :instantiation-filter (wrapper-options-instantiation-filter opts)
                        :include-sources (wrapper-options-include-sources opts)
                        :include-definitions (wrapper-options-include-definitions opts)

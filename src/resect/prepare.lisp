@@ -59,6 +59,7 @@
                                 language
                                 standard
                                 target
+                                intrinsics
                                 instantiation-filter)
   (let ((*prepared-entity-table* (make-hash-table :test 'equal))
         (*instantiated-classes* (make-hash-table :test 'equal))
@@ -71,7 +72,8 @@
                              frameworks
                              language
                              standard
-                             target)
+                             target
+                             intrinsics)
     (prepare-header uber-path prepared-path)
     (loop for macro-name being the hash-key of *macros*
           collect macro-name)))
@@ -87,12 +89,6 @@
       (remove-if #'emptyp
                  (split-template-argument-string-into-literals
                   (subseq string 1 (1- (length string))))))))
-
-
-(defun reformat-template-argument-string-from-type (type)
-  (reformat-template-argument-string
-   (extract-template-argument-string
-    (%resect:type-name type))))
 
 
 (defun prepare-type (type)

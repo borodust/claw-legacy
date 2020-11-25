@@ -17,6 +17,7 @@
                                         standard
                                         target
                                         defines
+                                        intrinsics
 
                                         include-definitions
                                         include-sources

@@ -64,8 +64,9 @@
                                             header-path
                                             includes frameworks
                                             language standard target
+                                            intrinsics
                                             &key)
-  (declare (ignore header-path includes frameworks language standard target))
+  (declare (ignore header-path includes frameworks language standard target intrinsics))
   (with-slots (language) this
     (setf language (case (%resect:translation-unit-language *translation-unit*)
                      (:c :c)
@@ -77,8 +78,9 @@
                                             header-path
                                             includes frameworks
                                             language standard target
+                                            intrinsics
                                             &key)
-  (declare (ignore header-path includes frameworks language standard target))
+  (declare (ignore header-path includes frameworks language standard target intrinsics))
   (let (*post-parse-hooks*)
     (call-next-method)))
 
@@ -87,8 +89,9 @@
                                            header-path
                                            includes frameworks
                                            language standard target
+                                           intrinsics
                                            &key)
-  (declare (ignore header-path includes frameworks language standard target))
+  (declare (ignore header-path includes frameworks language standard target intrinsics))
   (loop for hook in *post-parse-hooks*
         do (funcall hook)))
 
@@ -105,6 +108,7 @@
                                                             standard
                                                             target
                                                             defines
+                                                            intrinsics
                                                             instantiation-filter
 
                                                             include-definitions
@@ -122,6 +126,7 @@
                                              language
                                              standard
                                              target
+                                             intrinsics
                                              instantiation-filter))
             (*declaration-table* (make-hash-table :test 'equal))
             (*instantiated-table* (make-hash-table :test 'equal))
@@ -133,8 +138,14 @@
                                  frameworks
                                  language
                                  standard
-                                 target)
-        (loop for constant in (prepare-macros-as-constants uber-path includes frameworks target macros)
+                                 target
+                                 intrinsics)
+        (loop for constant in (prepare-macros-as-constants uber-path
+                                                           includes
+                                                           frameworks
+                                                           target
+                                                           macros
+                                                           intrinsics)
               do (register-entity-instance constant))
         (make-instance 'foreign-library
                        :entities (filter-library-entities
@@ -266,6 +277,15 @@
     (declare (ignore template-arg))
     (return-from specializationp t)))
 
+
+(defun reformat-template-argument-string-from-type (type)
+  (let ((args (loop for arg in (extract-type-arguments type)
+                    collect (if (cffi:pointerp arg)
+                                (let ((*qualify-types* nil))
+                                  (format-foreign-entity-c-name (parse-type-by-category arg)))
+                                arg))))
+    (format-template-argument-string args)))
+
 ;;;
 ;;; PRIMITIVE
 ;;;
@@ -312,7 +332,8 @@
       (:float128 (register-primitive-type "float128"))
       (:half (register-primitive-type "half"))
       (:float16 (register-primitive-type "float16"))
-      (:auto (register-primitive-type "auto")))))
+      (:auto (register-primitive-type "auto"))
+      (:atomic (register-primitive-type "atomic")))))
 
 
 (defmethod parse-type ((category (eql :arithmetic)) kind type)
@@ -386,12 +407,24 @@
 ;;; RECORD
 ;;;
 (defclass resect-record ()
-  ((fields :initform nil :accessor fields-of)))
-
+  ((fields :initform nil :accessor fields-of)
+   (args :initform nil :accessor arguments-of)
+   (params :initform nil :accessor parameters-of)))
 
 (defmethod foreign-record-fields ((this resect-record))
-  (with-slots (fields) this
-    fields))
+  (slot-value this 'fields))
+
+(defmethod foreign-entity-arguments ((this resect-record))
+  (slot-value this 'args))
+
+(defmethod foreign-entity-parameters ((this resect-record))
+  (slot-value this 'params))
+
+(defgeneric add-field (record field)
+  (:method ((this resect-record) field)
+    (let ((fields)) this
+      (unless (member (foreign-entity-name field) fields :key #'foreign-entity-name)
+        (nconcf fields (list field))))))
 
 (defclass resect-struct (resect-record foreign-struct) ())
 
@@ -466,15 +499,24 @@
       (collect-record-entity-arguments decl)))
 
 
+(defun nested-pointer-p (type)
+  (flet ((%any-pointer-p (type)
+           (member (%resect:type-kind type) '(:pointer :rvalue-reference :lvalue-reference))))
+    (or (and (eq (%resect:type-kind type) :pointer)
+             (%any-pointer-p (%resect:pointer-pointee-type type)))
+        (and (member (%resect:type-kind type) '(:rvalue-reference :lvalue-reference))
+             (%any-pointer-p (%resect:reference-pointee-type type))))))
+
 (defun ensure-const-type-if-needed (type entity &optional decl)
   (cond
     ((typep entity 'foreign-const-qualifier) entity)
-    ((or
-      ;; crazy, maybe a bug in libclang
-      (starts-with-subseq "const " (%resect:type-name type))
-      ;; i don't like this at all
-      ;; better to use lexer in resect
-      (and decl (starts-with-subseq "const " (%resect:declaration-source decl))))
+    ((and (not (nested-pointer-p type))
+          (or
+           ;; crazy, maybe a bug in libclang
+           (starts-with-subseq "const " (%resect:type-name type))
+           ;; i don't like this at all
+           ;; better to use lexer in resect
+           (and decl (starts-with-subseq "const " (%resect:declaration-source decl)))))
      (if (foreign-envelope-p entity)
          (make-instance (class-of entity)
                         :enveloped (const (claw.spec:foreign-enveloped-entity entity)))
@@ -582,14 +624,25 @@
     (return-from method-exists-p t)))
 
 
+(defun ensure-inherited-fields (entity)
+  (let ((owner (foreign-owner entity))
+        (fields (fields-of entity)))
+    (when (and (not (foreign-entity-name entity))
+               fields
+               (typep owner 'resect-record))
+      (loop for field in fields
+            do (add-field owner field))
+      ;; propagate further
+      (ensure-inherited-fields owner))))
+
+
 (defun parse-new-record-declaration (record-kind decl)
   (labels ((collect-parents ()
              (let (parents)
                (resect:docollection (parent-type (%resect:record-parents decl))
                  (push (parse-type-by-category parent-type) parents))
                (nreverse parents))))
-    (let* ((entity-parameters (collect-entity-parameters decl))
-           (owner (parse-owner decl)))
+    (let ((owner (parse-owner decl)))
       (multiple-value-bind (entity registeredp)
           (let ((decl-type (%resect:declaration-type decl)))
             (register-entity (ecase record-kind
@@ -609,45 +662,43 @@
                              :plain-old-data-type (%resect:type-plain-old-data-p decl-type)
                              :parents (collect-parents)
                              :abstract (%resect:record-abstract-p decl)
-                             :private (if (or (foreign-entity-private-p owner)
-                                              (not (publicp decl))
-                                              (not (template-arguments-public-p decl))
-                                              entity-parameters)
-                                          t
-                                          nil)
-                             :entity-parameters entity-parameters
-                             :entity-arguments (collect-entity-arguments decl)))
-        (when (and registeredp
-                   (not (foreign-entity-private-p entity)))
-          (unless (zerop (foreign-entity-bit-size entity))
-            (let (fields)
-              (resect:docollection (field-decl (%resect:type-fields (%resect:declaration-type decl)))
-                (when (publicp field-decl)
-                  (let ((field-type (%resect:declaration-type field-decl)))
-                    (push (make-instance 'foreign-record-field
-                                         :name (%resect:declaration-name field-decl)
-                                         :location (make-declaration-location field-decl)
-                                         :enveloped (ensure-const-type-if-needed
-                                                     field-type
-                                                     (parse-type-by-category field-type)
-                                                     field-decl)
-                                         :bit-size (%resect:type-size field-type)
-                                         :bit-alignment (%resect:type-alignment field-type)
-                                         :bit-offset (%resect:field-offset field-decl)
-                                         :bitfield-p (%resect:field-bitfield-p field-decl)
-                                         :bit-width (%resect:field-width field-decl))
-                          fields))))
-              (setf (fields-of entity) (nreverse fields))))
-          (register-instantiated entity decl)
-          (if (and (not (method-exists-p decl))
-                   (instantiated-p decl))
-              (on-post-parse
-                (with-template-argument-table (decl)
-                  (let ((postfix (reformat-template-argument-string-from-type
-                                  (%resect:declaration-type decl))))
-                    (when (not (and (foreign-entity-parameters entity) (not postfix)))
-                      (parse-methods entity (root-template decl) postfix)))))
-              (parse-methods entity decl)))
+                             :private (or (foreign-entity-private-p owner)
+                                          (not (publicp decl))
+                                          (not (template-arguments-public-p decl)))))
+        (when registeredp
+          (setf (arguments-of entity) (collect-entity-arguments decl)
+                (parameters-of entity) (collect-entity-parameters decl))
+          (unless (foreign-entity-private-p entity)
+            (unless (zerop (foreign-entity-bit-size entity))
+              (let (fields)
+                (resect:docollection (field-decl (%resect:type-fields (%resect:declaration-type decl)))
+                  (when (publicp field-decl)
+                    (let ((field-type (%resect:declaration-type field-decl)))
+                      (push (make-instance 'foreign-record-field
+                                           :name (%resect:declaration-name field-decl)
+                                           :location (make-declaration-location field-decl)
+                                           :enveloped (ensure-const-type-if-needed
+                                                       field-type
+                                                       (parse-type-by-category field-type)
+                                                       field-decl)
+                                           :bit-size (%resect:type-size field-type)
+                                           :bit-alignment (%resect:type-alignment field-type)
+                                           :bit-offset (%resect:field-offset field-decl)
+                                           :bitfield-p (%resect:field-bitfield-p field-decl)
+                                           :bit-width (%resect:field-width field-decl))
+                            fields))))
+                (setf (fields-of entity) (nreverse fields))
+                (ensure-inherited-fields entity)))
+            (register-instantiated entity decl)
+            (if (and (not (method-exists-p decl))
+                     (instantiated-p decl))
+                (on-post-parse
+                  (with-template-argument-table (decl)
+                    (let ((postfix (reformat-template-argument-string-from-type
+                                    (%resect:declaration-type decl))))
+                      (when (not (and (foreign-entity-parameters entity) (not postfix)))
+                        (parse-methods entity (root-template decl) postfix)))))
+                (parse-methods entity decl))))
         (values entity registeredp)))))
 
 

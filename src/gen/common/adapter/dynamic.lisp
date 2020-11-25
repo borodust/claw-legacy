@@ -83,11 +83,13 @@
                    definitions)))))))
 
 
-(defun build-dynamic-adapter (standard adapter-file includes target-file &key pedantic compiler flags)
+(defun build-dynamic-adapter (standard adapter-file includes target-file
+                              &key pedantic compiler flags intrinsics)
   (%build-adapter standard adapter-file includes target-file
                   :pedantic pedantic
                   :compiler compiler
-                  :flags flags))
+                  :flags flags
+                  :intrinsics intrinsics))
 
 
 (defun %verify-adapter-initialization (result)
@@ -123,7 +125,8 @@
                                                   "" wrapper))
                                :dependencies dependencies
                                :compiler compiler
-                               :flags flags))
+                               :flags flags
+                               :intrinsics ',(intrinsics-of this)))
       (defmethod initialize-adapter ((wrapper-name (eql ',name)))
         (declare (ignore wrapper-name))
         (%verify-adapter-initialization

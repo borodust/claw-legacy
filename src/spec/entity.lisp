@@ -97,12 +97,16 @@
            #:foreign-constructor-p
            #:format-foreign-location
            #:format-full-foreign-entity-name
+           #:*qualify-types*
            #:format-foreign-entity-c-name
 
            #:unwrap-foreign-entity
            #:unalias-foreign-entity
            #:unqualify-foreign-entity))
 (cl:in-package :claw.spec)
+
+
+(defvar *qualify-types* nil)
 
 ;;;
 ;;; ALIGNED
@@ -578,16 +582,31 @@
           (mapcar #'format-foreign-entity-c-name (foreign-function-parameters this))))
 
 
-(defmethod format-foreign-entity-c-name ((this foreign-struct) &key const-qualified name)
-  (format-default-c-name (format nil "struct ~A" (format-full-foreign-entity-name this)) const-qualified name))
+(defmethod format-foreign-entity-c-name ((this foreign-struct)
+                                         &key const-qualified name (qualify-types *qualify-types*))
+  (format-default-c-name (format nil "~@[~A ~]~A"
+                                 (when qualify-types
+                                   "struct")
+                                 (format-full-foreign-entity-name this))
+                         const-qualified name))
 
 
-(defmethod format-foreign-entity-c-name ((this foreign-union) &key const-qualified name)
-  (format-default-c-name (format nil "union ~A" (format-full-foreign-entity-name this)) const-qualified name))
+(defmethod format-foreign-entity-c-name ((this foreign-union)
+                                         &key const-qualified name (qualify-types *qualify-types*))
+  (format-default-c-name (format nil "~@[~A ~]~A"
+                                 (when qualify-types
+                                   "union")
+                                 (format-full-foreign-entity-name this))
+                         const-qualified name))
 
 
-(defmethod format-foreign-entity-c-name ((this foreign-enum) &key const-qualified name)
-  (format-default-c-name (format nil "enum ~A" (format-full-foreign-entity-name this)) const-qualified name))
+(defmethod format-foreign-entity-c-name ((this foreign-enum)
+                                         &key const-qualified name (qualify-types *qualify-types*))
+  (format-default-c-name (format nil "~@[~A ~]~A"
+                                 (when qualify-types
+                                   "enum")
+                                 (format-full-foreign-entity-name this))
+                         const-qualified name))
 
 
 (defmethod format-foreign-entity-c-name ((this foreign-class) &key const-qualified name)
@@ -607,10 +626,11 @@
 
 
 (defmethod format-foreign-entity-c-name ((this foreign-array) &key const-qualified name)
-  (format-default-c-name
-   (format nil "~A*"
-           (format-foreign-entity-c-name (foreign-enveloped-entity this)))
-   const-qualified name))
+  (format nil "~@[~A ~]~A~@[ ~A~][]"
+          (when const-qualified
+            "const")
+          (format-foreign-entity-c-name (foreign-enveloped-entity this))
+          name))
 
 
 (defmethod format-foreign-entity-c-name ((this foreign-entity-parameter) &key const-qualified name)

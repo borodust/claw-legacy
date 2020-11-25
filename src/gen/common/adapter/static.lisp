@@ -38,12 +38,13 @@
 
 
 (defun build-static-adapter (standard adapter-file includes target-file
-                             &key pedantic dependencies compiler flags)
+                             &key pedantic dependencies compiler flags intrinsics)
   (%build-adapter standard adapter-file includes target-file
                   :pedantic pedantic
                   :dependencies dependencies
                   :compiler compiler
-                  :flags flags))
+                  :flags flags
+                  :intrinsics intrinsics))
 
 
 (defmethod expand-adapter-routines ((this static-adapter) wrapper)
@@ -59,4 +60,5 @@
                                                  "" wrapper))
                               :dependencies dependencies
                               :compiler compiler
-                              :flags flags)))))
+                              :flags flags
+                              :intrinsics ',(intrinsics-of this))))))

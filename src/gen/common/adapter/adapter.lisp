@@ -15,6 +15,7 @@
    (standard :reader standard-of)
    (includes :reader includes-of)
    (defines :initform nil :reader defines-of)
+   (intrinsics :initform nil :reader intrinsics-of)
    (pointer-extractor-predicate :initform nil :reader pointer-extractor-predicate-of)))
 
 
@@ -25,7 +26,7 @@
 (defmethod initialize-instance :after ((this adapter) &key wrapper path extract-pointers)
   (with-slots (wrapper-name wrapper-last-update-time
                adapter-file headers standard includes defines
-               pointer-extractor-predicate)
+               intrinsics pointer-extractor-predicate)
       this
     (let ((opts (claw.wrapper:wrapper-options wrapper))
           (extractor-regexes (loop for regex in extract-pointers
@@ -42,6 +43,7 @@
               standard (claw.wrapper:wrapper-options-standard opts)
               includes (claw.wrapper:wrapper-options-includes opts)
               defines (claw.wrapper:wrapper-options-defines opts)
+              intrinsics (claw.wrapper:wrapper-options-intrinsics opts)
               pointer-extractor-predicate #'%extractor-predicate)))))
 
 
@@ -162,7 +164,7 @@
 
 
 (defun %build-adapter (standard adapter-file includes target-file
-                       &key pedantic dependencies compiler flags)
+                       &key pedantic dependencies compiler flags intrinsics)
   (multiple-value-bind (library-directories libraries) (parse-dependencies dependencies)
     (uiop:run-program (append (list (ecase (or compiler :clang)
                                       (:gcc "g++")
@@ -175,6 +177,15 @@
                               (when pedantic
                                 (list "-pedantic"))
                               (list "-O2" "-fPIC")
+                              (loop for intrinsic in intrinsics
+                                    collect (ecase intrinsic
+                                              (:sse "-msse")
+                                              (:sse2 "-msse2")
+                                              (:sse3 "-msse3")
+                                              (:sse41 "-msse4.1")
+                                              (:sse42 "-msse4.2")
+                                              (:avx "-mavx")
+                                              (:avx2 "-mavx2")))
                               (when flags
                                 (ensure-list flags))
                               (loop for directory in includes
