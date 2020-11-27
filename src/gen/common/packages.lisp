@@ -20,6 +20,7 @@
            #:function-pointer-extractor-required-p
 
            #:adapted-function-name
+           #:adapted-function-namespace
            #:adapted-function-parameters
            #:adapted-function-result-type
            #:adapted-function-body

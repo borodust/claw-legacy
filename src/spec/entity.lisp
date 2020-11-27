@@ -8,6 +8,7 @@
            #:foreign-entity-id
 
            #:foreign-owner
+           #:foreign-dependent
 
            #:foreign-named-p
            #:foreign-entity-name
@@ -97,7 +98,7 @@
            #:foreign-constructor-p
            #:format-foreign-location
            #:format-full-foreign-entity-name
-           #:*qualify-types*
+           #:*tag-types*
            #:format-foreign-entity-c-name
 
            #:unwrap-foreign-entity
@@ -106,7 +107,7 @@
 (cl:in-package :claw.spec)
 
 
-(defvar *qualify-types* nil)
+(defvar *tag-types* t)
 
 ;;;
 ;;; ALIGNED
@@ -170,6 +171,20 @@
 
 
 (defmethod foreign-owner (entity)
+  (declare (ignore entity))
+  nil)
+
+
+;;;
+;;; DEPENDABLE
+;;;
+(defclass dependable ()
+  ((dependents :initarg :owner
+               :initform nil
+               :reader foreign-depndent)))
+
+
+(defmethod foreign-depndent (entity)
   (declare (ignore entity))
   nil)
 
@@ -349,7 +364,7 @@
               :type fixnum)))
 
 
-(defclass foreign-record (declared parameterized specializable ownable foreign-type)
+(defclass foreign-record (declared parameterized specializable ownable dependable foreign-type)
   ((fields :initarg :fields
            :initform nil
            :reader foreign-record-fields)
@@ -583,27 +598,27 @@
 
 
 (defmethod format-foreign-entity-c-name ((this foreign-struct)
-                                         &key const-qualified name (qualify-types *qualify-types*))
+                                         &key const-qualified name (tag-types *tag-types*))
   (format-default-c-name (format nil "~@[~A ~]~A"
-                                 (when qualify-types
+                                 (when tag-types
                                    "struct")
                                  (format-full-foreign-entity-name this))
                          const-qualified name))
 
 
 (defmethod format-foreign-entity-c-name ((this foreign-union)
-                                         &key const-qualified name (qualify-types *qualify-types*))
+                                         &key const-qualified name (tag-types *tag-types*))
   (format-default-c-name (format nil "~@[~A ~]~A"
-                                 (when qualify-types
+                                 (when tag-types
                                    "union")
                                  (format-full-foreign-entity-name this))
                          const-qualified name))
 
 
 (defmethod format-foreign-entity-c-name ((this foreign-enum)
-                                         &key const-qualified name (qualify-types *qualify-types*))
+                                         &key const-qualified name (tag-types *tag-types*))
   (format-default-c-name (format nil "~@[~A ~]~A"
-                                 (when qualify-types
+                                 (when tag-types
                                    "enum")
                                  (format-full-foreign-entity-name this))
                          const-qualified name))

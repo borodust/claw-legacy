@@ -48,6 +48,7 @@
 
 
 (defgeneric adapted-function-name (function))
+(defgeneric adapted-function-namespace (function))
 (defgeneric adapted-function-parameters (function))
 (defgeneric adapted-function-result-type (function))
 (defgeneric adapted-function-body (function))

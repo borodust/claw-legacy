@@ -54,7 +54,8 @@
   "Generates dependency bindings first"
   (labels ((%generate-bindings ()
              (loop for dep in (find-foreign-dependencies entity)
-                   append (generate-binding generator dep)))
+                   append (call-shielded-from-unknown
+                           (lambda () (generate-binding generator dep)))))
            (%generate-depenencies ()
              (check-entity-known entity)
              (let* ((id (claw.spec:foreign-entity-id entity))

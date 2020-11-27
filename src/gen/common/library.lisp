@@ -44,10 +44,12 @@
             do (return value))))
 
 
-(defun %generate-binding (generator entity)
+(defun call-shielded-from-unknown (lambda &optional on-error)
   (flet ((return-nil (condi)
            (warn "Unknown entity found, skipping: ~A" (unknown-entity-of condi))
-           (return-from %generate-binding)))
+           (when on-error
+             (funcall on-error))
+           (return-from call-shielded-from-unknown)))
     (handler-bind ((unknown-entity-condition #'return-nil))
       ;; this mental code is to avoid polluting global tables
       ;; when bindings are only partially generated due to unrecognized entities
@@ -57,7 +59,7 @@
         (prog1 (let ((*visit-table* local-visit-table)
                      (*export-table* local-export-table)
                      (*adapted-function-table* local-adapted-table))
-                 (generate-binding generator entity))
+                 (funcall lambda))
           (setf *visit-table* local-visit-table
                 *export-table* local-export-table
                 *adapted-function-table* local-adapted-table))))))
@@ -107,7 +109,8 @@
         (with-symbol-renaming (in-package rename-symbols)
           (loop for entity in *entities*
                 do (let ((*dependency-type-list* nil)
-                         (generated (%generate-binding generator entity)))
+                         (generated (call-shielded-from-unknown
+                                     (lambda () (generate-binding generator entity)))))
                      (loop for bing in generated
                            do (push bing bindings))))
           (when *adapter*

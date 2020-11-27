@@ -1,6 +1,8 @@
 (cl:in-package :claw.resect)
 
 
+(declaim (special *inspector*))
+
 (defun instantiatablep (decl)
   (when *instantiation-filter*
     (funcall *instantiation-filter* decl)))
@@ -22,35 +24,41 @@
     (declare (ignore kind declaration))))
 
 
-(defclass preparing-inspector () ())
+;;;
+;;;
+;;;
+(defclass preparing-inspector ()
+  ((prepared-entity-table :initform (make-hash-table :test 'equal))
+   (instantiated-classes :initform (make-hash-table :test 'equal))
+   (instantiated-functions :initform (make-hash-table :test 'equal))
+   (instantiation-filter :initarg :instantiation-filter)
+   (macros :initform (make-hash-table :test 'equal) :reader macros-of)))
 
+
+(defgeneric prepare-header (inspector uber-path prepared-path))
+(defgeneric prepare-instantiated-source (inspector decl))
 
 (defmethod inspect-declaration ((this preparing-inspector) kind declaration)
-  (prepare-declaration kind declaration))
+  (with-slots (prepared-entity-table
+               instantiated-classes
+               instantiated-functions
+               instantiation-filter
+               macros)
+      this
+    (let ((*inspector* this)
+          (*prepared-entity-table* prepared-entity-table)
+          (*instantiated-classes* instantiated-classes)
+          (*instantiated-functions* instantiated-functions)
+          (*instantiation-filter* instantiation-filter)
+          (*macros* macros))
+      (prepare-declaration kind declaration))))
 
 
-(defun prepare-header (uber-path prepared-path)
-  (alexandria:with-output-to-file (out prepared-path :if-exists :supersede)
-    (format out "#ifndef  __CLAW_PREPARED~%#define __CLAW_PREPARED 1")
-    (format out "~%~%#include \"~A\"~%~%" (uiop:native-namestring uber-path))
-
-    (when-let ((classes (sort (hash-table-values *instantiated-classes*) #'string<)))
-      (format out "~%~%")
-      (loop for name in classes
-            for counter from 0
-            collect (format out "~%~A ~A~A;"
-                            name
-                            +instantiation-prefix+
-                            counter)))
-    (when-let ((functions (sort (hash-table-values *instantiated-functions*) #'string<
-                                :key #'first)))
-      (format out "~%~%")
-      (loop for (nil formatted) in functions
-            collect (format out "~%~A" formatted)))
-
-    (format out "~%~%")
-    (format out "~%#endif")))
-
+(defun %file-length (file-path)
+  (with-open-file (file file-path :if-does-not-exist nil)
+    (if file
+        (file-length file)
+        0)))
 
 (defun prepare-foreign-library (uber-path
                                 prepared-path
@@ -61,22 +69,43 @@
                                 target
                                 intrinsics
                                 instantiation-filter)
-  (let ((*prepared-entity-table* (make-hash-table :test 'equal))
-        (*instantiated-classes* (make-hash-table :test 'equal))
-        (*instantiated-functions* (make-hash-table :test 'equal))
-        (*instantiation-filter* instantiation-filter)
-        (*macros* (make-hash-table :test 'equal)))
-    (inspect-foreign-library (make-instance 'preparing-inspector)
-                             uber-path
-                             includes
-                             frameworks
-                             language
-                             standard
-                             target
-                             intrinsics)
-    (prepare-header uber-path prepared-path)
-    (loop for macro-name being the hash-key of *macros*
-          collect macro-name)))
+  (uiop:with-temporary-file (:pathname instantiation-path0 :type "h")
+    (let ((implicit (make-instance 'implicit-preparing-inspector
+                                   :instantiation-filter instantiation-filter)))
+      (inspect-foreign-library implicit
+                               uber-path
+                               includes
+                               frameworks
+                               language
+                               standard
+                               target
+                               intrinsics)
+      (prepare-header implicit uber-path instantiation-path0)
+      (uiop:with-temporary-file (:pathname instantiation-path1 :type "h")
+        (loop with instantiation-paths = (list instantiation-path0 instantiation-path1)
+              with old-size = -1
+              for source = (first instantiation-paths)
+              for destination = (second instantiation-paths)
+              for size = (%file-length source)
+              while (< old-size size)
+              for explicit = (make-instance 'explicit-preparing-inspector
+                                            :instantiation-filter instantiation-filter)
+              do (inspect-foreign-library explicit
+                                          source
+                                          includes
+                                          frameworks
+                                          language
+                                          standard
+                                          target
+                                          intrinsics)
+                 (prepare-header explicit uber-path destination)
+                 (setf old-size size)
+                 (rotatef (first instantiation-paths) (second instantiation-paths))
+              finally (return
+                        (progn
+                          (uiop:copy-file destination prepared-path)
+                          (loop for macro-name being the hash-key of (macros-of explicit)
+                                collect macro-name))))))))
 
 
 (defun format-template-argument-string (argument-literals)
@@ -119,10 +148,11 @@
   (unless (or (cffi:null-pointer-p (%resect:declaration-template decl))
               (%resect:declaration-partially-specialized-p decl)
               (not (publicp decl))
-              (not (template-arguments-public-p decl)))
+              (not (template-arguments-public-p decl))
+              (emptyp (%resect:declaration-name decl)))
     (setf
      (gethash (%resect:declaration-id decl) *instantiated-classes*)
-     (%resect:type-name (%resect:declaration-type decl))))
+     (prepare-instantiated-source *inspector* decl)))
 
   (resect:docollection (parent-type (%resect:record-parents decl))
     (prepare-type parent-type))
@@ -180,3 +210,88 @@
 (defmethod prepare-declaration ((kind (eql :macro)) declaration &key)
   (unless (%resect:macro-function-like-p declaration)
     (setf (gethash (%resect:declaration-name declaration) *macros*) t)))
+
+
+;;;
+;;; PREPARE IMPLICIT
+;;;
+(defclass implicit-preparing-inspector (preparing-inspector) ())
+
+
+(defmethod prepare-header ((inspector implicit-preparing-inspector) uber-path prepared-path)
+  (with-slots (instantiated-classes) inspector
+    (alexandria:with-output-to-file (out prepared-path :if-exists :supersede)
+      (format out "#ifndef __CLAW_PREPARED_IMPLICIT~%#define __CLAW_PREPARED_IMPLICIT 1")
+      (format out "~%~%#include \"~A\"~%~%" (uiop:native-namestring uber-path))
+
+      (when-let ((keys (sort (hash-table-keys instantiated-classes) #'string<)))
+        (loop for key in keys
+              for source = (gethash key instantiated-classes)
+              for counter from 0
+              collect (format out "~%~A ~A~A;" source +instantiation-prefix+ counter)))
+      (format out "~%~%")
+      (format out "~%#endif"))))
+
+
+(defmethod prepare-instantiated-source ((this implicit-preparing-inspector) decl)
+  (%resect:type-name (%resect:declaration-type decl)))
+
+;;;
+;;; PREPARE EXPLICIT
+;;;
+(defclass explicit-preparing-inspector (preparing-inspector)
+  ((instantiation-path :initarg :instantiation-path :reader instantiation-path-of)
+   (explicitly-instantiated-classes :initform (make-hash-table :test 'equal))
+   (counter :initform 0)))
+
+
+(defmethod prepare-header ((inspector explicit-preparing-inspector) uber-path prepared-path)
+  (with-slots (instantiated-classes instantiated-functions explicitly-instantiated-classes) inspector
+    (alexandria:with-output-to-file (out prepared-path :if-exists :supersede)
+      (format out "#ifndef __CLAW_PREPARED_EXPLICIT~%#define __CLAW_PREPARED_EXPLICIT 1")
+      (format out "~%~%#include \"~A\"~%~%" (uiop:native-namestring uber-path))
+
+      (when-let ((keys (sort (hash-table-keys instantiated-classes) #'string<)))
+        (multiple-value-bind (sources instantiations)
+            (loop for key in keys
+                  for (source instantiation) = (gethash key instantiated-classes)
+                  for counter from 0
+                  collect source into sources
+                  collect instantiation into instantiations
+                  finally (return (values sources instantiations)))
+          (loop for source in sources
+                when source
+                  do (format out "~%~A" source))
+          (loop for instantiation in instantiations
+                when instantiation
+                  do (format out "~%~A" instantiation)))
+        (when-let ((functions (sort (hash-table-values instantiated-functions) #'string<
+                                    :key #'first)))
+          (format out "~%")
+          (loop for (nil formatted) in functions
+                collect (format out "~%~A" formatted))))
+
+      (format out "~%~%")
+      (format out "~%#endif"))))
+
+
+(defmethod prepare-instantiated-source ((this explicit-preparing-inspector) decl)
+  (with-slots (counter) this
+    (flet ((namespace-wrapped (source)
+             (with-output-to-string (result)
+               (let ((namespaces (ppcre:split "::" (%resect:declaration-namespace decl))))
+                 (loop for namespace in namespaces
+                       do (format result "~&namespace ~A {" namespace))
+                 (format result "~A" source)
+                 (loop for nil in namespaces
+                       do (format result "~&}"))))))
+      (list (let ((source (%resect:declaration-source decl)))
+              (unless (or (search "__" (%resect:declaration-namespace decl))
+                          (search "type-parameter" source))
+                (namespace-wrapped
+                 (format nil "~%~A;" source))))
+            (namespace-wrapped
+             (format nil "~%~A ~A~A;"
+                     (%resect:type-name (%resect:declaration-type decl))
+                     +instantiation-prefix+
+                     (incf counter)))))))

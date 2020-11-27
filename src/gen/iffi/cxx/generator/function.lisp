@@ -38,10 +38,16 @@
       (values this nil)))
 
 
+(defun format-location-comment (entity &optional stream)
+  (format stream "~&// ~A~%" (claw.spec:format-foreign-location
+                              (claw.spec:foreign-entity-location entity))))
+
+
 (defclass adapted-function ()
   ((name :initarg :name :reader adapted-function-name)
    (params :initarg :parameters :reader adapted-function-parameters)
    (result-type :initarg :result-type :reader adapted-function-result-type)
+   (namespace :initarg :namespace :reader adapted-function-namespace)
    (body :initarg :body :reader adapted-function-body)))
 
 
@@ -129,8 +135,7 @@
                                   entity
                                   (claw.spec:format-full-foreign-entity-name entity))
                                  param-names))))
-    (format stream "~&// ~A~%" (claw.spec:format-foreign-location
-                                (claw.spec:foreign-entity-location entity)))
+    (format-location-comment entity stream)
     (cond
       ((and
         (typep result-type 'claw.spec:foreign-primitive)
@@ -185,6 +190,7 @@
                          params)))
         (make-instance 'adapted-function
                        :name (claw.spec:foreign-entity-mangled-name entity)
+                       :namespace (claw.spec:foreign-entity-namespace entity)
                        :parameters params
                        :result-type result-type
                        :body body)))))
@@ -201,6 +207,7 @@
          (result (make-instance 'claw.spec:foreign-pointer :enveloped proto)))
     (make-instance 'adapted-function
                    :name (format nil "__claw_ptrextr_~A" mangled-name)
+                   :namespace (claw.spec:foreign-entity-namespace entity)
                    :parameters nil
                    :result-type result
                    :body (format nil "return &~A;" full-name))))

@@ -25,6 +25,7 @@
 (defun adapt-reporter (entity reporter)
   (make-instance 'adapted-function
                  :name (format nil "~A_~A" reporter (mangle-full-record-name entity))
+                 :namespace (claw.spec:foreign-entity-namespace entity)
                  :parameters nil
                  :result-type (unsigned-long-long)
                  :body (format nil "return ~A(~A);"
@@ -44,10 +45,12 @@
                        :name (format nil "set_~A_~A"
                                      (mangle-full-record-name record)
                                      field-name)
+                       :namespace (claw.spec:foreign-entity-namespace record)
                        :parameters (list (parameter "__claw_this_" (pointer record))
                                          (parameter "__claw_value_" field-type))
                        :result-type (void)
-                       :body (format nil "__claw_this_->~A = ~@[~A~]__claw_value_;"
+                       :body (format nil "~A~%__claw_this_->~A = ~@[~A~]__claw_value_;"
+                                     (format-location-comment record)
                                      field-name
                                      (when adapted-p
                                        "*")))))))
@@ -65,9 +68,11 @@
                        :name (format nil "get_~A_~A"
                                      (mangle-full-record-name record)
                                      field-name)
+                       :namespace (claw.spec:foreign-entity-namespace record)
                        :parameters (list (parameter "__claw_this_" (pointer record)))
                        :result-type result-type
-                       :body (format nil "return ~@[(~A)~]~@[~A~]__claw_this_->~A;"
+                       :body (format nil "~A~%return ~@[(~A)~]~@[~A~]__claw_this_->~A;"
+                                     (format-location-comment record)
                                      (when (or array-p
                                                (typep (claw.spec:unqualify-foreign-entity unaliased)
                                                       'claw.spec:foreign-pointer))

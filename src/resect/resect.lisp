@@ -281,7 +281,7 @@
 (defun reformat-template-argument-string-from-type (type)
   (let ((args (loop for arg in (extract-type-arguments type)
                     collect (if (cffi:pointerp arg)
-                                (let ((*qualify-types* nil))
+                                (let ((*tag-types* nil))
                                   (format-foreign-entity-c-name (parse-type-by-category arg)))
                                 arg))))
     (format-template-argument-string args)))
@@ -409,7 +409,8 @@
 (defclass resect-record ()
   ((fields :initform nil :accessor fields-of)
    (args :initform nil :accessor arguments-of)
-   (params :initform nil :accessor parameters-of)))
+   (params :initform nil :accessor parameters-of)
+   (deps :initform nil :accessor dependents-of)))
 
 (defmethod foreign-record-fields ((this resect-record))
   (slot-value this 'fields))
@@ -420,11 +421,19 @@
 (defmethod foreign-entity-parameters ((this resect-record))
   (slot-value this 'params))
 
+(defmethod foreign-dependent ((this resect-record))
+  (slot-value this 'deps))
+
 (defgeneric add-field (record field)
   (:method ((this resect-record) field)
-    (let ((fields)) this
+    (with-slots (fields) this
       (unless (member (foreign-entity-name field) fields :key #'foreign-entity-name)
         (nconcf fields (list field))))))
+
+(defgeneric add-dependent (record dependent)
+  (:method ((this resect-record) dependent)
+    (with-slots (deps) this
+      (push dependent deps))))
 
 (defclass resect-struct (resect-record foreign-struct) ())
 
@@ -665,7 +674,10 @@
                              :private (or (foreign-entity-private-p owner)
                                           (not (publicp decl))
                                           (not (template-arguments-public-p decl)))))
+
         (when registeredp
+          (when owner
+            (add-dependent owner entity))
           (setf (arguments-of entity) (collect-entity-arguments decl)
                 (parameters-of entity) (collect-entity-parameters decl))
           (unless (foreign-entity-private-p entity)

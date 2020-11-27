@@ -122,7 +122,13 @@
          (name (format-adapted-function-name (adapted-function-name function)))
          (params (mapcar #'claw.spec:format-foreign-entity-c-name
                          (adapted-function-parameters function)))
-         (body (adapted-function-body function)))
+         (body (adapted-function-body function))
+         (namespaces (when-let ((namespace (adapted-function-namespace function)))
+                       (ppcre:split "::" namespace))))
+    (format stream "~&~%")
+    (loop for namespace in namespaces
+          do (format stream "~&namespace ~A {" namespace))
+    (format stream "~&__CLAW_API ")
     (if (enveloped-function-protoype-p result-type)
         (format stream "~A {~%~A~%}"
                 (claw.spec:format-foreign-entity-c-name result-type
@@ -132,14 +138,15 @@
                 (claw.spec:format-foreign-entity-c-name result-type)
                 name
                 params
-                body))))
+                body))
+    (loop for nil in namespaces
+          do (format stream "~&}"))))
 
 
 (defun %generate-adapted-function-definitions (functions invocation-prefix)
   (with-output-to-string (stream)
     (loop for function in functions
-          do (format stream "~&~%__CLAW_API ")
-             (format-function function stream))))
+          do (format-function function stream))))
 
 
 (defun %adapter-needs-rebuilding-p (this)

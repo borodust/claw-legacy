@@ -57,6 +57,9 @@
    (body :initarg :body :reader adapted-function-body)
    (entity :initarg :entity :reader adapted-function-entity)))
 
+(defmethod adapted-function-namespace ((this adapted-function))
+  nil)
+
 
 (defun adapt-parameters (entity)
   (flet ((%make-parameter (name type)
