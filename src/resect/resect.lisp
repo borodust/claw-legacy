@@ -133,7 +133,7 @@
               (*instantiated-table* (make-hash-table :test 'equal))
               (*mangled-table* (make-hash-table :test 'equal))
               (inspector (make-instance 'describing-inspector)))
-          (loop for (header nil) in prepared-headers
+          (loop for header in prepared-headers
                 do (inspect-foreign-library inspector
                                             header
                                             includes
@@ -707,15 +707,7 @@
                 (setf (fields-of entity) (nreverse fields))
                 (ensure-inherited-fields entity)))
             (register-instantiated entity decl)
-            (if (and (not (method-exists-p decl))
-                     (instantiated-p decl))
-                (on-post-parse
-                  (with-template-argument-table (decl)
-                    (let ((postfix (reformat-template-argument-string-from-type
-                                    (%resect:declaration-type decl))))
-                      (when (not (and (foreign-entity-parameters entity) (not postfix)))
-                        (parse-methods entity (root-template decl) postfix)))))
-                (parse-methods entity decl))))
+            (parse-methods entity decl)))
         (values entity registeredp)))))
 
 
