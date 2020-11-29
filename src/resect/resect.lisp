@@ -116,46 +116,48 @@
                                                             exclude-definitions
                                                             exclude-sources)
   (declare (ignore parser))
-  (uiop:with-temporary-file (:pathname prepared-path :type "h")
+  (with-temporary-directory (:pathname prepared-dir)
     (uiop:with-temporary-file (:pathname uber-path :type "h")
       (write-uber-header headers uber-path defines)
-      (let ((macros (prepare-foreign-library uber-path
-                                             prepared-path
-                                             includes
-                                             frameworks
-                                             language
-                                             standard
-                                             target
-                                             intrinsics
-                                             instantiation-filter))
-            (*declaration-table* (make-hash-table :test 'equal))
-            (*instantiated-table* (make-hash-table :test 'equal))
-            (*mangled-table* (make-hash-table :test 'equal))
-            (inspector (make-instance 'describing-inspector)))
-        (inspect-foreign-library inspector
-                                 prepared-path
-                                 includes
-                                 frameworks
-                                 language
-                                 standard
-                                 target
-                                 intrinsics)
-        (loop for constant in (prepare-macros-as-constants uber-path
-                                                           includes
-                                                           frameworks
-                                                           target
-                                                           macros
-                                                           intrinsics)
-              do (register-entity-instance constant))
-        (make-instance 'foreign-library
-                       :entities (filter-library-entities
-                                  (loop for value being the hash-value of *declaration-table*
-                                        collect value)
-                                  include-definitions
-                                  include-sources
-                                  exclude-definitions
-                                  exclude-sources)
-                       :language (language-of inspector))))))
+      (multiple-value-bind (prepared-headers macros)
+          (prepare-foreign-library uber-path
+                                   prepared-dir
+                                   includes
+                                   frameworks
+                                   language
+                                   standard
+                                   target
+                                   intrinsics
+                                   instantiation-filter)
+        (let ((*declaration-table* (make-hash-table :test 'equal))
+              (*instantiated-table* (make-hash-table :test 'equal))
+              (*mangled-table* (make-hash-table :test 'equal))
+              (inspector (make-instance 'describing-inspector)))
+          (loop for (header nil) in prepared-headers
+                do (inspect-foreign-library inspector
+                                            header
+                                            includes
+                                            frameworks
+                                            language
+                                            standard
+                                            target
+                                            intrinsics))
+          (loop for constant in (prepare-macros-as-constants uber-path
+                                                             includes
+                                                             frameworks
+                                                             target
+                                                             macros
+                                                             intrinsics)
+                do (register-entity-instance constant))
+          (make-instance 'foreign-library
+                         :entities (filter-library-entities
+                                    (loop for value being the hash-value of *declaration-table*
+                                          collect value)
+                                    include-definitions
+                                    include-sources
+                                    exclude-definitions
+                                    exclude-sources)
+                         :language (language-of inspector)))))))
 
 
 (defmacro on-post-parse (&body body)
@@ -410,7 +412,8 @@
   ((fields :initform nil :accessor fields-of)
    (args :initform nil :accessor arguments-of)
    (params :initform nil :accessor parameters-of)
-   (deps :initform nil :accessor dependents-of)))
+   (deps :initform nil :accessor dependents-of)
+   (parents :initform nil :accessor parents-of)))
 
 (defmethod foreign-record-fields ((this resect-record))
   (slot-value this 'fields))
@@ -420,6 +423,9 @@
 
 (defmethod foreign-entity-parameters ((this resect-record))
   (slot-value this 'params))
+
+(defmethod foreign-record-parents ((this resect-record))
+  (slot-value this 'parents))
 
 (defmethod foreign-dependent ((this resect-record))
   (slot-value this 'deps))
@@ -592,13 +598,12 @@
           (setf pure-virtual-found t))))
     (resect:docollection (method-decl (%resect:record-methods record-decl))
       (unless (search "= delete" (%resect:declaration-source method-decl))
-        (let* ((pure-name (remove-template-argument-string (%resect:declaration-name method-decl)))
-               (constructor-p (string= pure-name (remove-template-argument-string
-                                                  (foreign-entity-name entity))))
+        (let* ((name (%resect:declaration-name method-decl))
+               (constructor-p (string= name (foreign-entity-name entity)))
+               (pure-name (if constructor-p
+                              (remove-template-argument-string (foreign-entity-name entity))
+                              name))
                (destructor-p (starts-with #\~ pure-name))
-               (name (if constructor-p
-                         (foreign-entity-name entity)
-                         pure-name))
                (params (parse-parameters (%resect:method-parameters method-decl))))
           (when (and (publicp method-decl)
                      (not (and pure-virtual-found (or destructor-p constructor-p))))
@@ -669,7 +674,6 @@
                              :bit-size (%resect:type-size decl-type)
                              :bit-alignment (%resect:type-alignment decl-type)
                              :plain-old-data-type (%resect:type-plain-old-data-p decl-type)
-                             :parents (collect-parents)
                              :abstract (%resect:record-abstract-p decl)
                              :private (or (foreign-entity-private-p owner)
                                           (not (publicp decl))
@@ -678,7 +682,8 @@
         (when registeredp
           (when owner
             (add-dependent owner entity))
-          (setf (arguments-of entity) (collect-entity-arguments decl)
+          (setf (parents-of entity) (collect-parents)
+                (arguments-of entity) (collect-entity-arguments decl)
                 (parameters-of entity) (collect-entity-parameters decl))
           (unless (foreign-entity-private-p entity)
             (unless (zerop (foreign-entity-bit-size entity))

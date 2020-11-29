@@ -60,8 +60,9 @@
         (file-length file)
         0)))
 
+
 (defun prepare-foreign-library (uber-path
-                                prepared-path
+                                prepared-dir
                                 includes
                                 frameworks
                                 language
@@ -69,43 +70,46 @@
                                 target
                                 intrinsics
                                 instantiation-filter)
-  (uiop:with-temporary-file (:pathname instantiation-path0 :type "h")
-    (let ((implicit (make-instance 'implicit-preparing-inspector
-                                   :instantiation-filter instantiation-filter)))
-      (inspect-foreign-library implicit
-                               uber-path
-                               includes
-                               frameworks
-                               language
-                               standard
-                               target
-                               intrinsics)
-      (prepare-header implicit uber-path instantiation-path0)
-      (uiop:with-temporary-file (:pathname instantiation-path1 :type "h")
-        (loop with instantiation-paths = (list instantiation-path0 instantiation-path1)
-              with old-size = -1
-              for source = (first instantiation-paths)
-              for destination = (second instantiation-paths)
-              for size = (%file-length source)
-              while (< old-size size)
-              for explicit = (make-instance 'explicit-preparing-inspector
-                                            :instantiation-filter instantiation-filter)
-              do (inspect-foreign-library explicit
-                                          source
-                                          includes
-                                          frameworks
-                                          language
-                                          standard
-                                          target
-                                          intrinsics)
-                 (prepare-header explicit uber-path destination)
-                 (setf old-size size)
-                 (rotatef (first instantiation-paths) (second instantiation-paths))
-              finally (return
-                        (progn
-                          (uiop:copy-file destination prepared-path)
-                          (loop for macro-name being the hash-key of (macros-of explicit)
-                                collect macro-name))))))))
+  (let ((prepared-path (merge-pathnames "prepared_implicit.h" prepared-dir)))
+    (uiop:with-temporary-file (:pathname instantiation-path0 :type "h")
+      (let ((implicit (make-instance 'implicit-preparing-inspector
+                                     :instantiation-filter instantiation-filter)))
+        (inspect-foreign-library implicit
+                                 uber-path
+                                 includes
+                                 frameworks
+                                 language
+                                 standard
+                                 target
+                                 intrinsics)
+        (prepare-header implicit uber-path instantiation-path0)
+        #++(uiop:with-temporary-file (:pathname instantiation-path1 :type "h")
+             (loop with instantiation-paths = (list instantiation-path0 instantiation-path1)
+                   with old-size = -1
+                   for source = (first instantiation-paths)
+                   for destination = (second instantiation-paths)
+                   for size = (%file-length source)
+                   while (< old-size size)
+                   for explicit = (make-instance 'explicit-preparing-inspector
+                                                 :instantiation-filter instantiation-filter)
+                   do (inspect-foreign-library explicit
+                                               source
+                                               includes
+                                               frameworks
+                                               language
+                                               standard
+                                               target
+                                               intrinsics)
+                      (prepare-header explicit uber-path destination)
+                      (setf old-size size)
+                      (rotatef (first instantiation-paths) (second instantiation-paths))
+                   finally (return
+                             (values
+                              (prepare-individual-headers explicit uber-path prepared-dir)
+                              (loop for macro-name being the hash-key of (macros-of explicit)
+                                    collect macro-name)))))
+        (uiop:copy-file instantiation-path0 prepared-path))
+      (values (list (list prepared-path nil))))))
 
 
 (defun format-template-argument-string (argument-literals)
@@ -116,8 +120,7 @@
   (let ((string (extract-template-argument-string (%resect:type-name type))))
     (unless (emptyp string)
       (remove-if #'emptyp
-                 (split-template-argument-string-into-literals
-                  (subseq string 1 (1- (length string))))))))
+                 (split-template-argument-string-into-literals string)))))
 
 
 (defun prepare-type (type)
@@ -251,20 +254,19 @@
       (format out "#ifndef __CLAW_PREPARED_EXPLICIT~%#define __CLAW_PREPARED_EXPLICIT 1")
       (format out "~%~%#include \"~A\"~%~%" (uiop:native-namestring uber-path))
 
-      (when-let ((keys (sort (hash-table-keys instantiated-classes) #'string<)))
+      (when-let ((values (sort (hash-table-values instantiated-classes) #'< :key #'first)))
         (multiple-value-bind (sources instantiations)
-            (loop for key in keys
-                  for (source instantiation) = (gethash key instantiated-classes)
+            (loop for (nil source instantiation) in values
                   for counter from 0
                   collect source into sources
                   collect instantiation into instantiations
                   finally (return (values sources instantiations)))
-          (loop for source in sources
-                when source
-                  do (format out "~%~A" source))
           (loop for instantiation in instantiations
                 when instantiation
-                  do (format out "~%~A" instantiation)))
+                  do (format out "~%~A" instantiation))
+          (loop for source in sources
+                when source
+                  do (format out "~%~A" source)))
         (when-let ((functions (sort (hash-table-values instantiated-functions) #'string<
                                     :key #'first)))
           (format out "~%")
@@ -285,7 +287,9 @@
                  (format result "~A" source)
                  (loop for nil in namespaces
                        do (format result "~&}"))))))
-      (list (let ((source (%resect:declaration-source decl)))
+      (incf counter)
+      (list counter
+            (let ((source (%resect:declaration-source decl)))
               (unless (or (search "__" (%resect:declaration-namespace decl))
                           (search "type-parameter" source))
                 (namespace-wrapped
@@ -294,4 +298,68 @@
              (format nil "~%~A ~A~A;"
                      (%resect:type-name (%resect:declaration-type decl))
                      +instantiation-prefix+
-                     (incf counter)))))))
+                     counter))
+            (%resect:declaration-name decl)
+            (namespace-wrapped
+             (format nil "~%extern template ~A;"
+                     (%resect:type-name (%resect:declaration-type decl))))))))
+
+
+(defun prepare-individual-headers (explicit uber-path destination-dir)
+  (with-slots (instantiated-classes instantiated-functions explicitly-instantiated-classes) explicit
+    (flet ((%merge-pathnames (name)
+             (merge-pathnames
+              name
+              (uiop:ensure-directory-pathname destination-dir))))
+      (let ((fu-path (%merge-pathnames "prepared_functions.h"))
+            (instantiation-path (%merge-pathnames "prepared_instantiations.h"))
+            (class-path))
+        (when-let ((values (sort (hash-table-values instantiated-classes) #'< :key #'first)))
+          (multiple-value-bind (sources instantiations externs)
+              (loop for (nil source instantiation name extern) in values
+                    collect (list name source) into sources
+                    collect instantiation into instantiations
+                    collect extern into externs
+                    finally (return (values sources instantiations externs)))
+            (loop for (name source) in sources
+                  for counter from 0
+                  for prepared-path = (%merge-pathnames (format nil "prepared_template_~A~A.h"
+                                                                name
+                                                                counter))
+                  when source
+                    do (alexandria:with-output-to-file (out prepared-path :if-exists :supersede)
+                         (format out "#ifndef __CLAW_PREPARED_TEMPLATE~A" counter)
+                         (format out "~%#define __CLAW_PREPARED_TEMPLATE~A 1" counter)
+                         (format out "~%~%#include \"~A\"~%~%" (uiop:native-namestring uber-path))
+
+                         (loop for extern in externs
+                               when extern
+                                 do (format out "~%~A" extern))
+
+                         (format out "~%~A" source)
+                         (format out "~%#endif"))
+                       (push prepared-path class-path))
+            (alexandria:with-output-to-file (out instantiation-path :if-exists :supersede)
+              (format out "#ifndef __CLAW_PREPARED_INSTANTIATIONS")
+              (format out "~%#define __CLAW_PREPARED_INSTANTIATIONS 1")
+              (format out "~%~%#include \"~A\"~%~%" (uiop:native-namestring uber-path))
+
+              (loop for instantiation in instantiations
+                    when instantiation
+                      do (format out "~%~A" instantiation))
+
+              (format out "~%#endif"))))
+        (alexandria:with-output-to-file (out fu-path :if-exists :supersede)
+          (format out "#ifndef __CLAW_PREPARED_FUNCTIONS")
+          (format out "~%#define __CLAW_PREPARED_FUNCTIONS 1")
+          (format out "~%~%#include \"~A\"~%~%" (uiop:native-namestring uber-path))
+
+          (when-let ((functions (sort (hash-table-values instantiated-functions) #'string<
+                                      :key #'first)))
+            (format out "~%")
+            (loop for (nil formatted) in functions
+                  collect (format out "~%~A" formatted))))
+        (append (loop for path in class-path
+                      collect (list path t))
+                (list (list fu-path t))
+                (list (list instantiation-path nil)))))))

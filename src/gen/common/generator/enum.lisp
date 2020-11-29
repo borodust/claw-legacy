@@ -36,10 +36,12 @@
                        'cffi:defcenum)
                   (,name ,(entity->cffi-type enum-type))
                   ,(claw.spec:format-foreign-location (claw.spec:foreign-entity-location entity))
-                  ,@(loop for (key . value) in (if *trim-enum-prefix-p*
-                                                   (trim-enum-prefix values)
-                                                   values)
-                          collect (list (make-keyword key) value)))))))
+                  ,@(if-let (pairs (loop for (key . value) in (if *trim-enum-prefix-p*
+                                                                  (trim-enum-prefix values)
+                                                                  values)
+                                         collect (list (make-keyword key) value)))
+                      pairs
+                      '(:empty)))))))
       (cond
         (name
          (%generate-enum name))

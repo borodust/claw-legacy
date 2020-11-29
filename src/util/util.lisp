@@ -25,6 +25,8 @@
            #:local-environment
            #:local-platform
 
+           #:with-temporary-directory
+
            #:remove-template-argument-string
            #:extract-template-argument-string
            #:split-template-argument-string-into-literals
@@ -75,54 +77,98 @@
 ;;;
 (defparameter *function-parameter-list-extractor* (ppcre:create-scanner "\\(.*\\("))
 
-(defparameter *template-arguments-extractor* (ppcre:create-scanner "<.*>"))
-
 (defun remove-parameter-list-string (name)
   (ppcre:regex-replace-all *function-parameter-list-extractor* name ""))
 
+
+(defun substring-trim (name start-idx end-idx)
+  (string-trim '(#\Space #\Tab #\Newline) (subseq name start-idx end-idx)))
+
+
+(defun split-template-name-into-groups (name)
+  (labels ((%weird-char-p (idx)
+             (and (< idx (length name))
+                  (>= idx 0)
+                  (char= (aref name idx) #\=)))
+           (%extract (pos)
+             (loop with result = nil
+                   with len = (length name)
+                   with last-end = pos
+                   for idx from pos
+                   when (= idx len)
+                     do (unless (= last-end len)
+                          (push (substring-trim name last-end len) result))
+                        (return (values (nreverse result) len))
+                   when (and (char= (aref name idx) #\>)
+                             (not (%weird-char-p (1+ idx))))
+                     do (unless (= last-end idx)
+                          (push (substring-trim name last-end idx) result))
+                        (return (values (nreverse result) (1+ idx)))
+                   when (and (char= (aref name idx) #\<)
+                             (not (%weird-char-p (1+ idx))))
+                     do (when (> (- idx pos) 1)
+                          (push (substring-trim name pos idx) result))
+                        (multiple-value-bind (groups end)
+                            (%extract (1+ idx))
+                          (push groups result)
+                          (setf idx (1- end)
+                                last-end end)))))
+    (%extract 0)))
+
+
+(defun join-groups-into-template-name (groups)
+  (format nil "~{~A~}"
+          (loop for group in groups
+                collect (if (listp group)
+                            (format nil "<~A>" (join-groups-into-template-name group))
+                            group))))
+
+
 (defun remove-template-argument-string (name)
-  (ppcre:regex-replace-all *template-arguments-extractor*
-                           (remove-parameter-list-string name)
-                           ""))
+  (let* ((groups (split-template-name-into-groups name))
+         (last-group (first (last groups))))
+    (when (listp last-group)
+      (join-groups-into-template-name (butlast groups)))))
+
 
 (defun extract-template-argument-string (name)
-  (ppcre:scan-to-strings *template-arguments-extractor*
-                         (remove-parameter-list-string name)))
+  (let ((group (first (last (split-template-name-into-groups name)))))
+    (when (listp group)
+      (join-groups-into-template-name (list group)))))
 
 
 (defun split-template-argument-string-into-literals (name)
-  (flet ((next-idx (current-idx)
-           (let ((char (aref name current-idx)))
-             (flet ((pos (closing-char)
-                      (loop with depth = 1
-                            for idx from (1+ current-idx) below (length name)
-                            for current-char = (aref name idx)
-                            when (char= current-char char)
-                              do (incf depth)
-                            when (char= current-char closing-char)
-                              do (decf depth)
-                            until (= depth 0)
-                            finally (return idx))))
-               (switch (char :test #'char=)
-                 (#\< (pos #\>))
-                 (#\( (pos #\)))
-                 (#\[ (pos #\]))
-                 (t (1+ current-idx))))))
-         (trimmed-substr (start-idx end-idx)
-           (string-trim '(#\Space #\Tab #\Newline) (subseq name start-idx end-idx))))
-    (loop with args = nil
-          with start-idx = 0
-          with current-idx = 0
-          with len = (length name)
-          while (< current-idx len)
-          for char = (aref name current-idx)
-          if (char= #\, char)
-            do (push (trimmed-substr start-idx current-idx) args)
-               (incf current-idx)
-               (setf start-idx current-idx)
-          else
-            do (setf current-idx (next-idx current-idx))
-          finally (return (nreverse (list* (trimmed-substr start-idx current-idx) args))))))
+  (let ((name (subseq name 1 (1- (length name)))))
+    (flet ((next-idx (current-idx)
+             (let ((char (aref name current-idx)))
+               (flet ((pos (closing-char)
+                        (loop with depth = 1
+                              for idx from (1+ current-idx) below (length name)
+                              for current-char = (aref name idx)
+                              when (char= current-char char)
+                                do (incf depth)
+                              when (char= current-char closing-char)
+                                do (decf depth)
+                              until (= depth 0)
+                              finally (return idx))))
+                 (switch (char :test #'char=)
+                   (#\< (pos #\>))
+                   (#\( (pos #\)))
+                   (#\[ (pos #\]))
+                   (t (1+ current-idx)))))))
+      (loop with args = nil
+            with start-idx = 0
+            with current-idx = 0
+            with len = (length name)
+            while (< current-idx len)
+            for char = (aref name current-idx)
+            if (char= #\, char)
+              do (push (substring-trim name start-idx current-idx) args)
+                 (incf current-idx)
+                 (setf start-idx current-idx)
+            else
+              do (setf current-idx (next-idx current-idx))
+            finally (return (nreverse (list* (substring-trim name start-idx current-idx) args)))))))
 
 
 (defun reformat-template-argument-string (name)
@@ -550,10 +596,14 @@
 
 (defun parse-infix (string &key (case :preserve))
   (unless (emptyp string)
-    (let ((*readtable* (named-readtables:find-readtable 'claw-infix:infix))
-          (*package* (find-package :claw.util.infix)))
-      (claw-infix:with-reader-case (case)
-        (claw-infix:string->prefix string)))))
+    (handler-case
+        (let ((*readtable* (named-readtables:find-readtable 'claw-infix:infix))
+              (*package* (find-package :claw.util.infix)))
+          (claw-infix:with-reader-case (case)
+            (claw-infix:string->prefix string)))
+      (serious-condition (e)
+        (warn "Failed to parse infix expression: ~A~%~A" e string)
+        string))))
 
 
 (defmacro with-temporary-directory ((&key pathname) &body body)
