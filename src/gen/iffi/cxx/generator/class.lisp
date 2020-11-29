@@ -55,6 +55,13 @@
                                      (when adapted-p
                                        "*")))))))
 
+
+(defun adapt-array-for-result (result-type)
+  (if (typep result-type 'claw.spec:foreign-array)
+      (adapt-array-for-result (claw.spec:foreign-enveloped-entity result-type))
+      (pointer result-type)))
+
+
 (defun adapt-getter (record field)
   (let ((field-name (claw.spec:foreign-entity-name field)))
     (multiple-value-bind (field-type adapted-p)
@@ -62,7 +69,7 @@
       (let* ((unaliased (claw.spec:unalias-foreign-entity field-type))
              (array-p (typep unaliased 'claw.spec:foreign-array))
              (result-type (if array-p
-                              (pointer (claw.spec:foreign-enveloped-entity field-type))
+                              (adapt-array-for-result field-type)
                               field-type)))
         (make-instance 'adapted-function
                        :name (format nil "get_~A_~A"
@@ -121,15 +128,22 @@
           ,(claw.spec:format-foreign-location (claw.spec:foreign-entity-location entity))
           ,@(unless (claw.spec:foreign-entity-parameters entity)
               (loop for field in (claw.spec:foreign-record-fields entity)
-                    do (check-entity-known field)
-                    unless (anonymous-branch-p (claw.spec:foreign-enveloped-entity field))
+                    for known-p = (call-shielded-from-unknown
+                                   (lambda ()
+                                     (check-entity-known field)
+                                     t))
+                    unless (or (anonymous-branch-p (claw.spec:foreign-enveloped-entity field))
+                               (not known-p))
                       collect (let* ((adapted-setter (adapt-setter entity field))
                                      (setter-cname (when adapted-setter
                                                      (register-adapted-function adapted-setter)))
                                      (adapted-getter (adapt-getter entity field))
                                      (getter-cname (when adapted-getter
-                                                     (register-adapted-function adapted-getter))))
-                                `(,(c-name->lisp (claw.spec:foreign-entity-name field) :field)
+                                                     (register-adapted-function adapted-getter)))
+                                     (field-name (c-name->lisp
+                                                  (claw.spec:foreign-entity-name field) :field)))
+                                (export-symbol field-name)
+                                `(,field-name
                                   ,(entity->cffi-type (adapted-function-result-type adapted-getter))
                                   :setter ,setter-cname
                                   :getter ,getter-cname

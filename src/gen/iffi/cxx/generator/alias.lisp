@@ -8,5 +8,7 @@
     (when-let (owner (claw.spec:foreign-owner entity))
       (check-entity-known owner))
     (export-symbol id)
-    (unless (claw.spec:foreign-entity-private-p entity)
+    (unless (or (claw.spec:foreign-entity-private-p entity)
+                ;; next happens with typedefs for records with the same name
+                (eq id aliased-type))
       `((iffi:defitype ,id ,aliased-type)))))

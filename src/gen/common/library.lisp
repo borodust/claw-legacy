@@ -44,12 +44,17 @@
             do (return value))))
 
 
+(defun merge-hash-table (destination source)
+  (loop for key being the hash-key of source
+        unless (gethash key destination)
+          do (setf (gethash key destination) (gethash key source))))
+
+
 (defun call-shielded-from-unknown (lambda &optional on-error)
   (flet ((return-nil (condi)
-           (warn "Unknown entity found, skipping: ~A" (unknown-entity-of condi))
-           (when on-error
-             (funcall on-error))
-           (return-from call-shielded-from-unknown)))
+           #++(warn "Unknown entity found, skipping: ~A" (unknown-entity-of condi))
+           (return-from call-shielded-from-unknown (when on-error
+                                                     (funcall on-error)))))
     (handler-bind ((unknown-entity-condition #'return-nil))
       ;; this mental code is to avoid polluting global tables
       ;; when bindings are only partially generated due to unrecognized entities
@@ -60,9 +65,9 @@
                      (*export-table* local-export-table)
                      (*adapted-function-table* local-adapted-table))
                  (funcall lambda))
-          (setf *visit-table* local-visit-table
-                *export-table* local-export-table
-                *adapted-function-table* local-adapted-table))))))
+          (merge-hash-table *visit-table* local-visit-table)
+          (merge-hash-table *export-table* local-export-table)
+          (merge-hash-table *adapted-function-table* local-adapted-table))))))
 
 
 (defun explode-library-definition (generator language wrapper configuration)

@@ -7,11 +7,27 @@
                   *post-parse-hooks*))
 
 (defvar *parsed-pointers* nil)
+(defvar *current-owner* nil)
 
 (defgeneric parse-declaration (kind declaration &key &allow-other-keys))
 
 
 (defgeneric parse-type (category kind type))
+
+
+(defun find-instantiated-type-from-owner (type-entity)
+  (let* ((type-owner (foreign-owner type-entity))
+         (instantiated (when (and *current-owner*
+                                  type-owner
+                                  (foreign-entity-parameters type-owner)
+                                  (string= (format-full-foreign-entity-name type-owner)
+                                           (remove-template-argument-string
+                                            (format-full-foreign-entity-name *current-owner*))))
+                         (loop for dependent in (dependents-of *current-owner*)
+                               when (string= (foreign-entity-name type-entity)
+                                             (foreign-entity-name dependent))
+                                 return dependent))))
+    (or instantiated type-entity)))
 
 
 (defun const (entity)
@@ -357,20 +373,24 @@
          (value-alist))
     (resect:docollection (decl (%resect:enum-constants decl))
       (push (cons (%resect:declaration-name decl) (%resect:enum-constant-value decl)) value-alist))
-    (register-entity 'foreign-enum
-                     :id (decorate-id-if-instantiated-owner decl owner)
-                     :source (%resect:declaration-source decl)
-                     :owner owner
-                     :name (%resect:declaration-name decl)
-                     :namespace (unless-empty
-                                 (%resect:declaration-namespace decl))
-                     :mangled (%resect:declaration-mangled-name decl)
-                     :location (make-declaration-location decl)
-                     :bit-size (%resect:type-alignment decl-type)
-                     :bit-alignment (%resect:type-alignment decl-type)
-                     :plain-old-data-type (%resect:type-plain-old-data-p decl-type)
-                     :type (parse-type-by-category (%resect:enum-type decl))
-                     :values (nreverse value-alist))))
+    (multiple-value-bind (entity registeredp)
+        (register-entity 'foreign-enum
+                         :id (decorate-id-if-instantiated-owner decl owner)
+                         :source (%resect:declaration-source decl)
+                         :owner owner
+                         :name (%resect:declaration-name decl)
+                         :namespace (unless-empty
+                                     (%resect:declaration-namespace decl))
+                         :mangled (%resect:declaration-mangled-name decl)
+                         :location (make-declaration-location decl)
+                         :bit-size (%resect:type-alignment decl-type)
+                         :bit-alignment (%resect:type-alignment decl-type)
+                         :plain-old-data-type (%resect:type-plain-old-data-p decl-type)
+                         :type (parse-type-by-category (%resect:enum-type decl))
+                         :values (nreverse value-alist))
+      (when (and registeredp owner)
+        (add-dependent owner entity))
+      (find-instantiated-type-from-owner entity))))
 
 
 (defmethod parse-type (category (kind (eql :enum)) type)
@@ -577,12 +597,14 @@
                        :parameters nil
                        :variadic nil))))
 
+
 (defun postfix-decorate (name postfix)
   (format nil "~A~@[~A~]" name postfix))
 
 
 (defun parse-methods (entity record-decl &optional postfix)
-  (let (destructor-found
+  (let ((*current-owner* entity)
+        destructor-found
         constructor-found
         pure-virtual-found)
     (resect:docollection (method-decl (%resect:record-methods record-decl))
@@ -598,12 +620,26 @@
           (setf pure-virtual-found t))))
     (resect:docollection (method-decl (%resect:record-methods record-decl))
       (unless (search "= delete" (%resect:declaration-source method-decl))
-        (let* ((name (%resect:declaration-name method-decl))
-               (constructor-p (string= name (foreign-entity-name entity)))
-               (pure-name (if constructor-p
-                              (remove-template-argument-string (foreign-entity-name entity))
-                              name))
-               (destructor-p (starts-with #\~ pure-name))
+        (let* ((pure-method-name (remove-template-argument-string
+                                  (%resect:declaration-name method-decl)))
+               (pure-entity-name (remove-template-argument-string
+                                  (foreign-entity-name entity)))
+               (constructor-p (string= pure-method-name pure-entity-name))
+               (result-type (ensure-const-type-if-needed
+                             (%resect:method-result-type method-decl)
+                             (parse-type-by-category
+                              (%resect:method-result-type method-decl))))
+               (name (cond
+                       (constructor-p (foreign-entity-name entity))
+                       ((and (starts-with-subseq "operator " pure-method-name)
+                             (foreign-named-p result-type)
+                             (string= (format nil "operator ~A"
+                                              (remove-template-argument-string
+                                               (foreign-entity-name result-type)))
+                                      pure-method-name))
+                        (format nil "operator ~A" (foreign-entity-name result-type)))
+                       (t (%resect:declaration-name method-decl))))
+               (destructor-p (starts-with #\~ name))
                (params (parse-parameters (%resect:method-parameters method-decl))))
           (when (and (publicp method-decl)
                      (not (and pure-virtual-found (or destructor-p constructor-p))))
@@ -614,14 +650,11 @@
                              :name name
                              :owner entity
                              :namespace (unless-empty
-                                         (%resect:declaration-namespace record-decl))
+                                         (%resect:declaration-namespace method-decl))
                              :mangled (postfix-decorate (ensure-mangled method-decl) postfix)
                              :location (make-declaration-location method-decl)
 
-                             :result-type (ensure-const-type-if-needed
-                                           (%resect:method-result-type method-decl)
-                                           (parse-type-by-category
-                                            (%resect:method-result-type method-decl)))
+                             :result-type result-type
                              :parameters params
                              :variadic (%resect:method-variadic-p method-decl)
                              :static (eq :static (%resect:method-storage-class method-decl)))))))
@@ -677,6 +710,7 @@
                              :abstract (%resect:record-abstract-p decl)
                              :private (or (foreign-entity-private-p owner)
                                           (not (publicp decl))
+                                          (= (%resect:type-size decl-type) 0)
                                           (not (template-arguments-public-p decl)))))
 
         (when registeredp
@@ -707,8 +741,9 @@
                 (setf (fields-of entity) (nreverse fields))
                 (ensure-inherited-fields entity)))
             (register-instantiated entity decl)
-            (parse-methods entity decl)))
-        (values entity registeredp)))))
+            (on-post-parse
+              (parse-methods entity decl))))
+        (find-instantiated-type-from-owner entity)))))
 
 
 (defun find-instantiated-from-type (from-type)
@@ -773,7 +808,6 @@
     (nreverse params)))
 
 
-
 (defun parse-result-type (decl)
   (ensure-const-type-if-needed
    (%resect:function-result-type decl)
@@ -807,9 +841,9 @@
 (defun register-instantiated-function (template decl)
   (register-entity 'foreign-function
                    :id (%resect:declaration-id decl)
-                   :source (foreign-entity-source template)
                    :name (foreign-entity-name template)
                    :namespace (foreign-entity-namespace template)
+                   :source (foreign-entity-source template)
                    :mangled (ensure-mangled decl)
                    :location (foreign-entity-location template)
                    :result-type (parse-result-type decl)
@@ -854,15 +888,19 @@
                       (if-let ((instantiated (find-instantiated-from-type aliased-type)))
                         instantiated
                         (parse-type-by-category aliased-type)))))
-    (register-entity 'foreign-alias
-                     :id id
-                     :owner owner
-                     :name (%resect:declaration-name decl)
-                     :namespace (unless-empty
-                                 (%resect:declaration-namespace decl))
-                     :mangled (%resect:declaration-mangled-name decl)
-                     :location (make-declaration-location decl)
-                     :enveloped enveloped)))
+    (multiple-value-bind (entity registeredp)
+        (register-entity 'foreign-alias
+                         :id id
+                         :owner owner
+                         :name (%resect:declaration-name decl)
+                         :namespace (unless-empty
+                                     (%resect:declaration-namespace decl))
+                         :mangled (%resect:declaration-mangled-name decl)
+                         :location (make-declaration-location decl)
+                         :enveloped enveloped)
+      (when (and registeredp owner)
+        (add-dependent owner entity))
+      (find-instantiated-type-from-owner entity))))
 
 
 (defmethod parse-type (category (kind (eql :typedef)) type)

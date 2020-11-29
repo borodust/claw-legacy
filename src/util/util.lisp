@@ -30,7 +30,9 @@
            #:remove-template-argument-string
            #:extract-template-argument-string
            #:split-template-argument-string-into-literals
-           #:reformat-template-argument-string))
+           #:reformat-template-argument-string
+           #:split-template-name-into-groups
+           #:join-groups-into-template-name))
 (uiop:define-package :claw.util.infix
   (:use))
 (cl:in-package :claw.util)
@@ -99,6 +101,10 @@
                      do (unless (= last-end len)
                           (push (substring-trim name last-end len) result))
                         (return (values (nreverse result) len))
+                   when (char= (aref name idx) #\,)
+                     do (unless (= last-end idx)
+                          (push (substring-trim name last-end idx) result)
+                          (setf last-end (1+ idx)))
                    when (and (char= (aref name idx) #\>)
                              (not (%weird-char-p (1+ idx))))
                      do (unless (= last-end idx)
@@ -118,17 +124,20 @@
 
 (defun join-groups-into-template-name (groups)
   (format nil "~{~A~}"
-          (loop for group in groups
-                collect (if (listp group)
-                            (format nil "<~A>" (join-groups-into-template-name group))
-                            group))))
+          (loop for (group next) on groups
+                collect (cond
+                          ((listp group)
+                           (format nil "<~A>" (join-groups-into-template-name group)))
+                          ((listp next) group)
+                          (t (format nil "~A," group))))))
 
 
 (defun remove-template-argument-string (name)
   (let* ((groups (split-template-name-into-groups name))
          (last-group (first (last groups))))
-    (when (listp last-group)
-      (join-groups-into-template-name (butlast groups)))))
+    (join-groups-into-template-name (if (listp last-group)
+                                        (butlast groups)
+                                        groups))))
 
 
 (defun extract-template-argument-string (name)

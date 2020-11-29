@@ -133,6 +133,20 @@
   (format nil "~A &" (reconstruct-from-type (%resect:reference-pointee-type type))))
 
 
+(defun reconstruct-typename (type-name)
+  (let ((name (ppcre:regex-replace "typename " type-name "")))
+    (labels ((%reconstruct-replace (groups)
+               (loop for group in groups
+                     collect (if (listp group)
+                                 (%reconstruct-replace group)
+                                 (if-let (replacement (gethash group *template-argument-table*))
+                                   replacement
+                                   group)))))
+      (join-groups-into-template-name
+       (%reconstruct-replace
+        (split-template-name-into-groups name))))))
+
+
 (defmethod reconstruct-type (kind type)
   (declare (ignore kind))
   (let* ((literals (extract-template-literals type))
@@ -140,11 +154,14 @@
                               for replacement = (gethash literal *template-argument-table*)
                               collect (if replacement
                                           replacement
-                                          literal))))
-    (format nil "~A~@[~A~]"
-            (reconstruct-type-name type)
-            (when literals
-              (format-template-argument-string reconstructed)))))
+                                          literal)))
+         (type-name (%resect:type-name type)))
+    (if (search "typename " type-name)
+        (reconstruct-typename type-name)
+        (format nil "~A~@[~A~]"
+                (reconstruct-type-name type)
+                (when literals
+                  (format-template-argument-string reconstructed))))))
 
 
 (defun make-reconstruction-table (decl template-arguments)

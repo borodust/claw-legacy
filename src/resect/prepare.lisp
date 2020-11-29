@@ -3,6 +3,17 @@
 
 (declaim (special *inspector*))
 
+
+(defun wrap-with-namespace (source namespace)
+  (with-output-to-string (result)
+    (let ((namespaces (ppcre:split "::" namespace)))
+      (loop for namespace in namespaces
+            do (format result "~&namespace ~A {" namespace))
+      (format result "~&~A" source)
+      (loop for nil in namespaces
+            do (format result "~&}")))))
+
+
 (defun instantiatablep (decl)
   (when *instantiation-filter*
     (funcall *instantiation-filter* decl)))
@@ -16,7 +27,9 @@
                         (%resect:declaration-id declaration)
                         (format-template-argument-string template-args))
                 *instantiated-functions*)
-       (list (%resect:declaration-name declaration) reconstructred)))))
+       (list (%resect:declaration-name declaration) (wrap-with-namespace
+                                                     reconstructred
+                                                     (%resect:declaration-namespace declaration)))))))
 
 
 (defgeneric prepare-declaration (kind declaration &key &allow-other-keys)
@@ -80,7 +93,7 @@
 
 
 (defun format-template-argument-string (argument-literals)
-  (format nil "<~{~A~^,~}>" argument-literals))
+  (format nil "~@[<~{~A~^,~}>~]" argument-literals))
 
 
 (defun extract-template-literals (type)
@@ -189,19 +202,33 @@
 
 
 (defmethod prepare-header ((inspector implicit-preparing-inspector) uber-path prepared-path)
-  (with-slots (instantiated-classes) inspector
+  (with-slots (instantiated-classes instantiated-functions) inspector
     (alexandria:with-output-to-file (out prepared-path :if-exists :supersede)
       (format out "#ifndef __CLAW_PREPARED_IMPLICIT~%#define __CLAW_PREPARED_IMPLICIT 1")
       (format out "~%~%#include \"~A\"~%~%" (uiop:native-namestring uber-path))
 
       (when-let ((keys (sort (hash-table-keys instantiated-classes) #'string<)))
         (loop for key in keys
-              for source = (gethash key instantiated-classes)
               for counter from 0
-              collect (format out "~%~A ~A~A;" source +instantiation-prefix+ counter)))
+              for source = (gethash key instantiated-classes)
+              do (format out "~%~A" (funcall source counter))))
+
+      (when-let ((functions (sort (hash-table-values instantiated-functions) #'string<
+                                  :key #'first)))
+        (format out "~%")
+        (loop for (nil formatted) in functions
+              collect (format out "~%~A" formatted)))
+
       (format out "~%~%")
       (format out "~%#endif"))))
 
 
 (defmethod prepare-instantiated-source ((this implicit-preparing-inspector) decl)
-  (%resect:type-name (%resect:declaration-type decl)))
+  (let ((name (%resect:type-name (%resect:declaration-type decl)))
+        (namespace (%resect:declaration-namespace decl)))
+    (lambda (postfix)
+      (wrap-with-namespace (format nil "~A ~A~A;"
+                                   name
+                                   +instantiation-prefix+
+                                   postfix)
+                           namespace))))

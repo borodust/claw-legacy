@@ -33,6 +33,7 @@
            #:entity->cffi-type
            #:emulated-primitive-p
            #:anonymousp
+           #:call-shielded-from-unknown
 
            #:void
            #:pointer
