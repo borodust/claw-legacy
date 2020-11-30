@@ -3,6 +3,7 @@
   (:export #:foreign-entity
            #:foreign-entity-source
            #:foreign-entity-private-p
+           #:foreign-entity-forward-p
 
            #:foreign-identified-p
            #:foreign-entity-id
@@ -376,7 +377,15 @@
                :reader foreign-record-abstract-p)
    (private-p :initarg :private
               :initform nil
-              :reader foreign-entity-private-p)))
+              :reader foreign-entity-private-p)
+   (forward-p :initarg :forward
+              :initform nil
+              :reader foreign-entity-forward-p)))
+
+
+(defmethod foreign-entity-forward-p (any)
+  (declare (ignore any))
+  nil)
 
 
 (defclass foreign-struct (foreign-record) ())

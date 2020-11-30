@@ -98,10 +98,16 @@
 
 
 (defun reconstruct-type-name (type)
-  (let ((decl (%resect:type-declaration type)))
+  (let ((decl (%resect:type-declaration type))
+        (type-name (%resect:type-name type)))
     (if (cffi:null-pointer-p decl)
-        (%resect:type-name type)
-        (reconstruct-decl-name decl))))
+        (let ((reconstructed (reconstruct-type :template-parameter type)))
+          (or reconstructed type-name))
+        (format nil "~@[~A ~]~A"
+                (when (or (starts-with "const " type-name)
+                          (%resect:type-const-qualified-p type))
+                  "const")
+                (reconstruct-decl-name decl)))))
 
 
 (defun reconstruct-from-type (type)
@@ -149,19 +155,19 @@
 
 (defmethod reconstruct-type (kind type)
   (declare (ignore kind))
-  (let* ((literals (extract-template-literals type))
-         (reconstructed (loop for literal in literals
-                              for replacement = (gethash literal *template-argument-table*)
-                              collect (if replacement
-                                          replacement
-                                          literal)))
-         (type-name (%resect:type-name type)))
+  (let* ((type-name (%resect:type-name type)))
     (if (search "typename " type-name)
         (reconstruct-typename type-name)
-        (format nil "~A~@[~A~]"
-                (reconstruct-type-name type)
-                (when literals
-                  (format-template-argument-string reconstructed))))))
+        (let* ((literals (extract-template-literals type))
+               (reconstructed (loop for literal in literals
+                                    for replacement = (gethash literal *template-argument-table*)
+                                    collect (if replacement
+                                                replacement
+                                                literal))))
+          (format nil "~A~@[~A~]"
+                  (reconstruct-type-name type)
+                  (when literals
+                    (format-template-argument-string reconstructed)))))))
 
 
 (defun make-reconstruction-table (decl template-arguments)

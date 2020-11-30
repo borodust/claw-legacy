@@ -14,22 +14,37 @@
             do (format result "~&}")))))
 
 
+(defclass declaration-for-instantiation ()
+  ((name :initarg :name :reader declaration-name)
+   (namespace :initarg :namespace :reader declaration-namespace)
+   (parameters :initarg :parameters :reader declaration-template-parameters)))
+
+
 (defun instantiatablep (decl)
-  (when *instantiation-filter*
-    (funcall *instantiation-filter* decl)))
+  (let ((params (mapcar #'%resect:declaration-name (extract-decl-parameters decl))))
+    (when (and *instantiation-filter* params)
+      (funcall *instantiation-filter* (make-instance 'declaration-for-instantiation
+                                                     :name (%resect:declaration-name decl)
+                                                     :namespace (%resect:declaration-namespace decl)
+                                                     :parameters params)))))
 
 
 (defun register-function-if-instantiable (declaration)
   (when-let ((template-args (instantiatablep declaration)))
-    (when-let ((reconstructred (apply #'reconstruct-templated-function declaration template-args)))
+    (when-let ((reconstructred (loop for set in template-args
+                                     for rec = (apply #'reconstruct-templated-function
+                                                      declaration
+                                                      set)
+                                     when rec
+                                       collect (wrap-with-namespace
+                                                rec
+                                                (%resect:declaration-namespace declaration)))))
       (setf
        (gethash (format nil "~A~A"
                         (%resect:declaration-id declaration)
                         (format-template-argument-string template-args))
                 *instantiated-functions*)
-       (list (%resect:declaration-name declaration) (wrap-with-namespace
-                                                     reconstructred
-                                                     (%resect:declaration-namespace declaration)))))))
+       (list (%resect:declaration-name declaration) reconstructred)))))
 
 
 (defgeneric prepare-declaration (kind declaration &key &allow-other-keys)
@@ -217,7 +232,8 @@
                                   :key #'first)))
         (format out "~%")
         (loop for (nil formatted) in functions
-              collect (format out "~%~A" formatted)))
+              do (loop for f in formatted
+                       do (format out "~%~A" f))))
 
       (format out "~%~%")
       (format out "~%#endif"))))

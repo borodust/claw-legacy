@@ -213,13 +213,24 @@
                    :body (format nil "return &~A;" full-name))))
 
 
+(defun check-function-entity-known (entity)
+  (check-entity-known entity)
+  (when (and (not (or (typep entity 'claw.spec:foreign-primitive)
+                      (claw.spec:foreign-entity-forward-p entity)))
+             (claw.spec:foreign-aligned-p entity)
+             (= (claw.spec:foreign-entity-bit-size entity) 0))
+    (signal-unknown-entity entity))
+  (when (claw.spec:foreign-envelope-p entity)
+    (check-function-entity-known (claw.spec:foreign-enveloped-entity entity))))
+
+
 (defun generate-function-binding (entity)
-  (check-entity-known (claw.spec:foreign-function-result-type entity))
+  (check-function-entity-known (claw.spec:foreign-function-result-type entity))
   (loop for param in (claw.spec:foreign-function-parameters entity)
         for unqualified = (claw.spec:unwrap-foreign-entity param)
         when (claw.spec:foreign-entity-private-p unqualified)
           do (signal-unknown-entity unqualified)
-        do (check-entity-known param))
+        do (check-function-entity-known param))
 
   (let* ((adapted-function (adapt-function entity))
          (full-name (claw.spec:format-full-foreign-entity-name entity))
@@ -228,7 +239,7 @@
                        (adapted-function-result-type adapted-function)))
          (params (loop for param in (adapted-function-parameters adapted-function)
                        for name = (c-name->lisp (claw.spec:foreign-entity-name param)
-                                                :parameter)
+                                                :parreameter)
                        for enveloped = (claw.spec:foreign-enveloped-entity param)
                        collect `(,name ,(entity->cffi-type enveloped))))
 

@@ -182,7 +182,8 @@
 
 (defun instantiated-p (decl)
   (and (not (cffi:null-pointer-p (%resect:declaration-template decl)))
-       (> (%resect:type-size (%resect:declaration-type decl)) 0)))
+       (or (> (%resect:type-size (%resect:declaration-type decl)) 0)
+           (%resect:declaration-forward-p decl))))
 
 
 (defun derive-instantiated-id-from-type (type)
@@ -710,8 +711,8 @@
                              :abstract (%resect:record-abstract-p decl)
                              :private (or (foreign-entity-private-p owner)
                                           (not (publicp decl))
-                                          (= (%resect:type-size decl-type) 0)
-                                          (not (template-arguments-public-p decl)))))
+                                          (not (template-arguments-public-p decl)))
+                             :forward (%resect:declaration-forward-p decl)))
 
         (when registeredp
           (when owner
