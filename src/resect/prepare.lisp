@@ -17,16 +17,23 @@
 (defclass declaration-for-instantiation ()
   ((name :initarg :name :reader declaration-name)
    (namespace :initarg :namespace :reader declaration-namespace)
-   (parameters :initarg :parameters :reader declaration-template-parameters)))
+   (parameters :initarg :parameters :reader declaration-template-parameters)
+   (location :initarg :location :reader declaration-location)))
 
 
 (defun instantiatablep (decl)
   (let ((params (mapcar #'%resect:declaration-name (extract-decl-parameters decl))))
     (when (and *instantiation-filter* params)
-      (funcall *instantiation-filter* (make-instance 'declaration-for-instantiation
-                                                     :name (%resect:declaration-name decl)
-                                                     :namespace (%resect:declaration-namespace decl)
-                                                     :parameters params)))))
+      (let* ((location (%resect:declaration-location decl))
+             (location-string (format nil "~A:~A:~A"
+                                      (%resect:location-name location)
+                                      (%resect:location-line location)
+                                      (%resect:location-column location))))
+        (funcall *instantiation-filter* (make-instance 'declaration-for-instantiation
+                                                       :name (%resect:declaration-name decl)
+                                                       :namespace (%resect:declaration-namespace decl)
+                                                       :parameters params
+                                                       :location location-string))))))
 
 
 (defun register-function-if-instantiable (declaration)

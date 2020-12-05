@@ -176,8 +176,8 @@
                                       until (cffi:null-pointer-p owner)
                                       collect (extract-decl-parameters owner) into result
                                       finally (return (flatten (nreverse result)))))
-         (template-params (mapcar #'%resect:declaration-name
-                                  (append owner-template-params (extract-decl-parameters decl)))))
+         (template-params (mapcar #'%resect:declaration-name (extract-decl-parameters decl))))
+    ;; TODO: should we use owner-template-params here?
     (when (= (length template-params) (length template-arguments))
       (loop with table = (make-hash-table :test 'equal)
             for param in template-params
