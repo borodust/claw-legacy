@@ -23,8 +23,6 @@
 (define-condition intricate-condition (serious-condition)
   (handle))
 
-(defvar *function-table* (make-hash-table :test 'equal))
-
 (defvar *function-pointer-extractor-table* (make-hash-table :test 'equal))
 
 (defvar *intricate-table* (make-hash-table))
@@ -33,24 +31,7 @@
 
 (defvar *record-table* (make-hash-table))
 
-(defvar *alias-table* (make-hash-table :test 'equal))
-
 (initialize-iffi)
-
-
-;;;
-;;;
-;;;
-(defun find-intricate-aliases (name)
-  (gethash name *alias-table*))
-
-
-(defun register-intricate-alias (new-alias origin)
-  (let ((new-set (union (list new-alias origin)
-                        (union (gethash new-alias *alias-table*)
-                               (gethash origin *alias-table*)))))
-    (loop for alias in new-set
-          do (setf (gethash alias *alias-table*) new-set))))
 
 
 ;;;
@@ -70,26 +51,6 @@
     (setf (assoc-value (gethash name *doc-table*) arg-types :test #'equal) docstring
           (documentation (symbol-function name) t) (format-docs)))
   docstring)
-
-
-(defun (setf intricate-function) (value name &rest arg-types)
-  (setf (gethash (list* name arg-types) *function-table*) value))
-
-
-(defun intricate-function (name &rest arg-types)
-  (labels ((aliases (type)
-             (append
-              (list* type (find-intricate-aliases type))
-              (when (and (listp type)
-                         (eq (first type) :pointer))
-                (loop for pointer-type-alias in (find-intricate-aliases (second type))
-                      collect `(:pointer ,pointer-type-alias)))))
-           (find-intricate-function (types aliases)
-             (if aliases
-                 (loop for alias in (first aliases)
-                         thereis (find-intricate-function (list* alias types) (rest aliases)))
-                 (gethash (list* name (reverse types)) *function-table*))))
-    (find-intricate-function nil (mapcar #'aliases arg-types))))
 
 
 (defun (setf intricate-function-pointer-extractor) (value name &rest arg-types)
@@ -459,7 +420,7 @@
 (defmacro defitype (alias origin)
   `(progn
      (cffi:defctype ,alias ,origin)
-     (register-intricate-alias ',alias ',origin)))
+     (register-intricate-alias ',origin ',alias)))
 
 ;;;
 ;;; INSTANCE

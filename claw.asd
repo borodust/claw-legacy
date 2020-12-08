@@ -111,6 +111,7 @@
   :pathname "src/iffi/"
   :serial t
   :components ((:file "packages")
+               (:file "function-index")
                (:file "iffi")))
 
 

@@ -102,10 +102,11 @@
 
 (defun entity->cffi-type (entity &key (qualify-records *qualify-records*))
   (labels ((%enveloped-entity ()
-             (claw.spec:foreign-enveloped-entity entity))
+             (claw.spec:unqualify-foreign-entity (claw.spec:foreign-enveloped-entity entity)))
            (%enveloped-char-p ()
-             (and (claw.spec:foreign-named-p (%enveloped-entity))
-                  (string= "char" (claw.spec:foreign-entity-name (%enveloped-entity)))))
+             (let ((unwrapped (%enveloped-entity)))
+               (and (typep unwrapped 'claw.spec:foreign-primitive)
+                    (string= "char" (claw.spec:foreign-entity-name unwrapped)))))
            (%lisp-name ()
              (get-overriden-type
               (name->cffi-type (let ((full-name (and (claw.spec:foreign-named-p entity)
@@ -114,7 +115,7 @@
                                      (claw.spec:foreign-entity-id entity)
                                      full-name))))))
     (typecase entity
-      (claw.spec:foreign-pointer (if (%enveloped-char-p)
+      (claw.spec:foreign-pointer (if (and *recognize-strings-p* (%enveloped-char-p))
                                      (get-overriden-type :string)
                                      (list :pointer (entity->cffi-type
                                                      (%enveloped-entity)
