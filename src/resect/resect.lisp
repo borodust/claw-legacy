@@ -108,7 +108,7 @@
                                            intrinsics
                                            &key)
   (declare (ignore header-path includes frameworks language standard target intrinsics))
-  (loop for hook in *post-parse-hooks*
+  (loop for hook in (reverse *post-parse-hooks*)
         do (funcall hook)))
 
 
@@ -641,24 +641,28 @@
                         (format nil "operator ~A" (foreign-entity-name result-type)))
                        (t (%resect:declaration-name method-decl))))
                (destructor-p (starts-with #\~ name))
-               (params (parse-parameters (%resect:method-parameters method-decl))))
+               (params (parse-parameters (%resect:method-parameters method-decl)))
+               (mangled-name (postfix-decorate (ensure-mangled method-decl) postfix)))
           (when (and (publicp method-decl)
                      (not (and pure-virtual-found (or destructor-p constructor-p))))
-            (register-entity 'foreign-method
-                             :id (postfix-decorate (%resect:declaration-id method-decl)
-                                                   postfix)
-                             :source (%resect:declaration-source method-decl)
-                             :name name
-                             :owner entity
-                             :namespace (unless-empty
-                                         (%resect:declaration-namespace method-decl))
-                             :mangled (postfix-decorate (ensure-mangled method-decl) postfix)
-                             :location (make-declaration-location method-decl)
+            (multiple-value-bind (method newp)
+                (register-entity 'foreign-method
+                                 :id (postfix-decorate (%resect:declaration-id method-decl)
+                                                       postfix)
+                                 :source (%resect:declaration-source method-decl)
+                                 :name name
+                                 :owner entity
+                                 :namespace (unless-empty
+                                             (%resect:declaration-namespace method-decl))
+                                 :mangled mangled-name
+                                 :location (make-declaration-location method-decl)
 
-                             :result-type result-type
-                             :parameters params
-                             :variadic (%resect:method-variadic-p method-decl)
-                             :static (eq :static (%resect:method-storage-class method-decl)))))))
+                                 :result-type result-type
+                                 :parameters params
+                                 :variadic (%resect:method-variadic-p method-decl)
+                                 :static (eq :static (%resect:method-storage-class method-decl)))
+              (when newp
+                (setf (gethash mangled-name *mangled-table*) method)))))))
     (unless (or (claw.spec:foreign-record-abstract-p entity)
                 pure-virtual-found
                 (not (claw.spec:foreign-entity-name entity))
@@ -810,9 +814,12 @@
 
 
 (defun parse-result-type (decl)
-  (ensure-const-type-if-needed
-   (%resect:function-result-type decl)
-   (parse-type-by-category (%resect:function-result-type decl))))
+  (let ((type (if (eq :function (%resect:declaration-kind decl))
+                  (%resect:function-result-type decl)
+                  (%resect:method-result-type decl))))
+    (ensure-const-type-if-needed
+     type
+     (parse-type-by-category type))))
 
 
 (defun register-function (decl)
@@ -840,27 +847,43 @@
 
 
 (defun register-instantiated-function (template decl)
-  (register-entity 'foreign-function
-                   :id (%resect:declaration-id decl)
-                   :name (foreign-entity-name template)
-                   :namespace (foreign-entity-namespace template)
-                   :source (foreign-entity-source template)
-                   :mangled (ensure-mangled decl)
-                   :location (foreign-entity-location template)
-                   :result-type (parse-result-type decl)
-                   :parameters (parse-parameters (%resect:function-parameters decl))
-                   :variadic (foreign-function-variadic-p template)
-                   :entity-parameters nil
-                   :entity-arguments nil))
+  (let ((params (parse-parameters (%resect:function-parameters decl))))
+    (if (typep template 'foreign-method)
+        (register-entity 'foreign-method
+                         :id (%resect:declaration-id decl)
+                         :name (foreign-entity-name template)
+                         :namespace (foreign-entity-namespace template)
+                         :source (foreign-entity-source template)
+                         :mangled (ensure-mangled decl)
+                         :location (foreign-entity-location template)
+                         :result-type (parse-result-type decl)
+                         :parameters (rest params)
+                         :owner (foreign-enveloped-entity (first params))
+                         :variadic (foreign-function-variadic-p template)
+                         :entity-parameters nil
+                         :entity-arguments nil)
+        (register-entity 'foreign-function
+                         :id (%resect:declaration-id decl)
+                         :name (foreign-entity-name template)
+                         :namespace (foreign-entity-namespace template)
+                         :source (foreign-entity-source template)
+                         :mangled (ensure-mangled decl)
+                         :location (foreign-entity-location template)
+                         :result-type (parse-result-type decl)
+                         :parameters params
+                         :variadic (foreign-function-variadic-p template)
+                         :entity-parameters nil
+                         :entity-arguments nil))))
 
 
 (defmethod parse-declaration ((type (eql :function)) decl &key)
   (if (starts-with-subseq +instantiation-prefix+ (%resect:declaration-name decl))
-      (let ((template-mangled-name (subseq (%resect:declaration-name decl)
-                                           (length +instantiation-prefix+))))
-        (if-let ((template (gethash template-mangled-name *mangled-table*)))
-          (register-instantiated-function template decl)
-          (warn "Template with mangled name ~A not found" template-mangled-name)))
+      (on-post-parse
+        (let ((template-mangled-name (subseq (%resect:declaration-name decl)
+                                             (length +instantiation-prefix+))))
+          (if-let ((template (gethash template-mangled-name *mangled-table*)))
+            (register-instantiated-function template decl)
+            (warn "Template with mangled name ~A not found" template-mangled-name))))
       (register-function decl)))
 
 

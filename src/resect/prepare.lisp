@@ -18,22 +18,30 @@
   ((name :initarg :name :reader declaration-name)
    (namespace :initarg :namespace :reader declaration-namespace)
    (parameters :initarg :parameters :reader declaration-template-parameters)
+   (owner :initarg :owner :reader declaration-owner)
    (location :initarg :location :reader declaration-location)))
 
 
+(defun make-declaration-for-instantiation (decl)
+  (let* ((params (mapcar #'%resect:declaration-name (extract-decl-parameters decl)))
+         (location (%resect:declaration-location decl))
+         (location-string (format nil "~A:~A:~A"
+                                  (%resect:location-name location)
+                                  (%resect:location-line location)
+                                  (%resect:location-column location)))
+         (owner (%resect:declaration-owner decl)))
+    (make-instance 'declaration-for-instantiation
+                   :name (%resect:declaration-name decl)
+                   :namespace (%resect:declaration-namespace decl)
+                   :parameters params
+                   :location location-string
+                   :owner (unless (cffi:null-pointer-p owner)
+                            (make-declaration-for-instantiation owner)))))
+
+
 (defun instantiatablep (decl)
-  (let ((params (mapcar #'%resect:declaration-name (extract-decl-parameters decl))))
-    (when (and *instantiation-filter* params)
-      (let* ((location (%resect:declaration-location decl))
-             (location-string (format nil "~A:~A:~A"
-                                      (%resect:location-name location)
-                                      (%resect:location-line location)
-                                      (%resect:location-column location))))
-        (funcall *instantiation-filter* (make-instance 'declaration-for-instantiation
-                                                       :name (%resect:declaration-name decl)
-                                                       :namespace (%resect:declaration-namespace decl)
-                                                       :parameters params
-                                                       :location location-string))))))
+  (when (and *instantiation-filter* (extract-decl-parameters decl))
+    (funcall *instantiation-filter* (make-declaration-for-instantiation decl))))
 
 
 (defun register-function-if-instantiable (declaration)

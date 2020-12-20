@@ -171,19 +171,24 @@
 
 
 (defun make-reconstruction-table (decl template-arguments)
-  (let* ((owner-template-params (loop for owner = (%resect:declaration-owner decl)
-                                        then (%resect:declaration-owner owner)
-                                      until (cffi:null-pointer-p owner)
-                                      collect (extract-decl-parameters owner) into result
-                                      finally (return (flatten (nreverse result)))))
-         (template-params (mapcar #'%resect:declaration-name (extract-decl-parameters decl))))
-    ;; TODO: should we use owner-template-params here?
-    (when (= (length template-params) (length template-arguments))
-      (loop with table = (make-hash-table :test 'equal)
-            for param in template-params
-            for arg in template-arguments
-            do (setf (gethash param table) arg)
-            finally (return table)))))
+  (flet ((%parse-param (param)
+           (list (%resect:declaration-name param)
+                 (not (position #\= (%resect:declaration-source param))))))
+    (let* ((owner-template-params (loop for owner = (%resect:declaration-owner decl)
+                                          then (%resect:declaration-owner owner)
+                                        until (cffi:null-pointer-p owner)
+                                        collect (extract-decl-parameters owner) into result
+                                        finally (return (flatten (nreverse result)))))
+           (template-params (mapcar #'%parse-param (extract-decl-parameters decl)))
+           (required-param-len (or (position nil template-params :key #'second)
+                                   (length template-params))))
+      ;; TODO: should we use owner-template-params here?
+      (when (<= required-param-len (length template-arguments))
+        (loop with table = (make-hash-table :test 'equal)
+              for param in (mapcar #'first template-params)
+              for arg in template-arguments
+              do (setf (gethash param table) arg)
+              finally (return table))))))
 
 
 (defun reconstruct-templated-function (decl &rest template-arguments)
@@ -196,7 +201,7 @@
                                            (%resect:method-parameters decl)
                                            (%resect:function-parameters decl)))
         (push (reconstruct-from-type (%resect:declaration-type param-decl)) params))
-      (format nil "~A ~A~A(~@[~A*, ~]~{~A~^, ~});"
+      (format nil "~A ~A~A(~@[~A, ~]~{~A~^, ~});"
               (reconstruct-from-type (if method-p
                                          (%resect:method-result-type decl)
                                          (%resect:function-result-type decl)))
@@ -204,5 +209,5 @@
               (ensure-mangled decl)
               (unless (or (cffi:null-pointer-p owner)
                           (eq :static (%resect:method-storage-class decl)))
-                (reconstruct-from-type owner))
+                (reconstruct-from-type (%resect:declaration-type owner)))
               (nreverse params)))))

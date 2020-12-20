@@ -283,3 +283,7 @@
               (and (claw.spec:foreign-record-abstract-p (claw.spec:foreign-owner entity))
                    (claw.spec:foreign-constructor-p entity)))
     (generate-function-binding entity)))
+
+
+(defmethod foreign-entity-dependencies ((entity claw.spec:foreign-method))
+  (append (list (claw.spec:foreign-owner entity)) (call-next-method)))
