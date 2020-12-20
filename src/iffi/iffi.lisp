@@ -417,9 +417,9 @@
 ;;;
 ;;; ALIAS
 ;;;
-(defmacro defitype (alias origin)
+(defmacro defitype (alias origin &optional documentation)
   `(progn
-     (cffi:defctype ,alias ,origin)
+     (cffi:defctype ,alias ,origin ,@(when documentation `(,documentation)))
      (register-intricate-alias ',origin ',alias)))
 
 ;;;

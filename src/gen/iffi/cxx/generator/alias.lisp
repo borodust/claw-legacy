@@ -11,4 +11,5 @@
     (unless (or (claw.spec:foreign-entity-private-p entity)
                 ;; next happens with typedefs for records with the same name
                 (eq id aliased-type))
-      `((iffi:defitype ,id ,aliased-type)))))
+      `((iffi:defitype ,id ,aliased-type
+          ,(claw.spec:format-foreign-location (claw.spec:foreign-entity-location entity)))))))

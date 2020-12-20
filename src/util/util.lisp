@@ -373,7 +373,7 @@
   (let* ((string (ppcre:regex-replace-all "([A-Z]+)([A-Z][a-z])" string "\\1_\\2"))
          (string (ppcre:regex-replace-all "([A-Z]+)([A-Z][a-z])" string "\\1_\\2"))
          (string (ppcre:regex-replace-all "([a-z]+)([A-Z])" string "\\1_\\2"))
-         (string (ppcre:regex-replace-all "\\:\\:|\\s" string "_"))
+         (string (ppcre:regex-replace-all "\\:\\:|\\s" string "+"))
          (string (ppcre:regex-replace-all "," string "+"))
          (string (if (ppcre:all-matches "^(:_|_)" string)
                      (let ((position (position #\_ string :test (complement #'equal))))
