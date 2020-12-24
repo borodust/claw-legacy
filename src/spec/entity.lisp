@@ -75,6 +75,7 @@
 
            #:foreign-method
            #:foreign-method-static-p
+           #:foreign-method-const-p
 
            #:foreign-variable
            #:foreing-variable-type
@@ -435,7 +436,10 @@
 (defclass foreign-method (foreign-function)
   ((static-p :initarg :static
              :initform nil
-             :reader foreign-method-static-p)))
+             :reader foreign-method-static-p)
+   (const-p :initarg :const
+             :initform nil
+             :reader foreign-method-const-p)))
 
 
 ;;;

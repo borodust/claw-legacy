@@ -63,35 +63,45 @@
 
 
 (defun intricate-funcall (name &rest args)
-  (loop for (type . rest) on args by #'cddr
-        unless rest
-          do (error "Odd number of arguments: ~A" args)
-        collect type into arg-types
-        collect (first rest) into arg-values
-        finally (return (if-let ((fu (apply #'intricate-function name arg-types)))
-                          (apply fu arg-values)
-                          (error "Intricate function with signature ~A ~A not found" name arg-types)))))
+  (let* ((const-p (eq (first args) :const))
+         (args (if const-p (rest args) args)))
+    (loop for (type . rest) on args by #'cddr
+          unless rest
+            do (error "Odd number of arguments: ~A" args)
+          collect type into arg-types
+          collect (first rest) into arg-values
+          finally (return (let ((arg-types (append (when const-p
+                                                     (list :const))
+                                                   arg-types)))
+                            (if-let ((fu (apply #'intricate-function name arg-types)))
+                              (apply fu arg-values)
+                              (error "Intricate function with signature ~A ~A not found" name arg-types)))))))
 
 
 (define-compiler-macro intricate-funcall (&whole whole name &rest args)
-  (loop for (type . rest) on args by #'cddr
-        unless rest
-          do (error "Odd number of arguments: ~A" args)
-        collect (if-let ((actual (find-quoted type)))
-                  actual
-                  (progn
-                    (warn "Passing argument types dynamically is discouraged. Invocation: ~A " whole)
-                    (return whole)))
-          into arg-types
-        collect (first rest) into arg-values
-        finally (return
-                  (if-let ((quoted (find-quoted name)))
-                    (if-let ((function (apply #'intricate-function quoted arg-types)))
-                      `(,function ,@arg-values)
-                      (progn
-                        (warn "Function ~A is not defined for parameters ~A " quoted arg-types)
-                        whole))
-                    whole))))
+  (let* ((const-p (eq (first args) :const))
+         (args (if const-p (rest args) args)))
+    (loop for (type . rest) on args by #'cddr
+          unless rest
+            do (error "Odd number of arguments: ~A" args)
+          collect (if-let ((actual (find-quoted type)))
+                    actual
+                    (progn
+                      (warn "Passing argument types dynamically is discouraged. Invocation: ~A " whole)
+                      (return whole)))
+            into arg-types
+          collect (first rest) into arg-values
+          finally (return
+                    (if-let ((quoted (find-quoted name)))
+                      (let ((arg-types (append (when const-p
+                                                 (list :const))
+                                               arg-types)))
+                        (if-let ((function (apply #'intricate-function quoted arg-types)))
+                          `(,function ,@arg-values)
+                          (progn
+                            (warn "Function ~A is not defined for parameters ~A " quoted arg-types)
+                            whole)))
+                      whole)))))
 
 
 (defun expand-intricate-function-body (name arguments)
@@ -102,7 +112,8 @@
     (let (doc
           arg-config
           cffi-opts
-          pointer-extractor)
+          pointer-extractor
+          const-p)
       (if (stringp (first configuration))
           (setf doc (first configuration)
                 arg-config (rest configuration))
@@ -110,6 +121,7 @@
       (loop for (name value) on opts by #'cddr
             do (case name
                  (:pointer-extractor (setf pointer-extractor value))
+                 (:non-mutating (setf const-p value))
                  (t (setf cffi-opts (list* name value cffi-opts)))))
       (let* ((arg-types (loop for arg in arg-config
                               for type = (if (eq arg '&rest)
@@ -121,7 +133,12 @@
         `(progn
            (declaim (inline ,cfun-name))
            (cffi:defcfun (,mangled ,cfun-name ,@(nreverse cffi-opts)) ,result-type ,@configuration)
-           (setf (intricate-function ',name ,@arg-types) ',cfun-name)
+           (setf
+            (intricate-function ',name
+                                ,@(when const-p
+                                    '(:const))
+                                ,@arg-types)
+            ',cfun-name)
            ,@(when pointer-extractor
                (let ((extractor-cfun-name (symbolicate cfun-name '$pointer-extractor)))
                  `((cffi:defcfun (,pointer-extractor ,extractor-cfun-name) :pointer)
@@ -136,7 +153,12 @@
                  (define-compiler-macro ,name (&rest arguments)
                    (expand-intricate-function-body ',name arguments))))
            ,@(when doc
-               `((setf (intricate-documentation ',name ,@arg-types) ,doc))))))))
+               `((setf
+                  (intricate-documentation ',name
+                                           ,@(when const-p
+                                               '(:const))
+                                           ,@arg-types)
+                  ,doc))))))))
 
 
 ;;;

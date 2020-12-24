@@ -247,8 +247,12 @@
          (extractor-cname (when (function-pointer-extractor-required-p full-name)
                             (register-adapted-function (adapt-pointer-extractor entity)))))
     (export-symbol name)
-    `((iffi:defifun (,adapted-cname ,name ,@(when extractor-cname
-                                              `(:pointer-extractor ,extractor-cname)))
+    `((iffi:defifun (,adapted-cname ,name
+                                    ,@(when extractor-cname
+                                        `(:pointer-extractor ,extractor-cname))
+                                    ,@(when (and (typep entity 'claw.spec:foreign-method)
+                                                 (claw.spec:foreign-method-const-p entity))
+                                        `(:non-mutating t)))
           ,result-type
         ,(claw.spec:format-foreign-location (claw.spec:foreign-entity-location entity))
         ,@params

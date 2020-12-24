@@ -660,7 +660,8 @@
                                  :result-type result-type
                                  :parameters params
                                  :variadic (%resect:method-variadic-p method-decl)
-                                 :static (eq :static (%resect:method-storage-class method-decl)))
+                                 :static (eq :static (%resect:method-storage-class method-decl))
+                                 :const (%resect:method-const-p method-decl))
               (when newp
                 (setf (gethash mangled-name *mangled-table*) method)))))))
     (unless (or (claw.spec:foreign-record-abstract-p entity)
