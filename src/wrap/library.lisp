@@ -9,6 +9,10 @@
 
 (defgeneric generate-bindings (generator language wrapper configuration))
 
+(defgeneric bindings-definition (bindings))
+(defgeneric unexport-bindings (bindings))
+(defgeneric reexport-bindings (bindings))
+
 (defgeneric describe-foreign-library (parser headers
                                       &key
                                         includes

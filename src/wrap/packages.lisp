@@ -17,6 +17,9 @@
            #:merge-wrapper-pathname
 
            #:generate-bindings
+           #:bindings-definition
+           #:unexport-bindings
+           #:reexport-bindings
 
            #:describe-foreign-library
            #:foreign-library-entities
@@ -24,4 +27,4 @@
 
 
 (uiop:define-package :%claw.wrapper.pristine
-  (:use))
+  (:use :cl))

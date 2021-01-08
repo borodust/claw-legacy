@@ -70,6 +70,28 @@
           (merge-hash-table *adapted-function-table* local-adapted-table))))))
 
 
+
+(defclass bindings ()
+  ((definitions :initarg :definitions :reader claw.wrapper:bindings-definition)
+   (exported-symbols :initarg :exported-symbols)))
+
+
+(defmethod claw.wrapper:unexport-bindings ((this bindings))
+  (with-slots (exported-symbols) this
+    (loop for sym in exported-symbols
+          for sym-package = (symbol-package sym)
+          when (find-symbol (symbol-name sym) sym-package)
+            do (unexport sym sym-package))))
+
+
+(defmethod claw.wrapper:reexport-bindings ((this bindings))
+  (with-slots (exported-symbols) this
+    (loop for sym in exported-symbols
+          for sym-package = (symbol-package sym)
+          when (find-symbol (symbol-name sym) sym-package)
+            do (export sym sym-package))))
+
+
 (defun explode-library-definition (generator language wrapper configuration)
   (let ((entities (claw.wrapper:wrapper-entities wrapper)))
     (destructuring-bind (&key in-package
@@ -120,11 +142,14 @@
                            do (push bing bindings))))
           (when *adapter*
             (generate-adapter-file *adapter*))
-          `(,@(nreverse bindings)
-            ,@(loop for symbol being the hash-key of *export-table*
-                    collect `(export ',symbol ,(package-name (symbol-package symbol))))
-            ,@(when *adapter*
-                (expand-adapter-routines *adapter* wrapper))))))))
+          (make-instance
+           'bindings
+           :definitions `(,@(nreverse bindings)
+                          ,@(loop for symbol being the hash-key of *export-table*
+                                  collect `(export ',symbol ,(package-name (symbol-package symbol))))
+                          ,@(when *adapter*
+                              (expand-adapter-routines *adapter* wrapper)))
+           :exported-symbols (hash-table-keys *export-table*)))))))
 
 
 (defclass generator () ())

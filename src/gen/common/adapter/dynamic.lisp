@@ -84,12 +84,13 @@
 
 
 (defun build-dynamic-adapter (standard adapter-file includes target-file
-                              &key pedantic compiler flags intrinsics)
+                              &key pedantic compiler flags intrinsics dependencies)
   (%build-adapter standard adapter-file includes target-file
                   :pedantic pedantic
                   :compiler compiler
                   :flags flags
-                  :intrinsics intrinsics))
+                  :intrinsics intrinsics
+                  :dependencies dependencies))
 
 
 (defun %verify-adapter-initialization (result)
