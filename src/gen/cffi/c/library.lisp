@@ -4,6 +4,10 @@
 (defclass cffi-generator (generator) ())
 
 
+(defmethod list-required-systems ((this cffi-generator))
+  '(:cffi))
+
+
 (defmethod claw.wrapper:generate-bindings ((generator (eql :claw/cffi))
                                            (language (eql :c))
                                            wrapper

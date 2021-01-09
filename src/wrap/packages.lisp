@@ -18,6 +18,8 @@
 
            #:generate-bindings
            #:bindings-definition
+           #:bindings-required-systems
+           #:bindings-required-packages
            #:unexport-bindings
            #:reexport-bindings
 
@@ -27,4 +29,7 @@
 
 
 (uiop:define-package :%claw.wrapper.pristine
+  (:use))
+
+(uiop:define-package :%claw.wrapper.cl
   (:use :cl))

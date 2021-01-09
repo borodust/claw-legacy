@@ -4,6 +4,10 @@
 (defclass iffi-generator (generator) ())
 
 
+(defmethod list-required-systems ((this iffi-generator))
+  '(:cffi :iffi))
+
+
 (defun fill-construction-table (entities)
   (loop for entity in entities
         when (typep entity 'claw.spec:foreign-method)

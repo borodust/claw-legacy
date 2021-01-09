@@ -12,6 +12,8 @@
 (defgeneric bindings-definition (bindings))
 (defgeneric unexport-bindings (bindings))
 (defgeneric reexport-bindings (bindings))
+(defgeneric bindings-required-systems (bindings))
+(defgeneric bindings-required-packages (bindings))
 
 (defgeneric describe-foreign-library (parser headers
                                       &key

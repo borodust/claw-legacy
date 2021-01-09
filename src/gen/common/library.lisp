@@ -22,6 +22,7 @@
   entity)
 
 
+(defgeneric list-required-systems (generator))
 (defgeneric generate-binding (generator entity &key &allow-other-keys))
 (defgeneric generate-forward-declaration (generator entity &key &allow-other-keys))
 
@@ -73,7 +74,9 @@
 
 (defclass bindings ()
   ((definitions :initarg :definitions :reader claw.wrapper:bindings-definition)
-   (exported-symbols :initarg :exported-symbols)))
+   (exported-symbols :initarg :exported-symbols)
+   (required-systems :initarg :required-systems :reader claw.wrapper:bindings-required-systems)
+   (required-packages :initarg :required-packages :reader claw.wrapper:bindings-required-packages)))
 
 
 (defmethod claw.wrapper:unexport-bindings ((this bindings))
@@ -133,6 +136,7 @@
             (*entities* (remove-if (eval ignore-entities)
                                    (stable-sort entities #'string<
                                                 :key #'claw.spec:foreign-entity-id))))
+        (uiop:ensure-package in-package :use nil)
         (with-symbol-renaming (in-package rename-symbols)
           (loop for entity in *entities*
                 do (let ((*dependency-type-list* nil)
@@ -149,7 +153,9 @@
                                   collect `(export ',symbol ,(package-name (symbol-package symbol))))
                           ,@(when *adapter*
                               (expand-adapter-routines *adapter* wrapper)))
-           :exported-symbols (hash-table-keys *export-table*)))))))
+           :exported-symbols (hash-table-keys *export-table*)
+           :required-systems (list-required-systems generator)
+           :required-packages (list in-package)))))))
 
 
 (defclass generator () ())

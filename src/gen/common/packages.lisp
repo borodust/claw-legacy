@@ -41,4 +41,5 @@
            #:unsigned-long-long
            #:parameter
 
-           #:generator))
+           #:generator
+           #:list-required-systems))
