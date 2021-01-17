@@ -173,29 +173,34 @@
       (marked-included-p (foreign-entity-id entity))))
 
 
+(defun create-scanner (regex)
+  (ppcre:create-scanner regex :single-line-mode t :extended-mode t))
+
+
+(defun create-scanners (regexps)
+  (mapcar #'create-scanner regexps))
+
+
+(defmacro with-scanners ((include-definitions
+                          include-sources
+                          exclude-definitions
+                          exclude-sources) &body body)
+  `(let ((*include-definitions* (create-scanners ,include-definitions))
+         (*exclude-definitions* (create-scanners ,exclude-definitions))
+         (*include-sources* (create-scanners ,include-sources))
+         (*exclude-sources* (create-scanners ,exclude-sources)))
+     ,@body))
 ;;;
 ;;;
 ;;;
-(defun make-inclusion-table (entities
-                             include-definitions
-                             include-sources
-                             exclude-definitions
-                             exclude-sources)
-  (labels ((create-scanner (regex)
-             (ppcre:create-scanner regex :single-line-mode t :extended-mode t))
-           (create-scanners (regexps)
-             (mapcar #'create-scanner regexps)))
-    (let ((*inclusion-table* (make-hash-table :test 'equal))
-          (*include-definitions* (create-scanners include-definitions))
-          (*exclude-definitions* (create-scanners exclude-definitions))
-          (*include-sources* (create-scanners include-sources))
-          (*exclude-sources* (create-scanners exclude-sources)))
-      (loop for entity in entities
-            for entity-id = (foreign-entity-id entity)
-            do (cond
-                 ((starts-with-subseq +instantiation-prefix+ (foreign-entity-name entity))
-                  (mark-included entity-id t))
-                 ((entity-explicitly-excluded-p entity)
-                  (mark-excluded entity-id))
-                 (t (try-including-entity entity))))
-      *inclusion-table*)))
+(defun make-inclusion-table (entities)
+  (let ((*inclusion-table* (make-hash-table :test 'equal)))
+    (loop for entity in entities
+          for entity-id = (foreign-entity-id entity)
+          do (cond
+               ((starts-with-subseq +instantiation-prefix+ (foreign-entity-name entity))
+                (mark-included entity-id t))
+               ((entity-explicitly-excluded-p entity)
+                (mark-excluded entity-id))
+               (t (try-including-entity entity))))
+    *inclusion-table*))

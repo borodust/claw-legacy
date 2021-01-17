@@ -678,9 +678,16 @@
 
 
 (defun ensure-inherited-fields (entity)
-  (let ((owner (foreign-owner entity))
-        (fields (fields-of entity)))
+  (let* ((owner (foreign-owner entity))
+         (fields (fields-of entity))
+         (owner-has-field (when owner
+                            (loop for owner-field in (foreign-record-fields owner)
+                                  for unwrapped-type = (unwrap-foreign-entity owner-field)
+                                    thereis (and (foreign-identified-p unwrapped-type)
+                                                 (string= (foreign-entity-id unwrapped-type)
+                                                          (foreign-entity-id entity)))))))
     (when (and (not (foreign-entity-name entity))
+               (not owner-has-field)
                fields
                (typep owner 'resect-record))
       (loop for field in fields
@@ -694,7 +701,8 @@
         fields)
     (resect:docollection (field-decl (%resect:type-fields (%resect:declaration-type decl)))
       (when (publicp field-decl)
-        (let ((field-type (%resect:declaration-type field-decl)))
+        (let ((field-type (%resect:declaration-type field-decl))
+              (*field* t))
           (push (make-instance 'foreign-record-field
                                :name (%resect:declaration-name field-decl)
                                :location (make-declaration-location field-decl)
@@ -741,7 +749,6 @@
                                           (not (publicp decl))
                                           (not (template-arguments-public-p decl)))
                              :forward (%resect:declaration-forward-p decl)))
-
         (when registeredp
           (when owner
             (add-dependent owner entity))
