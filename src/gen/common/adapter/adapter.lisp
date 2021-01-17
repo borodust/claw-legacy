@@ -2,6 +2,8 @@
 
 
 (defvar *lib-name-regex* (ppcre:create-scanner "^lib(.*)\\..*$"))
+(defparameter *generated-adapters* (make-hash-table :test 'equal))
+
 
 (defgeneric generate-adapter-file (adapter))
 (defgeneric build-adapter (wrapper-name &key target dependencies compiler flags))
@@ -16,7 +18,8 @@
    (includes :reader includes-of)
    (defines :initform nil :reader defines-of)
    (intrinsics :initform nil :reader intrinsics-of)
-   (pointer-extractor-predicate :initform nil :reader pointer-extractor-predicate-of)))
+   (pointer-extractor-predicate :initform nil :reader pointer-extractor-predicate-of)
+   (target :initform nil :reader target-of)))
 
 
 (defmethod adapted-functions ()
@@ -26,7 +29,7 @@
 (defmethod initialize-instance :after ((this adapter) &key wrapper path extract-pointers)
   (with-slots (wrapper-name wrapper-last-update-time
                adapter-file headers standard includes defines
-               intrinsics pointer-extractor-predicate)
+               intrinsics pointer-extractor-predicate target)
       this
     (let ((opts (claw.wrapper:wrapper-options wrapper))
           (extractor-regexes (loop for regex in extract-pointers
@@ -44,6 +47,7 @@
               includes (claw.wrapper:wrapper-options-includes opts)
               defines (claw.wrapper:wrapper-options-defines opts)
               intrinsics (claw.wrapper:wrapper-options-intrinsics opts)
+              target (claw.wrapper:wrapper-target wrapper)
               pointer-extractor-predicate #'%extractor-predicate)))))
 
 
@@ -150,8 +154,16 @@
 
 
 (defun %adapter-needs-rebuilding-p (this)
-  (or (uiop:featurep :claw-rebuild-adapter)
-      (not (probe-file (adapter-file-of this)))))
+  (let ((registered-target (gethash (wrapper-name-of this) *generated-adapters*)))
+    (or (not (probe-file (adapter-file-of this)))
+        (not registered-target)
+        (and (member :claw-regen-adapter *features*)
+             (equal (target-of this) registered-target)))))
+
+
+(defun %register-adapter-generation (this)
+  (setf (gethash (wrapper-name-of this) *generated-adapters*) (target-of this)))
+
 
 ;;;
 ;;; BUILD

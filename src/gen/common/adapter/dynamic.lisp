@@ -51,6 +51,7 @@
 
 (defmethod generate-adapter-file ((this dynamic-adapter))
   (when (%adapter-needs-rebuilding-p this)
+    (%register-adapter-generation this)
     (ensure-directories-exist (uiop:pathname-directory-pathname (adapter-file-of this)))
     (with-output-to-file (output (adapter-file-of this) :if-exists :supersede)
       (let* ((functions (adapted-functions))

@@ -68,6 +68,7 @@
   name
   options
   configuration
+  target
   entities)
 
 
@@ -209,7 +210,8 @@
                                                            (make-wrapper :name name
                                                                          :options opts
                                                                          :configuration configuration
-                                                                         :entities entities)
+                                                                         :entities entities
+                                                                         :target target)
                                                            configuration))
         finally (return table)))
 
