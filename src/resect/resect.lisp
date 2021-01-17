@@ -689,6 +689,29 @@
       (ensure-inherited-fields owner))))
 
 
+(defun parse-fields (entity decl)
+  (let ((*current-owner* entity)
+        fields)
+    (resect:docollection (field-decl (%resect:type-fields (%resect:declaration-type decl)))
+      (when (publicp field-decl)
+        (let ((field-type (%resect:declaration-type field-decl)))
+          (push (make-instance 'foreign-record-field
+                               :name (%resect:declaration-name field-decl)
+                               :location (make-declaration-location field-decl)
+                               :enveloped (ensure-const-type-if-needed
+                                           field-type
+                                           (parse-type-by-category field-type)
+                                           field-decl)
+                               :bit-size (%resect:type-size field-type)
+                               :bit-alignment (%resect:type-alignment field-type)
+                               :bit-offset (%resect:field-offset field-decl)
+                               :bitfield-p (%resect:field-bitfield-p field-decl)
+                               :bit-width (%resect:field-width field-decl))
+                fields))))
+    (setf (fields-of entity) (nreverse fields))
+    (ensure-inherited-fields entity)))
+
+
 (defun parse-new-record-declaration (record-kind decl)
   (labels ((collect-parents ()
              (let (parents)
@@ -727,25 +750,8 @@
                 (parameters-of entity) (collect-entity-parameters decl))
           (unless (foreign-entity-private-p entity)
             (unless (zerop (foreign-entity-bit-size entity))
-              (let (fields)
-                (resect:docollection (field-decl (%resect:type-fields (%resect:declaration-type decl)))
-                  (when (publicp field-decl)
-                    (let ((field-type (%resect:declaration-type field-decl)))
-                      (push (make-instance 'foreign-record-field
-                                           :name (%resect:declaration-name field-decl)
-                                           :location (make-declaration-location field-decl)
-                                           :enveloped (ensure-const-type-if-needed
-                                                       field-type
-                                                       (parse-type-by-category field-type)
-                                                       field-decl)
-                                           :bit-size (%resect:type-size field-type)
-                                           :bit-alignment (%resect:type-alignment field-type)
-                                           :bit-offset (%resect:field-offset field-decl)
-                                           :bitfield-p (%resect:field-bitfield-p field-decl)
-                                           :bit-width (%resect:field-width field-decl))
-                            fields))))
-                (setf (fields-of entity) (nreverse fields))
-                (ensure-inherited-fields entity)))
+              (on-post-parse
+                (parse-fields entity decl)))
             (register-instantiated entity decl)
             (on-post-parse
               (parse-methods entity decl))))

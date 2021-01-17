@@ -5,7 +5,9 @@
                                          "int128"
                                          "uint128"
                                          "float128"
-                                         "nullptr")
+                                         "nullptr"
+                                         "__f16"
+                                         "half")
   :test 'equal)
 
 
