@@ -2,7 +2,6 @@
 
 
 (defvar *lib-name-regex* (ppcre:create-scanner "^lib(.*)\\..*$"))
-(defparameter *generated-adapters* (make-hash-table :test 'equal))
 
 
 (defgeneric generate-adapter-file (adapter))
@@ -31,6 +30,7 @@
                adapter-file headers standard includes defines
                intrinsics pointer-extractor-predicate target)
       this
+
     (let ((opts (claw.wrapper:wrapper-options wrapper))
           (extractor-regexes (loop for regex in extract-pointers
                                    collect (ppcre:create-scanner regex))))
@@ -39,15 +39,22 @@
                             thereis (ppcre:scan regex name))
                     t)))
         (setf wrapper-name (claw.wrapper:wrapper-name wrapper)
+              target (claw.wrapper:wrapper-target wrapper)
               adapter-file (uiop:ensure-pathname
-                            (claw.wrapper:merge-wrapper-pathname path wrapper)
+                            (claw.wrapper:merge-wrapper-pathname
+                             (merge-pathnames
+                              (format nil "~A.~A.~A"
+                                      (pathname-name path)
+                                      target
+                                      (pathname-type path))
+                              (uiop:pathname-directory-pathname path))
+                             wrapper)
                             :want-file t)
               headers (claw.wrapper:wrapper-options-headers opts)
               standard (claw.wrapper:wrapper-options-standard opts)
               includes (claw.wrapper:wrapper-options-includes opts)
               defines (claw.wrapper:wrapper-options-defines opts)
               intrinsics (claw.wrapper:wrapper-options-intrinsics opts)
-              target (claw.wrapper:wrapper-target wrapper)
               pointer-extractor-predicate #'%extractor-predicate)))))
 
 
@@ -154,15 +161,8 @@
 
 
 (defun %adapter-needs-rebuilding-p (this)
-  (let ((registered-target (gethash (wrapper-name-of this) *generated-adapters*)))
-    (or (not (probe-file (adapter-file-of this)))
-        (not registered-target)
-        (and (member :claw-regen-adapter *features*)
-             (equal (target-of this) registered-target)))))
-
-
-(defun %register-adapter-generation (this)
-  (setf (gethash (wrapper-name-of this) *generated-adapters*) (target-of this)))
+  (or (not (probe-file (adapter-file-of this)))
+      (member :claw-regen-adapter *features*)))
 
 
 ;;;

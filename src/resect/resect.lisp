@@ -337,7 +337,7 @@
       (:unsigned-long-long (register-primitive-type "unsigned long long"))
       (:unsigned-int128 (register-primitive-type "uint128"))
       (:char-s (register-primitive-type "char"))
-      (:char-u (register-primitive-type "unsigned char"))
+      (:char-u (register-primitive-type "char"))
       (:wchar (register-primitive-type "wchar_t"))
       (:short (register-primitive-type "short"))
       (:int (register-primitive-type "int"))
