@@ -102,25 +102,12 @@
                              (:file "function")))))
 
 
-(asdf:defsystem :claw/iffi
-  :description "Intricate foreign function interface"
-  :author "Pavel Korolev"
-  :license "MIT"
-  :version "1.0"
-  :depends-on (:alexandria :cffi :trivial-features)
-  :pathname "src/iffi/"
-  :serial t
-  :components ((:file "packages")
-               (:file "function-index")
-               (:file "iffi")))
-
-
 (asdf:defsystem :claw/generator/iffi
   :description "Intricate foreign function interface generator for CLAW"
   :author "Pavel Korolev"
   :license "MIT"
   :version "1.0"
-  :depends-on (:claw/wrapper :claw/generator/common :claw/iffi)
+  :depends-on (:claw/wrapper :claw/generator/common :iffi)
   :pathname "src/gen/iffi/cxx/"
   :serial t
   :components ((:file "packages")
