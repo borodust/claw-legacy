@@ -1,5 +1,7 @@
 (uiop:define-package :claw.util
   (:use :cl :alexandria)
+  (:import-from :claw-utils
+                #:common-prefix)
   (:export #:+known-platforms+
            #:+byte-size+
 
@@ -32,7 +34,9 @@
            #:split-template-argument-string-into-literals
            #:reformat-template-argument-string
            #:split-template-name-into-groups
-           #:join-groups-into-template-name))
+           #:join-groups-into-template-name
+
+           #:ignore-functions))
 (uiop:define-package :claw.util.infix
   (:use))
 (cl:in-package :claw.util)
@@ -580,23 +584,6 @@
 ;;;
 (defun get-timestamp ()
   (local-time:format-timestring nil (local-time:now) :timezone local-time:+utc-zone+))
-
-
-(defun common-prefix (strings)
-  (let ((len (length strings))
-        (strings (map 'vector #'string strings)))
-    (if (> len 1)
-        (let* ((sorted-strings (sort strings #'string<))
-               (first (aref sorted-strings 0))
-               (last (aref sorted-strings (1- (length sorted-strings))))
-               (mismatch-idx (mismatch first last)))
-          (if mismatch-idx
-              (if-let ((hyphenated-prefix-idx (position #\- first :from-end t
-                                                                  :end mismatch-idx)))
-                (subseq first 0 (1+ hyphenated-prefix-idx))
-                "")
-              ""))
-        "")))
 
 
 (defun string+ (&rest strings)

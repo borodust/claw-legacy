@@ -14,6 +14,7 @@
 (define-constant +macro-prefix+ "__claw_macro_"
   :test #'string=)
 
+(defvar *class* nil)
 
 
 (defun unless-empty (seq)
@@ -55,3 +56,49 @@
               found-mangled-name
               (mangle-id (%resect:declaration-id decl))))
         (or mangled (mangle-id (%resect:declaration-id decl))))))
+
+
+;;;
+;;; IGNORE FUNCTIONS
+;;;
+(defun match-function-signature (entity owner-name name &rest param-type-names)
+  (let ((owner (claw.spec:foreign-owner entity))
+        (any-params (eq (first param-type-names) :any)))
+    (and (typep entity 'claw.spec:foreign-function)
+         (string= (if owner-name
+                      (claw.spec:foreign-entity-name entity)
+                      (claw.spec:format-full-foreign-entity-name entity))
+                  (if (and owner (or (eq name :ctor) (eq name :dtor)))
+                      (claw.spec:foreign-entity-name owner)
+                      name))
+         (if owner-name
+             (when owner
+               (string= owner-name (claw.spec:format-full-foreign-entity-name owner)))
+             t)
+         (or any-params
+             (= (length (claw.spec:foreign-function-parameters entity))
+                (length param-type-names)))
+         (or any-params
+             (loop for expected-param in (claw.spec:foreign-function-parameters entity)
+                   for provided-type-name in param-type-names
+                   for expected-unqualified = (claw.spec:unqualify-foreign-entity
+                                               (claw.spec:foreign-enveloped-entity
+                                                expected-param))
+                   for expected-param-type-name = (when (claw.spec:foreign-named-p expected-unqualified)
+                                                    (claw.spec:format-full-foreign-entity-name
+                                                     expected-unqualified))
+                   always (string= expected-param-type-name provided-type-name))))))
+
+
+(defmacro ignore-functions (&body funcs)
+  (let ((entity (gensym (string 'entity))))
+    `(lambda (,entity)
+       (or ,@(loop for fu in funcs
+                   collect (if (eq (first fu) :in-class)
+                               `(let ((*class* ,(second fu)))
+                                  (funcall (ignore-functions ,@(cddr fu)) ,entity))
+                               (destructuring-bind (name &rest params) fu
+                                 `(match-function-signature ,entity
+                                                            *class*
+                                                            ,name
+                                                            ,@params))))))))

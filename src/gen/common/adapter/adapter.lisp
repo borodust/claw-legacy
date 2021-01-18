@@ -12,13 +12,15 @@
 (defclass adapter ()
   ((wrapper-name :reader wrapper-name-of)
    (adapter-file :reader adapter-file-of)
+   (package :initarg :package :reader package-of)
    (headers :reader headers-of)
    (standard :reader standard-of)
    (includes :reader includes-of)
    (defines :initform nil :reader defines-of)
    (intrinsics :initform nil :reader intrinsics-of)
    (pointer-extractor-predicate :initform nil :reader pointer-extractor-predicate-of)
-   (target :initform nil :reader target-of)))
+   (target :initform nil :reader target-of)
+   (builder-enabled-p :initform nil :reader builder-enabled-p)))
 
 
 (defmethod adapted-functions ()
@@ -28,7 +30,7 @@
 (defmethod initialize-instance :after ((this adapter) &key wrapper path extract-pointers)
   (with-slots (wrapper-name wrapper-last-update-time
                adapter-file headers standard includes defines
-               intrinsics pointer-extractor-predicate target)
+               intrinsics pointer-extractor-predicate target package)
       this
 
     (let ((opts (claw.wrapper:wrapper-options wrapper))

@@ -119,10 +119,12 @@
                              (ecase (eval adapter-kind)
                                (:static (make-static-adapter wrapper
                                                              adapter-path
-                                                             extract-pointers))
+                                                             extract-pointers
+                                                             in-package))
                                (:dynamic (make-dynamic-adapter wrapper
                                                                adapter-path
-                                                               extract-pointers)))))))
+                                                               extract-pointers
+                                                               in-package)))))))
             (*export-table* (make-hash-table))
             (*forward-declaration-table* (make-hash-table :test 'equal))
             (*visit-table* (make-hash-table :test 'equal))

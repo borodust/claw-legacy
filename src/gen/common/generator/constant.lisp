@@ -17,7 +17,7 @@
         `((define-symbol-macro ,decorated-name
               ,(if (typep type 'claw.spec:foreign-array)
                    `(cffi:foreign-symbol-pointer ,(claw.spec:foreign-entity-name entity))
-                   (with-gensyms (ptr)
+                   (let ((ptr (format-symbol (symbol-package decorated-name) "~A" 'ptr)))
                      `(let ((,ptr (cffi:foreign-symbol-pointer ,(claw.spec:foreign-entity-name entity))))
                         (when ,ptr
                           (cffi:mem-ref ,ptr ',(entity->cffi-type type))))))))

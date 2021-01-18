@@ -3,7 +3,7 @@
   :author "Pavel Korolev"
   :license "MIT"
   :version "1.0"
-  :depends-on (:uiop :alexandria :cl-ppcre :local-time :named-readtables)
+  :depends-on (:uiop :alexandria :cl-ppcre :local-time :named-readtables :claw-utils)
   :pathname "src/util/"
   :serial t
   :components ((:file "sha1")

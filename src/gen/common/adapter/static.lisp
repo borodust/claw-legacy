@@ -4,10 +4,11 @@
 (defclass static-adapter (adapter) ())
 
 
-(defun make-static-adapter (wrapper path extract-pointers)
+(defun make-static-adapter (wrapper path extract-pointers package)
   (make-instance 'static-adapter :wrapper wrapper
                                  :path path
-                                 :extract-pointers extract-pointers))
+                                 :extract-pointers extract-pointers
+                                 :package package))
 
 
 (defun load-static-adapter-template ()
@@ -50,15 +51,19 @@
 (defmethod expand-adapter-routines ((this static-adapter) wrapper)
   (let ((name (wrapper-name-of this))
         (shared-library-name (default-shared-adapter-library-name)))
-    `((defmethod build-adapter ((wrapper-name (eql ',name)) &key target dependencies compiler flags)
-        (declare (ignore wrapper-name))
-        (build-static-adapter ,(standard-of this)
-                              ,(adapter-file-of this)
-                              (list ,@(includes-of this))
-                              (merge-pathnames (or target ,shared-library-name)
-                                               ,(claw.wrapper:merge-wrapper-pathname
-                                                 "" wrapper))
-                              :dependencies dependencies
-                              :compiler compiler
-                              :flags flags
-                              :intrinsics ',(intrinsics-of this))))))
+    `(,@(when (builder-enabled-p this)
+          `((defmethod build-adapter ((wrapper-name (eql ',name)) &key target
+                                                                    dependencies
+                                                                    compiler
+                                                                    flags)
+              (declare (ignore wrapper-name))
+              (build-static-adapter ,(standard-of this)
+                                    ,(adapter-file-of this)
+                                    (list ,@(includes-of this))
+                                    (merge-pathnames (or target ,shared-library-name)
+                                                     ,(claw.wrapper:merge-wrapper-pathname
+                                                       "" wrapper))
+                                    :dependencies dependencies
+                                    :compiler compiler
+                                    :flags flags
+                                    :intrinsics ',(intrinsics-of this))))))))

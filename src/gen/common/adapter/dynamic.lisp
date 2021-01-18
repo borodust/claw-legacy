@@ -7,8 +7,11 @@
 (defclass dynamic-adapter (adapter) ())
 
 
-(defun make-dynamic-adapter (wrapper path extract-pointers)
-  (make-instance 'dynamic-adapter :wrapper wrapper :path path :extract-pointers extract-pointers))
+(defun make-dynamic-adapter (wrapper path extract-pointers package)
+  (make-instance 'dynamic-adapter :wrapper wrapper
+                                  :path path
+                                  :extract-pointers extract-pointers
+                                  :package package))
 
 
 (defun load-dynamic-adapter-template ()
@@ -116,19 +119,22 @@
 (defmethod expand-adapter-routines ((this dynamic-adapter) wrapper)
   (let ((name (wrapper-name-of this))
         (shared-library-name (default-shared-adapter-library-name)))
-    `((defmethod build-adapter ((wrapper-name (eql ',name)) &key target dependencies compiler flags)
-        (declare (ignore wrapper-name))
-        (build-dynamic-adapter ,(standard-of this)
-                               ,(adapter-file-of this)
-                               (list ,@(includes-of this))
-                               (merge-pathnames (or target ,shared-library-name)
-                                                ,(claw.wrapper:merge-wrapper-pathname
-                                                  "" wrapper))
-                               :dependencies dependencies
-                               :compiler compiler
-                               :flags flags
-                               :intrinsics ',(intrinsics-of this)))
-      (defmethod initialize-adapter ((wrapper-name (eql ',name)))
-        (declare (ignore wrapper-name))
-        (%verify-adapter-initialization
-         (cffi:foreign-funcall ,(library-loader-name name) :int))))))
+    `(,@(when (builder-enabled-p this)
+          `((defmethod build-adapter ((wrapper-name (eql ',name)) &key target
+                                                                    dependencies
+                                                                    compiler
+                                                                    flags)
+              (declare (ignore wrapper-name))
+              (build-dynamic-adapter ,(standard-of this)
+                                     ,(adapter-file-of this)
+                                     (list ,@(includes-of this))
+                                     (merge-pathnames (or target ,shared-library-name)
+                                                      ,(claw.wrapper:merge-wrapper-pathname
+                                                        "" wrapper))
+                                     :dependencies dependencies
+                                     :compiler compiler
+                                     :flags flags
+                                     :intrinsics ',(intrinsics-of this)))))
+      (defun ,(format-symbol (package-of this) "~A~A" 'initialize-claw-library- name) ()
+        (unless (zerop (cffi:foreign-funcall ,(library-loader-name name) :int))
+          (error "Failed to initialize adapater"))))))
