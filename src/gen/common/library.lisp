@@ -151,8 +151,9 @@
           (make-instance
            'bindings
            :definitions `(,@(nreverse bindings)
-                          ,@(loop for symbol being the hash-key of *export-table*
-                                  collect `(export ',symbol ,(package-name (symbol-package symbol))))
+                          (eval-when (:load-toplevel :compile-toplevel :execute)
+                            ,@(loop for symbol being the hash-key of *export-table*
+                                    collect `(export ',symbol ,(package-name (symbol-package symbol)))))
                           ,@(when *adapter*
                               (expand-adapter-routines *adapter* wrapper)))
            :exported-symbols (hash-table-keys *export-table*)

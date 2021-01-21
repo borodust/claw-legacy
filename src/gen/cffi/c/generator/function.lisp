@@ -102,3 +102,7 @@
 (defmethod foreign-entity-dependencies ((entity claw.spec:foreign-function))
   (list* (claw.spec:foreign-function-result-type entity)
          (mapcar #'claw.spec:foreign-enveloped-entity (claw.spec:foreign-function-parameters entity))))
+
+
+(defmethod generate-binding ((generator cffi-generator) (entity claw.spec:foreign-method) &key)
+  nil)
