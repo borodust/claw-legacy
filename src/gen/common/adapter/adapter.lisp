@@ -206,7 +206,8 @@
                                               (:sse41 "-msse4.1")
                                               (:sse42 "-msse4.2")
                                               (:avx "-mavx")
-                                              (:avx2 "-mavx2")))
+                                              (:avx2 "-mavx2")
+                                              (:neon "-mfpu=neon")))
                               (when flags
                                 (ensure-list flags))
                               (loop for directory in includes

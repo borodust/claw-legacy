@@ -26,6 +26,12 @@
            #:adapted-function-body
            #:adapted-function-entity
 
+           #:adapt-type
+
+           #:adapted-function
+           #:format-location-comment
+           #:adapt-function
+
            #:*qualify-records*
            #:get-overriden-type
            #:export-symbol

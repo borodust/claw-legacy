@@ -9,9 +9,10 @@
            #:wrapper-target
            #:wrapper-entities
 
+           #:wrapper-options-standard
+
            #:wrapper-options-headers
            #:wrapper-options-includes
-           #:wrapper-options-standard
            #:wrapper-options-defines
            #:wrapper-options-intrinsics
 

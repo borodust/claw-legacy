@@ -73,7 +73,8 @@
                 :components ((:file "type")
                              (:file "primitive")
                              (:file "constant")
-                             (:file "enum")))
+                             (:file "enum")
+                             (:file "function")))
                (:module "adapter"
                 :serial t
                 :components ((:file "adapter")

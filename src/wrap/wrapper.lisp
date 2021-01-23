@@ -12,6 +12,60 @@
   system-depends-on)
 
 
+(defstruct parse-options
+  headers
+  includes
+  framework-includes
+  defines
+  intrinsics
+  system-includes)
+
+
+(defun parse-parse-options (opts)
+  (destructuring-bind (&key
+                         headers
+                         includes
+                         framework-includes
+                         defines
+                         intrinsics
+                         system-includes
+                       &allow-other-keys)
+      (alist-plist opts)
+    (with-evaluated-lists (headers
+                           includes
+                           framework-includes
+                           system-includes
+                           defines
+                           intrinsics)
+      (let* ((includes (mapcar #'map-path
+                               (append
+                                (list nil)
+                                includes)))
+             (system-includes (mapcar #'map-path
+                                      (append
+                                       (list nil)
+                                       system-includes
+                                       (list-all-known-include-paths))))
+             (framework-includes (mapcar #'map-path
+                                         (append
+                                          (list nil)
+                                          framework-includes
+                                          (list-all-known-framework-paths)))))
+        (make-parse-options :headers headers
+                            :includes includes
+                            :framework-includes framework-includes
+                            :system-includes system-includes
+                            :defines defines
+                            :intrinsics intrinsics)))))
+
+
+(defstruct target-options
+  features
+  triple
+
+  parse)
+
+
 (defun parse-persistent-options (config system)
   (when (first config)
     (destructuring-bind (bindings-system &key asd-path bindings-path depends-on) config
@@ -46,22 +100,46 @@
   parser
   generator
 
-  headers
-  includes
-  framework-includes
   targets
-  defines
-  intrinsics
+  selected-target
+  parse
 
-  generated-header
   instantiation-filter
-
-  system-includes
 
   include-sources
   include-definitions
   exclude-sources
   exclude-definitions)
+
+
+(defmacro selected-parse-option (opts name)
+  (let ((accessor-name (symbolicate 'parse-options- name)))
+    (once-only (opts)
+      (with-gensyms (target)
+        `(let ((,target (wrapper-options-selected-target ,opts)))
+           (append
+            (when ,target
+              (,accessor-name (target-options-parse ,target)))
+            (,accessor-name (wrapper-options-parse ,opts))))))))
+
+
+(defun wrapper-options-headers (opts)
+  (selected-parse-option opts headers))
+
+(defun wrapper-options-includes (opts)
+  (selected-parse-option opts includes))
+
+(defun wrapper-options-system-includes (opts)
+  (selected-parse-option opts system-includes))
+
+(defun wrapper-options-framework-includes (opts)
+  (selected-parse-option opts framework-includes))
+
+(defun wrapper-options-defines (opts)
+  (selected-parse-option opts defines))
+
+(defun wrapper-options-intrinsics (opts)
+  (selected-parse-option opts intrinsics))
 
 
 (defstruct wrapper
@@ -86,8 +164,10 @@
 
 
 (defun eval-targets (targets)
-  (loop for (features target) on targets by #'cddr
-        collect (cons features (eval target))))
+  (loop for (features target . parse-opts) in targets
+        collect (make-target-options :features features
+                                     :triple target
+                                     :parse (parse-parse-options parse-opts))))
 
 
 (defun eval-opts (name opts)
@@ -101,16 +181,12 @@
                          parser
                          generator
 
-                         headers
-                         includes
-                         framework-includes
                          (targets '(:native))
-                         defines
-                         intrinsics
                          instantiate
 
                          include-sources include-definitions
-                         exclude-sources exclude-definitions)
+                         exclude-sources exclude-definitions
+                       &allow-other-keys)
       (alist-plist opts)
     (with-evaluated-variables (base-path
                                language
@@ -118,41 +194,23 @@
                                parser
                                generator
                                instantiate)
-      (with-evaluated-lists (headers
-                             includes
-                             include-sources
+      (with-evaluated-lists (include-sources
                              include-definitions
                              exclude-sources
-                             exclude-definitions
-                             defines
-                             intrinsics)
+                             exclude-definitions)
         (let* ((system (or (first system) (when (asdf:find-system name nil) name)))
                (base-path (when base-path
                             (find-path base-path :system system)))
                (*path-mapper* (lambda (path)
                                 (find-path path :system system :path base-path)))
                (parser (or parser :claw/resect))
-               (headers (or headers (list (generate-default-header-name name))))
                (targets (case (first targets)
                           (:local `((t . ,(local-platform))))
                           (:gnu (predefined-targets :linux "gnu"
                                                     :windows "gnu"
                                                     :darwin "gnu"))
                           (:native (predefined-targets))
-                          (t (eval-targets targets))))
-               (includes (mapcar #'map-path
-                                 (append
-                                  (list nil)
-                                  includes)))
-               (system-includes (mapcar #'map-path
-                                        (append
-                                         (list nil)
-                                         (list-all-known-include-paths))))
-               (framework-includes (mapcar #'map-path
-                                           (append
-                                            (list nil)
-                                            framework-includes
-                                            (list-all-known-framework-paths)))))
+                          (t (eval-targets targets)))))
           (make-wrapper-options :system system
                                 :base-path base-path
                                 :persistent (parse-persistent-options persistent system)
@@ -162,58 +220,80 @@
                                 :parser parser
                                 :generator generator
 
-                                :headers headers
-                                :includes includes
-                                :framework-includes framework-includes
                                 :targets targets
-
-                                :system-includes system-includes
+                                :parse (parse-parse-options opts)
 
                                 :include-sources include-sources
                                 :include-definitions include-definitions
                                 :exclude-sources exclude-sources
                                 :exclude-definitions exclude-definitions
-                                :defines defines
-                                :intrinsics intrinsics
                                 :instantiation-filter instantiate))))))
+
+
+(defun make-wrapper-options-for-target (opts target)
+  (let ((copy (copy-wrapper-options opts)))
+    (setf (wrapper-options-targets copy) (list target)
+          (wrapper-options-selected-target copy) target)
+    copy))
 
 
 (defun make-bindings-table (name opts configuration)
   (loop with table = (make-hash-table :test 'equal)
-        for (nil . target) in (wrapper-options-targets opts)
+        for target in (wrapper-options-targets opts)
+        for triple = (target-options-triple target)
+        for selected-opts = (make-wrapper-options-for-target opts target)
         for library = (describe-foreign-library
-                       (wrapper-options-parser opts)
-                       (wrapper-options-headers opts)
-                       :language (wrapper-options-language opts)
-                       :standard (wrapper-options-standard opts)
-                       :includes (append (wrapper-options-includes opts)
-                                         (wrapper-options-system-includes opts))
-                       :framework-includes (wrapper-options-framework-includes opts)
-                       :target target
-                       :defines (wrapper-options-defines opts)
-                       :intrinsics (wrapper-options-intrinsics opts)
-                       :instantiation-filter (wrapper-options-instantiation-filter opts)
-                       :include-sources (wrapper-options-include-sources opts)
-                       :include-definitions (wrapper-options-include-definitions opts)
-                       :exclude-sources (wrapper-options-exclude-sources opts)
-                       :exclude-definitions (wrapper-options-exclude-definitions opts))
-        for selected-language = (or (wrapper-options-language opts)
+                       (wrapper-options-parser selected-opts)
+                       (wrapper-options-headers selected-opts)
+                       :language (wrapper-options-language selected-opts)
+                       :standard (wrapper-options-standard selected-opts)
+                       :includes (append (wrapper-options-includes selected-opts)
+                                         (wrapper-options-system-includes selected-opts))
+                       :framework-includes (wrapper-options-framework-includes selected-opts)
+                       :target triple
+                       :defines (wrapper-options-defines selected-opts)
+                       :intrinsics (wrapper-options-intrinsics selected-opts)
+                       :instantiation-filter (wrapper-options-instantiation-filter selected-opts)
+                       :include-sources (wrapper-options-include-sources selected-opts)
+                       :include-definitions (wrapper-options-include-definitions selected-opts)
+                       :exclude-sources (wrapper-options-exclude-sources selected-opts)
+                       :exclude-definitions (wrapper-options-exclude-definitions selected-opts))
+        for selected-language = (or (wrapper-options-language selected-opts)
                                     (foreign-library-language library)
                                     :c)
-        for selected-generator = (or (wrapper-options-generator opts)
+        for selected-generator = (or (wrapper-options-generator selected-opts)
                                      (ecase selected-language
                                        (:c :claw/cffi)
                                        (:c++ :claw/iffi)))
         for entities = (foreign-library-entities library)
-        do (setf (gethash target table) (generate-bindings selected-generator
+        do (setf (gethash triple table) (generate-bindings selected-generator
                                                            selected-language
                                                            (make-wrapper :name name
-                                                                         :options opts
+                                                                         :options selected-opts
                                                                          :configuration configuration
                                                                          :entities entities
-                                                                         :target target)
+                                                                         :target triple)
                                                            configuration))
         finally (return table)))
+
+
+(defun unexport-package-symbols (packages)
+  (loop for package-name in packages
+        for package = (find-package package-name)
+        when package
+          append (let (exported)
+                   (do-external-symbols (symbol package)
+                     (handler-case
+                         (progn
+                           (unexport symbol package)
+                           (push exported symbol))
+                       (package-error ())))
+                   exported)))
+
+
+(defun reexport-package-symbols (symbols)
+  (loop for symbol in symbols
+        do (export symbol (symbol-package symbol))))
 
 
 (defun persist-bindings (opts bindings-table)
@@ -227,14 +307,16 @@
          required-systems)
     (flet ((%bindings-file (target)
              (merge-pathnames (format nil "~A.lisp" target) bindings-path)))
-      (loop for (features . target) in (wrapper-options-targets opts)
-            for bindings = (gethash target bindings-table)
-            for bindings-file = (%bindings-file target)
+      (loop for target-opts in (wrapper-options-targets opts)
+            for features = (target-options-features target-opts)
+            for triple = (target-options-triple target-opts)
+            for bindings = (gethash triple bindings-table)
+            for bindings-file = (%bindings-file triple)
             when (or (null selected-target)
                      (eq t features)
                      (uiop:featurep features))
-              do (setf selected-target (%bindings-file target))
-            do (push (cons features target) feature-targets)
+              do (setf selected-target (%bindings-file triple))
+            do (push (cons features triple) feature-targets)
                (push (bindings-required-systems bindings) required-systems)
                (with-open-file (out bindings-file
                                     :direction :output
@@ -258,7 +340,8 @@
                      (prin1 `(cl:in-package ,generated-package-name) out)
                      (fresh-line out)
                      (terpri out))
-                   (let ((*package* (find-package :%claw.wrapper.cl)))
+                   (let ((*package* (find-package :%claw.wrapper.cl))
+                         (symbols (unexport-package-symbols (bindings-required-packages bindings))))
                      (unwind-protect
                           (progn
                             (unexport-bindings bindings)
@@ -266,6 +349,7 @@
                                   do (prin1 binding out)
                                      (fresh-line out)
                                      (terpri out)))
+                       (reexport-package-symbols symbols)
                        (reexport-bindings bindings)))))))
     (values selected-target feature-targets required-systems)))
 
