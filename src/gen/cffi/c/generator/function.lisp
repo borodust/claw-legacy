@@ -18,7 +18,7 @@
     (let* ((id (entity->cffi-type entity))
            (c-name (if (and (adapter) adapted-p)
                        (register-adapted-function adapted)
-                       (adapted-function-name adapted))))
+                       (claw.spec:foreign-entity-name entity))))
       (export-symbol id)
       `((cffi:defcfun (,c-name ,id) ,(entity->cffi-type (adapted-function-result-type adapted))
           ,@(generate-cffi-parameters (adapted-function-parameters adapted))
