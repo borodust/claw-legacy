@@ -378,6 +378,10 @@
   (cffi-sys:foreign-free ptr))
 
 
+(define-compiler-macro intricate-free (ptr)
+  `(cffi-sys:foreign-free ,ptr))
+
+
 (defmacro with-field-setter ((field-setter type-name slot-name) &body body)
   (with-gensyms (intricate field)
     `(if-let ((,intricate (find-intricate-record ,type-name)))
