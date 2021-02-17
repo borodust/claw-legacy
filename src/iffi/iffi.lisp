@@ -113,7 +113,8 @@
           arg-config
           cffi-opts
           pointer-extractor
-          const-p)
+          const-p
+          (inline-p t))
       (if (stringp (first configuration))
           (setf doc (first configuration)
                 arg-config (rest configuration))
@@ -122,6 +123,7 @@
             do (case name
                  (:pointer-extractor (setf pointer-extractor value))
                  (:non-mutating (setf const-p value))
+                 (:inline (setf inline-p value))
                  (t (setf cffi-opts (list* name value cffi-opts)))))
       (let* ((arg-types (loop for arg in arg-config
                               for type = (if (eq arg '&rest)
@@ -131,7 +133,8 @@
              (intricately-defined (gethash name *intricate-table*))
              (cfun-name (format-symbol (symbol-package name) "~A~A$~A" 'iffi-cfun$ name mangled)))
         `(progn
-           (declaim (inline ,cfun-name))
+           ,@(when inline-p
+               `((declaim (inline ,cfun-name))))
            (cffi:defcfun (,mangled ,cfun-name ,@(nreverse cffi-opts)) ,result-type ,@configuration)
            (setf
             (intricate-function ',name
@@ -141,7 +144,9 @@
             ',cfun-name)
            ,@(when pointer-extractor
                (let ((extractor-cfun-name (symbolicate cfun-name '$pointer-extractor)))
-                 `((cffi:defcfun (,pointer-extractor ,extractor-cfun-name) :pointer)
+                 `(,@(when inline-p
+                       `((declaim (inline ,extractor-cfun-name))))
+                   (cffi:defcfun (,pointer-extractor ,extractor-cfun-name) :pointer)
                    (setf (intricate-function-pointer-extractor ',name ,@arg-types) ',extractor-cfun-name))))
            ,@(when (or (not intricately-defined)
                        (equal intricately-defined arg-types))
@@ -227,7 +232,7 @@
           thereis (gethash alias *record-table*)))
 
 
-(defun expand-record-field (record field)
+(defun expand-record-field (record inline field)
   (destructuring-bind (field-name type &key
                                          setter
                                          getter
@@ -236,21 +241,31 @@
     (when-let ((record-field (find-intricate-field record field-name)))
       (append
        (when setter
-         `((cffi:defcfun (,setter ,(setter-of record-field)) :void
-             (this :pointer)
-             (value ,type))))
+         (let ((cffi-setter (setter-of record-field)))
+           `(,@(when inline
+                 `((declaim (inline ,cffi-setter))))
+             (cffi:defcfun (,setter ,cffi-setter) :void
+               (this :pointer)
+               (value ,type)))))
        (when getter
-         `((cffi:defcfun (,getter ,(getter-of record-field)) ,type
-             (this :pointer))))))))
+         (let ((cffi-getter (getter-of record-field)))
+           `(,@(when inline
+                 `((declaim (inline ,cffi-getter))))
+             (cffi:defcfun (,getter ,cffi-getter) ,type
+               (this :pointer)))))))))
 
 
-(defun expand-record (record size-reporter alignment-reporter fields)
-  `((cffi:defcfun (,size-reporter ,(size-reporter-of record))
-        :unsigned-long-long)
-    (cffi:defcfun (,alignment-reporter ,(alignment-reporter-of record))
-        :unsigned-long-long)
-    ,@(loop for field in fields
-            append (expand-record-field record field))))
+(defun expand-record (record size-reporter alignment-reporter inline fields)
+  (let ((cffi-size-reporter (size-reporter-of record))
+        (cffi-alignment-reporter (alignment-reporter-of record)))
+    `(,@(when inline
+          `((declaim (inline ,cffi-size-reporter ,cffi-alignment-reporter))))
+      (cffi:defcfun (,size-reporter ,cffi-size-reporter)
+          :unsigned-long-long)
+      (cffi:defcfun (,alignment-reporter ,cffi-alignment-reporter)
+          :unsigned-long-long)
+      ,@(loop for field in fields
+              append (expand-record-field record inline field)))))
 
 
 (defun make-field-map (record-name fields)
@@ -286,7 +301,7 @@
         (if (stringp (first fields))
             (values (first fields) (rest fields))
             (values nil fields))
-      (destructuring-bind (&key size-reporter alignment-reporter constructor destructor)
+      (destructuring-bind (&key size-reporter alignment-reporter constructor destructor (inline t))
           opts
         (let ((record (make-instance 'intricate-record
                                      :name name
@@ -300,7 +315,7 @@
           (prog1 `(progn
                     (cffi:defctype ,name :void ,doc)
                     ,@(when (and size-reporter alignment-reporter)
-                        (expand-record record size-reporter alignment-reporter fields))
+                        (expand-record record size-reporter alignment-reporter inline fields))
                     (register-intricate-record ',(serialize-intricate-record record)))))))))
 
 

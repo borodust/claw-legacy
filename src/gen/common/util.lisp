@@ -13,6 +13,7 @@
                   *recognize-strings-p*
                   *recognize-bitfields-p*
                   *recognize-arrays-p*
+                  *inline-functions*
                   *override-table*
                   *entities*
                   *adapted-function-table*))

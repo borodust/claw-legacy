@@ -57,7 +57,9 @@
                                         `(:pointer-extractor ,extractor-cname))
                                     ,@(when (and (typep entity 'claw.spec:foreign-method)
                                                  (claw.spec:foreign-method-const-p entity))
-                                        `(:non-mutating t)))
+                                        `(:non-mutating t))
+                                    ,@(unless *inline-functions*
+                                        `(:inline nil)))
           ,result-type
         ,(claw.spec:format-foreign-location (claw.spec:foreign-entity-location entity))
         ,@params

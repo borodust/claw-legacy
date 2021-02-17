@@ -20,7 +20,9 @@
                        (register-adapted-function adapted)
                        (claw.spec:foreign-entity-name entity))))
       (export-symbol id)
-      `((cffi:defcfun (,c-name ,id) ,(entity->cffi-type (adapted-function-result-type adapted))
+      `(,@(when *inline-functions*
+            `((declaim (inline ,id))))
+        (cffi:defcfun (,c-name ,id) ,(entity->cffi-type (adapted-function-result-type adapted))
           ,@(generate-cffi-parameters (adapted-function-parameters adapted))
           ,@(when (claw.spec:foreign-function-variadic-p entity)
               (list 'cl:&rest)))))))

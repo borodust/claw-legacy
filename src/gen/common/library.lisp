@@ -53,7 +53,7 @@
 
 (defun call-shielded-from-unknown (lambda &optional on-error)
   (flet ((return-nil (condi)
-           #++(warn "Unknown entity found, skipping: ~A" (unknown-entity-of condi))
+           (declare (ignore condi))
            (return-from call-shielded-from-unknown (when on-error
                                                      (funcall on-error)))))
     (handler-bind ((unknown-entity-condition #'return-nil))
@@ -96,6 +96,7 @@
 
 
 (defun explode-library-definition (generator language wrapper configuration)
+  (declare (ignore language))
   (let ((entities (claw.wrapper:wrapper-entities wrapper)))
     (destructuring-bind (&key in-package
                            symbolicate-names
@@ -105,6 +106,7 @@
                            recognize-bitfields
                            recognize-arrays
                            recognize-strings
+                           (inline-functions t)
                            (ignore-entities (constantly nil)))
         configuration
       (let ((in-package (eval in-package))
@@ -133,6 +135,7 @@
             (*recognize-strings-p* recognize-strings)
             (*recognize-bitfields-p* recognize-bitfields)
             (*recognize-arrays-p* recognize-arrays)
+            (*inline-functions* inline-functions)
             (rename-symbols (eval (parse-renaming-pipeline symbolicate-names)))
             (bindings (list))
             (*entities* (remove-if (eval ignore-entities)

@@ -33,6 +33,7 @@
            #:adapt-function
 
            #:*qualify-records*
+           #:*inline-functions*
            #:get-overriden-type
            #:export-symbol
            #:expand-constant

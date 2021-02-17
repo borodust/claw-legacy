@@ -122,7 +122,9 @@
                         ,@(when-let ((ctor (find-constructor id)))
                             `(:constructor ,(symbolicate-function-name ctor)))
                         ,@(when-let ((dtor (find-destructor id)))
-                            `(:destructor ,(symbolicate-function-name dtor))))
+                            `(:destructor ,(symbolicate-function-name dtor)))
+                        ,@(unless *inline-functions*
+                            `(:inline nil)))
             ,@(when with-superclasses
                 '(()))
           ,(claw.spec:format-foreign-location (claw.spec:foreign-entity-location entity))
