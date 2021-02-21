@@ -9,6 +9,7 @@
 (defvar *doc-table* (make-hash-table))
 (defvar *record-table* (make-hash-table))
 
+
 (initialize-iffi)
 
 
@@ -74,7 +75,7 @@
           finally (return
                     (if-let ((quoted (find-quoted name)))
                       (let ((arg-types (append (when const-p
-                                                 '(:const))
+                                                 (list :const))
                                                arg-types)))
                         (if-let ((function (apply #'intricate-function quoted arg-types)))
                           `(,function ,@arg-values)
@@ -86,6 +87,7 @@
 
 (defun expand-intricate-function-body (name arguments)
   `(intricate-funcall ',name ,@arguments))
+
 
 (defmacro defifun (name-and-options result-type &body configuration)
   (destructuring-bind (mangled name &rest opts) (ensure-list name-and-options)
@@ -113,33 +115,37 @@
                                               '&rest
                                               (second arg))
                                collect type)))
+             (quoted-arg-types (mapcar (lambda (type) `(quote ,type)) arg-types))
              (intricately-defined (gethash name *intricate-table*))
              (cfun-name (format-symbol (symbol-package name) "~A~A$~A" 'iffi-cfun$ name mangled)))
-        (apply #'(setf intricate-function) cfun-name name arg-types)
-        (when (and doc
-                   (not (member :iffi-skip-documentation *features*)))
-          (setf (intricate-documentation name arg-types) doc))
         `(progn
            ,@(when inline-p
                `((declaim (inline ,cfun-name))))
            (cffi:defcfun (,mangled ,cfun-name ,@(nreverse cffi-opts)) ,result-type ,@configuration)
+           (meta-eval
+             (setf (intricate-function ',name ,@quoted-arg-types) ',cfun-name))
            ,@(when pointer-extractor
                (let ((extractor-cfun-name (symbolicate cfun-name '$pointer-extractor)))
-                 (apply #'(setf intricate-function-pointer-extractor)
-                        extractor-cfun-name
-                        name
-                        arg-types)
                  `(,@(when inline-p
                        `((declaim (inline ,extractor-cfun-name))))
-                   (cffi:defcfun (,pointer-extractor ,extractor-cfun-name) :pointer))))
+                   (cffi:defcfun (,pointer-extractor ,extractor-cfun-name) :pointer)
+                   (meta-eval
+                     (setf
+                      (intricate-function-pointer-extractor ',name ,@quoted-arg-types)
+                      ',extractor-cfun-name)))))
            ,@(when (or (not intricately-defined)
                        (equal intricately-defined arg-types))
                (setf (gethash name *intricate-table*) arg-types)
                `((defun ,name (&rest args)
                    (apply #'intricate-funcall ',name args))
                  (define-compiler-macro ,name (&rest arguments)
-                   (expand-intricate-function-body ',name arguments))
-                 (ensure-documentation ',name))))))))
+                   (expand-intricate-function-body ',name arguments))))
+           ,@(when (and doc
+                        (not (member :iffi-skip-documentation *features*)))
+               `((meta-eval
+                   (setf (intricate-documentation ',name ,@quoted-arg-types) ,doc)
+                   (ensure-documentation ',name)))))))))
+
 
 ;;;
 ;;; RECORD
@@ -159,13 +165,47 @@
    (field-map :initarg :field-map :initform (make-hash-table))))
 
 
+(defun serialize-intricate-record (record)
+  (with-slots (field-map) record
+    (list :name (name-of record)
+          :size (size-reporter-of record)
+          :alignment (alignment-reporter-of record)
+          :constructor (constructor-of record)
+          :destructor (destructor-of record)
+          :fields (loop for field being the hash-value of field-map
+                        collect (list :name (name-of field)
+                                      :getter (getter-of field)
+                                      :setter (setter-of field))))))
+
+
+(defun deserialize-intricate-record (record-data)
+  (destructuring-bind (&key name size alignment constructor destructor fields)
+      record-data
+    (let ((field-map (loop with map = (make-hash-table)
+                           for field in fields
+                           do (destructuring-bind (&key name setter getter)
+                                  field
+                                (setf (gethash name map)
+                                      (make-instance 'intricate-field :name name
+                                                                      :getter getter
+                                                                      :setter setter)))
+                           finally (return map))))
+      (make-instance 'intricate-record :name name
+                                       :size-reporter size
+                                       :alignment-reporter alignment
+                                       :constructor constructor
+                                       :destructor destructor
+                                       :field-map field-map))))
+
+
 (defun find-intricate-field (record field-name)
   (with-slots (field-map) record
     (gethash field-name field-map)))
 
 
-(defun register-intricate-record (record)
-  (setf (gethash (name-of record) *record-table*) record))
+(defun register-intricate-record (record-data)
+  (let ((record (deserialize-intricate-record record-data)))
+    (setf (gethash (name-of record) *record-table*) record)))
 
 
 (defun find-intricate-record (name)
@@ -253,11 +293,12 @@
                                      :alignment-reporter (format-symbol (symbol-package name)
                                                                         "~A$~A" 'iffi-alignof name)
                                      :field-map (make-field-map name fields))))
-          (register-intricate-record record)
-          `(progn
-             (cffi:defctype ,name :void ,doc)
-             ,@(when (and size-reporter alignment-reporter)
-                 (expand-record record size-reporter alignment-reporter inline fields))))))))
+          (prog1 `(progn
+                    (cffi:defctype ,name :void ,doc)
+                    ,@(when (and size-reporter alignment-reporter)
+                        (expand-record record size-reporter alignment-reporter inline fields))
+                    (meta-eval
+                      (register-intricate-record ',(serialize-intricate-record record))))))))))
 
 
 (defmacro defiunion (name-and-opts &body fields)
@@ -400,8 +441,10 @@
 ;;; ALIAS
 ;;;
 (defmacro defitype (alias origin &optional documentation)
-  (register-intricate-alias origin alias)
-  `(cffi:defctype ,alias ,origin ,@(when documentation `(,documentation))))
+  `(progn
+     (cffi:defctype ,alias ,origin ,@(when documentation `(,documentation)))
+     (meta-eval
+       (register-intricate-alias ',origin ',alias))))
 
 ;;;
 ;;; INSTANCE
