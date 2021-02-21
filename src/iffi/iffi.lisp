@@ -143,8 +143,8 @@
            ,@(when (and doc
                         (not (member :iffi-skip-documentation *features*)))
                `((meta-eval
-                   (setf (intricate-documentation ',name ,@quoted-arg-types) ,doc)
-                   (ensure-documentation ',name)))))))))
+                   (setf (intricate-documentation ',name ,@quoted-arg-types) ,doc))
+                 (ensure-documentation ',name))))))))
 
 
 ;;;
