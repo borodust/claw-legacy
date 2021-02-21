@@ -7,5 +7,6 @@
   :pathname "src/iffi/"
   :serial t
   :components ((:file "packages")
+               (:file "utils")
                (:file "function-index")
                (:file "iffi")))
