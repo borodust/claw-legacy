@@ -1,7 +1,7 @@
 (cl:in-package :iffi)
 
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
+(eval-when (:compile-toplevel :execute)
   (defun find-quoted (value)
     (cond
       ((keywordp value) value)
@@ -24,11 +24,8 @@
   (handle))
 
 (defvar *function-pointer-extractor-table* (make-hash-table :test 'equal))
-
 (defvar *intricate-table* (make-hash-table))
-
 (defvar *doc-table* (make-hash-table))
-
 (defvar *record-table* (make-hash-table))
 
 (initialize-iffi)
@@ -157,7 +154,8 @@
                    (apply #'intricate-funcall ',name args))
                  (define-compiler-macro ,name (&rest arguments)
                    (expand-intricate-function-body ',name arguments))))
-           ,@(when doc
+           ,@(when (and doc
+                        (not (member :iffi-skip-documentation *features*)))
                `((setf
                   (intricate-documentation ',name
                                            ,@(when const-p
