@@ -16,7 +16,7 @@
   :author "Pavel Korolev"
   :license "MIT"
   :version "1.0"
-  :depends-on (:uiop :alexandria :claw-support :claw/util)
+  :depends-on (:uiop :alexandria :claw/util)
   :pathname "src/spec/"
   :serial t
   :components ((:file "entity")))
@@ -40,7 +40,7 @@
   :author "Pavel Korolev"
   :license "MIT"
   :version "1.0"
-  :depends-on (:uiop :alexandria :claw-support :cl-resect :claw/util :claw/spec
+  :depends-on (:uiop :alexandria :cl-resect :claw/util :claw/spec
                :claw/wrapper :parse-number)
   :pathname "src/resect/"
   :serial t
