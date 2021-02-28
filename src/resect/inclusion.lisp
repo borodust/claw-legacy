@@ -159,6 +159,15 @@
                               (get-location-path entity))))
 
 
+(defun probably-included-p (name location)
+  (and (explicitly-included-p name location)
+       (not (explicitly-excluded-p name location))))
+
+
+(defun entity-probably-included-p (entity)
+  (and (entity-explicitly-included-p entity)
+       (not (entity-explicitly-excluded-p entity))))
+
 ;;;
 ;;;
 ;;;
@@ -166,8 +175,7 @@
 
 
 (defmethod try-including-entity ((entity foreign-entity))
-  (if (and (entity-explicitly-included-p entity)
-           (not (entity-explicitly-excluded-p entity)))
+  (if (entity-probably-included-p entity)
       (prog1 t
         (mark-included (foreign-entity-id entity) t))
       (marked-included-p (foreign-entity-id entity))))

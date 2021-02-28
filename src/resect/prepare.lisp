@@ -118,8 +118,8 @@
                              intrinsics)
     (prepare-header implicit uber-path prepared-path)
     (values (list prepared-path)
-            (loop for macro-name being the hash-key of (macros-of implicit)
-                  collect macro-name))))
+            (loop for macro being the hash-value of (macros-of implicit)
+                  collect macro))))
 
 
 (defun format-template-argument-string (argument-literals)
@@ -222,7 +222,9 @@
 ;;;
 (defmethod prepare-declaration ((kind (eql :macro)) declaration &key)
   (unless (%resect:macro-function-like-p declaration)
-    (setf (gethash (%resect:declaration-name declaration) *macros*) t)))
+    (let ((name (%resect:declaration-name declaration))
+          (location (format-foreign-location (make-declaration-location declaration) nil)))
+      (setf (gethash name *macros*) (cons name location)))))
 
 
 ;;;
