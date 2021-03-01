@@ -550,7 +550,9 @@
 
 (defun ensure-const-type-if-needed (type entity &optional decl)
   (cond
-    ((typep entity 'foreign-const-qualifier) entity)
+    ((or (typep entity 'foreign-const-qualifier)
+         (typep (unwrap-foreign-entity entity) 'foreign-function-prototype))
+     entity)
     ((and (not (nested-pointer-p type))
           (or
            ;; crazy, maybe a bug in libclang
