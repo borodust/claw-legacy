@@ -121,31 +121,31 @@
       ""))
 
 
-(defun included-p (thing includes)
+(defun mentionedp (thing includes)
   (when thing
     (loop for scanner in includes
             thereis (and (cl-ppcre:scan scanner thing) t))))
 
 
 (defun excluded-p (name location)
-  (and (or (included-p name *exclude-definitions*)
-           (and (included-p location *exclude-sources*)
-                (not (included-p name *include-definitions*))))
-       (not (or (included-p name *include-definitions*)
-                (and (included-p location *include-sources*)
-                     (not (included-p name *exclude-definitions*)))))))
+  (and (or (mentionedp name *exclude-definitions*)
+           (and (mentionedp location *exclude-sources*)
+                (not (mentionedp name *include-definitions*))))
+       (not (or (mentionedp name *include-definitions*)
+                (and (mentionedp location *include-sources*)
+                     (not (mentionedp name *exclude-definitions*)))))))
 
 
 (defun explicitly-included-p (name location)
-  (or (included-p name *include-definitions*)
-      (and (included-p location *include-sources*)
-           (not (included-p name *exclude-definitions*)))))
+  (or (mentionedp name *include-definitions*)
+      (and (mentionedp location *include-sources*)
+           (not (mentionedp name *exclude-definitions*)))))
 
 
 (defun explicitly-excluded-p (name location)
-  (or (included-p name *exclude-definitions*)
-      (and (included-p location *exclude-sources*)
-           (not (included-p name *include-definitions*)))))
+  (or (mentionedp name *exclude-definitions*)
+      (and (mentionedp location *exclude-sources*)
+           (not (mentionedp name *include-sources*)))))
 
 
 (defun entity-explicitly-included-p (entity)

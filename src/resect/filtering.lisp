@@ -37,6 +37,15 @@
     this))
 
 
+(defmethod filter-entity ((this foreign-alias))
+  (let ((unwrapped (unwrap-foreign-entity this)))
+    (unless (and (not (foreign-entity-unknown-p unwrapped))
+                 (explicitly-excluded-p
+                  (entity-name-string unwrapped)
+                  (entity-location-string unwrapped)))
+      this)))
+
+
 (defun filter-library-entities (entities
                                 include-definitions
                                 include-sources
@@ -51,4 +60,4 @@
             for filtered = (filter-entity entity)
             when (and filtered
                       (marked-included-p (foreign-entity-id entity) inclusion-table))
-              collect (filter-entity entity)))))
+              collect filtered))))

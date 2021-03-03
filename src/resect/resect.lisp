@@ -616,42 +616,43 @@
         constructor-found
         pure-virtual-found)
     (resect:docollection (method-decl (%resect:record-methods record-decl))
-      (let ((name (%resect:declaration-name method-decl)))
-        (when (and (not pure-virtual-found)
-                   (%resect:method-pure-virtual-p method-decl))
-          (setf pure-virtual-found t))))
+      (when (and (not pure-virtual-found)
+                 (%resect:method-pure-virtual-p method-decl))
+        (setf pure-virtual-found t)))
     (resect:docollection (method-decl (%resect:record-methods record-decl))
-      (unless (search "= delete" (%resect:declaration-source method-decl))
-        (let* ((pure-method-name (remove-template-argument-string
-                                  (%resect:declaration-name method-decl)))
-               (pure-entity-name (remove-template-argument-string
-                                  (foreign-entity-name entity)))
-               (constructor-p (string= pure-method-name pure-entity-name))
-               (result-type (ensure-const-type-if-needed
-                             (%resect:method-result-type method-decl)
-                             (parse-type-by-category
-                              (%resect:method-result-type method-decl))))
-               (name (cond
-                       (constructor-p (foreign-entity-name entity))
-                       ((and (starts-with-subseq "operator " pure-method-name)
-                             (foreign-named-p result-type)
-                             (string= (format nil "operator ~A"
-                                              (remove-template-argument-string
-                                               (foreign-entity-name result-type)))
-                                      pure-method-name))
-                        (format nil "operator ~A" (foreign-entity-name result-type)))
-                       (t (%resect:declaration-name method-decl))))
-               (destructor-p (starts-with #\~ name))
-               (params (parse-parameters (%resect:method-parameters method-decl)))
-               (mangled-name (postfix-decorate (ensure-mangled method-decl) postfix)))
-          (when (and constructor-p
-                     (not constructor-found))
-            (setf constructor-found t))
-          (when (and destructor-p
-                     (not destructor-found))
-            (setf destructor-found t))
-          (when (and (publicp method-decl)
-                     (not (and pure-virtual-found (or destructor-p constructor-p))))
+      (let* ((deleted-p (search "= delete" (%resect:declaration-source method-decl)))
+             (pure-method-name (remove-template-argument-string
+                                (%resect:declaration-name method-decl)))
+             (pure-entity-name (remove-template-argument-string
+                                (foreign-entity-name entity)))
+             (constructor-p (string= pure-method-name pure-entity-name))
+             (destructor-p (starts-with #\~ pure-method-name)))
+        (when (and constructor-p
+                   (not constructor-found))
+          (setf constructor-found t))
+        (when (and destructor-p
+                   (not destructor-found))
+          (setf destructor-found t))
+        (when (and (publicp method-decl)
+                   (not (and pure-virtual-found (or destructor-p constructor-p)))
+                   (not deleted-p))
+          (let* ((result-type (ensure-const-type-if-needed
+                               (%resect:method-result-type method-decl)
+                               (parse-type-by-category
+                                (%resect:method-result-type method-decl))))
+                 (name (cond
+                         (constructor-p (foreign-entity-name entity))
+                         ((and (starts-with-subseq "operator " pure-method-name)
+                               (foreign-named-p result-type)
+                               (string= (format nil "operator ~A"
+                                                (remove-template-argument-string
+                                                 (foreign-entity-name result-type)))
+                                        pure-method-name))
+                          (format nil "operator ~A" (foreign-entity-name result-type)))
+                         (t (%resect:declaration-name method-decl))))
+
+                 (params (parse-parameters (%resect:method-parameters method-decl)))
+                 (mangled-name (postfix-decorate (ensure-mangled method-decl) postfix)))
             (multiple-value-bind (method newp)
                 (register-entity 'foreign-method
                                  :id (postfix-decorate (%resect:declaration-id method-decl)
