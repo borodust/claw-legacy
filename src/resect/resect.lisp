@@ -1032,6 +1032,9 @@
   (declare (ignore this))
   t)
 
+(defmethod format-foreign-entity-c-name ((this unrecognized-entity) &key &allow-other-keys)
+  (foreign-entity-name this))
+
 ;;;
 ;;; UNRECOGNIZED TYPE
 ;;;
