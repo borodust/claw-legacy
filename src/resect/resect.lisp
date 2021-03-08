@@ -650,7 +650,6 @@
                                         pure-method-name))
                           (format nil "operator ~A" (foreign-entity-name result-type)))
                          (t (%resect:declaration-name method-decl))))
-
                  (params (parse-parameters (%resect:method-parameters method-decl)))
                  (mangled-name (postfix-decorate (ensure-mangled method-decl) postfix)))
             (multiple-value-bind (method newp)
@@ -819,12 +818,18 @@
 ;;; FUNCTION
 ;;;
 (defun parse-parameters (parameters)
-  (let (params)
+  (let (params
+        parsed-param-names
+        (repeat-idx 0))
     (resect:docollection (param parameters)
-      (let* ((name (%resect:declaration-name param))
-             (param-type (%resect:declaration-type param)))
+      (let ((name (unless-empty (%resect:declaration-name param)))
+            (param-type (%resect:declaration-type param)))
+        (when name
+          (when (member name parsed-param-names :test #'string=)
+            (setf name (format nil "~A~A" name (incf repeat-idx))))
+          (push name parsed-param-names))
         (push (make-instance 'foreign-parameter
-                             :name (unless-empty name)
+                             :name name
                              :mangled (%resect:declaration-mangled-name param)
                              :location (make-declaration-location param)
                              :enveloped (ensure-const-type-if-needed

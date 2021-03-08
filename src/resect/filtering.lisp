@@ -1,5 +1,6 @@
 (cl:in-package :claw.resect)
 
+(declaim (special *inclusion-table*))
 
 (defgeneric filter-entity (entity)
   (:method (entity)
@@ -17,11 +18,17 @@
 
 (defmethod filter-entity ((this foreign-record))
   (setf (fields-of this) (loop for field in (fields-of this)
-                               unless (explicitly-excluded-p
-                                       (format nil "~A::~A"
-                                               (entity-name-string this)
-                                               (entity-name-string field))
-                                       (entity-location-string this))
+                               for field-type = (unwrap-foreign-entity field)
+                               unless (or
+                                       (not (and (foreign-identified-p field-type)
+                                                 (marked-included-p
+                                                  (foreign-entity-id field-type)
+                                                  *inclusion-table*)))
+                                       (explicitly-excluded-p
+                                        (format nil "~A::~A"
+                                                (entity-name-string this)
+                                                (entity-name-string field))
+                                        (entity-location-string this)))
                                  collect field))
   this)
 
@@ -55,9 +62,9 @@
                   include-sources
                   exclude-definitions
                   exclude-sources)
-    (let ((inclusion-table (make-inclusion-table entities)))
+    (let ((*inclusion-table* (make-inclusion-table entities)))
       (loop for entity in entities
             for filtered = (filter-entity entity)
             when (and filtered
-                      (marked-included-p (foreign-entity-id entity) inclusion-table))
+                      (marked-included-p (foreign-entity-id entity) *inclusion-table*))
               collect filtered))))
