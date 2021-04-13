@@ -15,6 +15,8 @@
 
            #:intricate-alloc
            #:intricate-free
+           #:with-intricate-alloc
+           #:with-intricate-allocs
 
            #:intricate-slot-value
 

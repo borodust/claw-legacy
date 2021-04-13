@@ -355,6 +355,23 @@
     whole))
 
 
+(defmacro with-intricate-alloc (bindings &body body)
+  (let* ((bindings (if (listp (first bindings))
+                       bindings
+                       (list bindings))))
+    `(let (,@(loop for binding in bindings
+                   collect (destructuring-bind (name type &optional count) binding
+                             `(,name (intricate-alloc ',type ,@(when count `(,count)))))))
+       (unwind-protect
+            (progn ,@body)
+         ,@(loop for name in (mapcar #'first bindings)
+                 collect `(intricate-free ,name))))))
+
+
+(defmacro with-intricate-allocs (bindings &body body)
+  `(with-intricate-alloc ,bindings ,@body))
+
+
 (declaim (inline intricate-free))
 (defun intricate-free (ptr)
   (cffi-sys:foreign-free ptr))
