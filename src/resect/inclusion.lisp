@@ -181,6 +181,16 @@
       (marked-included-p (foreign-entity-id entity))))
 
 
+(defmethod try-including-entity ((entity foreign-record))
+  (when (call-next-method)
+    (prog1 t
+      (loop for field in (foreign-record-fields entity)
+            for field-type = (unwrap-foreign-entity field)
+            when (and (typep field-type 'foreign-primitive)
+                      (not (entity-explicitly-excluded-p field-type)))
+              do (mark-partially-included (foreign-entity-id field-type))))))
+
+
 (defun create-scanner (regex)
   (ppcre:create-scanner regex :single-line-mode t :extended-mode t))
 
