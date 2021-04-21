@@ -67,6 +67,7 @@
            #:foreign-function-prototype
            #:foreign-function
            #:foreign-function-variadic-p
+           #:foreign-function-inlined-p
            #:foreign-function-result-type
            #:foreign-function-storage-class
 
@@ -430,7 +431,10 @@
                             foreign-function-prototype)
   ((storage-class :initarg :storage-class
                   :initform nil
-                  :reader foreign-function-storage-class)))
+                  :reader foreign-function-storage-class)
+   (inlined-p :initarg :inlined
+              :initform nil
+              :reader foreign-function-inlined-p)))
 
 
 (defclass foreign-method (foreign-function)

@@ -866,6 +866,7 @@
                          :result-type (parse-result-type decl)
                          :parameters params
                          :variadic (%resect:function-variadic-p decl)
+                         :inlined (%resect:function-inlined-p decl)
                          :entity-parameters (collect-entity-parameters decl)
                          :entity-arguments (collect-entity-arguments decl))
       (when newp

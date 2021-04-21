@@ -16,7 +16,9 @@
   (multiple-value-bind (adapted adapted-p)
       (adapt-function entity)
     (let* ((id (entity->cffi-type entity))
-           (c-name (if (and (adapter) adapted-p)
+           (c-name (if (and (adapter)
+                            (or adapted-p
+                                (claw.spec:foreign-function-inlined-p entity)))
                        (register-adapted-function adapted)
                        (claw.spec:foreign-entity-name entity))))
       (export-symbol id)
