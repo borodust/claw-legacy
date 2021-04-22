@@ -150,7 +150,7 @@
                                           (%enveloped-entity)
                                           :qualify-records qualify-records))
       (claw.spec:foreign-function (%lisp-name))
-      (claw.spec:foreign-function-prototype :pointer)
+      (claw.spec:foreign-function-prototype :void)
       (t (%lisp-name)))))
 
 

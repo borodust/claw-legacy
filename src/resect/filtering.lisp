@@ -19,15 +19,15 @@
 (defmethod filter-entity ((this foreign-record))
   (setf (fields-of this) (loop for field in (fields-of this)
                                for field-type = (unwrap-foreign-entity field)
-                               when (and (foreign-identified-p field-type)
-                                         (marked-included-p
-                                          (foreign-entity-id field-type)
-                                          *inclusion-table*)
-                                         (not (explicitly-excluded-p
-                                               (format nil "~A::~A"
-                                                       (entity-name-string this)
-                                                       (entity-name-string field))
-                                               (entity-location-string this))))
+                               when (or (not (foreign-identified-p field-type))
+                                        (and (marked-included-p
+                                              (foreign-entity-id field-type)
+                                              *inclusion-table*)
+                                             (not (explicitly-excluded-p
+                                                   (format nil "~A::~A"
+                                                           (entity-name-string this)
+                                                           (entity-name-string field))
+                                                   (entity-location-string this)))))
                                  collect field))
   this)
 
