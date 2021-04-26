@@ -1,6 +1,13 @@
 (cl:in-package :claw.wrapper)
 
 
+(defvar *wrapper-registry* (make-hash-table :test 'equal))
+
+
+(defun register-wrapper (name configuration)
+  (setf (gethash name *wrapper-registry*) configuration))
+
+
 (defun generate-default-header-name (symbol)
   (format nil "~A.h" (substitute #\_ #\- (string-downcase (symbol-name symbol)))))
 
@@ -406,7 +413,7 @@
       (unless (zerop (hash-table-count bindings-table))
         (persist-bindings-asd name persistent-opts feature-targets required-systems))
       (when selected-target
-        `(load ,selected-target)))))
+        (load selected-target)))))
 
 
 (defun expand-bindings (opts bindings-table)
@@ -417,8 +424,8 @@
                return (bindings-definition (gethash target bindings-table)))))
 
 
-(defmacro defwrapper (name-and-opts &body configuration)
-  (destructuring-bind (name &rest opts) (ensure-list name-and-opts)
+(defun load-wrapper (name)
+  (destructuring-bind (opts . configuration) (gethash name *wrapper-registry*)
     (let* ((name (if (keywordp name)
                      name
                      (make-keyword name)))
@@ -429,13 +436,20 @@
            (bindings-table (make-bindings-table name opts configuration)))
       (if (wrapper-options-persistent opts)
           (persist-and-load-bindings name opts bindings-table)
-          (expand-bindings opts bindings-table)))))
+          (eval (expand-bindings opts bindings-table))))))
+
+
+(defmacro defwrapper (name-and-opts &body configuration)
+  (destructuring-bind (name &rest opts) (ensure-list name-and-opts)
+    `(register-wrapper ,name (cons ',opts ',configuration))))
 
 
 (defmacro include (path-or-paths &key in-package)
   (with-gensyms (name)
-    `(defwrapper (,name
-                  (:headers ,@(ensure-list path-or-paths))
-                  (:targets :local)
-                  (:persistent nil))
-       :in-package ,in-package)))
+    `(progn
+       (defwrapper (,name
+                    (:headers ,@(ensure-list path-or-paths))
+                    (:targets :local)
+                    (:persistent nil))
+         :in-package ,in-package)
+       (load-wrapper ,name))))

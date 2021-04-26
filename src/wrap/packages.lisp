@@ -2,6 +2,7 @@
   (:use #:cl #:alexandria #:claw.util)
   (:export #:defwrapper
            #:include
+           #:load-wrapper
 
            #:wrapper-name
            #:wrapper-options
