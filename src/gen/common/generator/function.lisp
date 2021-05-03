@@ -40,6 +40,10 @@
       (values this nil)))
 
 
+(defmethod adapt-type ((this claw.spec:foreign-function-prototype))
+  (values (make-instance 'claw.spec:foreign-pointer :enveloped this) this))
+
+
 (defun format-location-comment (entity &optional stream)
   (format stream "~&// ~A~%" (claw.spec:format-foreign-location
                               (claw.spec:foreign-entity-location entity))))
