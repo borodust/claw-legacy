@@ -19,6 +19,7 @@
            #:with-intricate-allocs
 
            #:intricate-slot-value
+           #:with-intricate-slots
 
            #:make-intricate-instance
            #:destroy-intricate-instance

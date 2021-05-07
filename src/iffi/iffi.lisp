@@ -115,7 +115,10 @@
                                               '&rest
                                               (second arg))
                                collect type)))
-             (quoted-arg-types (mapcar (lambda (type) `(quote ,type)) arg-types))
+             (quoted-arg-types (mapcar (lambda (type) (if (keywordp type)
+                                                          type
+                                                          `(quote ,type)))
+                                       arg-types))
              (intricately-defined (gethash name *intricate-table*))
              (cfun-name (format-symbol (symbol-package name) "~A~A$~A" 'iffi-cfun$ name mangled)))
         `(progn
@@ -446,6 +449,16 @@
             (error "Field ~A not found in type ~A" slot-name type-name))
           (error "Metadata for intricate record ~A not found" type-name))
         whole)))
+
+
+(defmacro with-intricate-slots (type (&rest slots) instance &body body)
+  (once-only (instance)
+    `(symbol-macrolet (,@(loop for slot-def in slots
+                               collect (destructuring-bind (var-name &optional slot-name) slot-def
+                                         (let ((slot-name (or slot-name var-name)))
+                                           `(,var-name
+                                             (intricate-slot-value ,instance ',type ',slot-name))))))
+       ,@body)))
 
 
 (defun intricate-signal-handler (ptr)

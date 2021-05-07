@@ -62,15 +62,20 @@
 ;;; IGNORE FUNCTIONS
 ;;;
 (defun match-function-signature (entity owner-name name &rest param-type-names)
-  (let ((owner (claw.spec:foreign-owner entity))
-        (any-params (eq (first param-type-names) :any)))
+  (let* ((owner (claw.spec:foreign-owner entity))
+         (any-params (eq (first param-type-names) :any))
+         (entity-name (if owner-name
+                          (claw.spec:foreign-entity-name entity)
+                          (claw.spec:format-full-foreign-entity-name entity)))
+         (expected-name (cond
+                          ((and owner (eq name :ctor))
+                           (claw.spec:foreign-entity-name owner))
+                          ((and owner (eq name :dtor))
+                           (remove-template-argument-string
+                            (string+ "~" (claw.spec:foreign-entity-name owner))))
+                          (t name))))
     (and (typep entity 'claw.spec:foreign-function)
-         (string= (if owner-name
-                      (claw.spec:foreign-entity-name entity)
-                      (claw.spec:format-full-foreign-entity-name entity))
-                  (if (and owner (or (eq name :ctor) (eq name :dtor)))
-                      (claw.spec:foreign-entity-name owner)
-                      name))
+         (string= entity-name expected-name)
          (if owner-name
              (when owner
                (string= owner-name (claw.spec:format-full-foreign-entity-name owner)))
