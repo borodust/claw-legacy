@@ -589,7 +589,7 @@
                        :owner entity
                        :namespace entity-namespace
                        :mangled (format nil "~A_claw_ctor" entity-id)
-                       :location nil
+                       :location (foreign-entity-location entity)
                        :result-type (register-void)
                        :parameters nil
                        :variadic nil))
@@ -600,7 +600,7 @@
                        :owner entity
                        :namespace entity-namespace
                        :mangled (format nil "~A_claw_dtor" entity-id)
-                       :location nil
+                       :location (foreign-entity-location entity)
                        :result-type (register-void)
                        :parameters nil
                        :variadic nil))))
@@ -708,8 +708,7 @@
         fields)
     (resect:docollection (field-decl (%resect:type-fields (%resect:declaration-type decl)))
       (when (publicp field-decl)
-        (let ((field-type (%resect:declaration-type field-decl))
-              (*field* t))
+        (let ((field-type (%resect:declaration-type field-decl)))
           (push (make-instance 'foreign-record-field
                                :name (%resect:declaration-name field-decl)
                                :location (make-declaration-location field-decl)
