@@ -441,7 +441,7 @@
 
 (defmacro defwrapper (name-and-opts &body configuration)
   (destructuring-bind (name &rest opts) (ensure-list name-and-opts)
-    `(register-wrapper ,name (cons ',opts ',configuration))))
+    `(register-wrapper ',name (cons ',opts ',configuration))))
 
 
 (defmacro include (path-or-paths &key in-package)
