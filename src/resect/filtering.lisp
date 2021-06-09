@@ -17,18 +17,25 @@
       ""))
 
 (defmethod filter-entity ((this foreign-record))
-  (setf (fields-of this) (loop for field in (fields-of this)
-                               for field-type = (unwrap-foreign-entity field)
-                               when (or (not (foreign-identified-p field-type))
-                                        (and (marked-included-p
-                                              (foreign-entity-id field-type)
-                                              *inclusion-table*)
-                                             (not (explicitly-excluded-p
-                                                   (format nil "~A::~A"
-                                                           (entity-name-string this)
-                                                           (entity-name-string field))
-                                                   (entity-location-string this)))))
-                                 collect field))
+  (let* ((eid (foreign-entity-id this))
+         (record-partially-included-p (or (not (marked-included-p eid *inclusion-table*))
+                                          (marked-partially-included-p eid *inclusion-table*))))
+    (setf (fields-of this) (loop for field in (fields-of this)
+                                 for field-type = (unwrap-foreign-entity field)
+                                 for name = (format nil "~A::~A"
+                                                    (entity-name-string this)
+                                                    (entity-name-string field))
+                                 for location = (entity-location-string this)
+                                 when (if record-partially-included-p
+                                          (and (explicitly-included-p name location)
+                                               (not (explicitly-excluded-p name location))
+                                               (not (entity-explicitly-excluded-p field-type)))
+                                          (or (not (foreign-identified-p field-type))
+                                              (and (marked-included-p
+                                                    (foreign-entity-id field-type)
+                                                    *inclusion-table*)
+                                                   (not (explicitly-excluded-p name location)))))
+                                   collect field)))
   this)
 
 
@@ -49,6 +56,7 @@
                  (explicitly-excluded-p
                   (entity-name-string unwrapped)
                   (entity-location-string unwrapped)))
+      (filter-entity unwrapped) ; mostly to filter record fields
       this)))
 
 
@@ -63,7 +71,7 @@
                   exclude-sources)
     (let ((*inclusion-table* (make-inclusion-table entities)))
       (loop for entity in entities
-            for filtered = (filter-entity entity)
-            when (and filtered
-                      (marked-included-p (foreign-entity-id entity) *inclusion-table*))
+            for included-p = (marked-included-p (foreign-entity-id entity) *inclusion-table*)
+            for filtered = (when included-p (filter-entity entity))
+            when filtered
               collect filtered))))

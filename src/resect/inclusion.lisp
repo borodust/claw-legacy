@@ -85,9 +85,10 @@
   (eq (find-inclusion-status entity-id) :enforced))
 
 
-(defun marked-partially-included-p (entity-id)
-  (member (find-inclusion-status entity-id)
-          '(:partially-enforced :partially-included)))
+(defun marked-partially-included-p (entity-id &optional table)
+  (let ((*inclusion-table* (or table *inclusion-table*)))
+    (member (find-inclusion-status entity-id)
+            '(:partially-enforced :partially-included))))
 
 
 (defun mark-included (entity-id &optional enforce)
