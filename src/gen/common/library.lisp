@@ -107,7 +107,8 @@
                            recognize-arrays
                            recognize-strings
                            (inline-functions t)
-                           (ignore-entities (constantly nil)))
+                           (ignore-entities (constantly nil))
+                           use-float-features)
         configuration
       (let ((in-package (eval in-package))
             (*trim-enum-prefix-p* (eval trim-enum-prefix))
@@ -136,6 +137,8 @@
             (*recognize-bitfields-p* recognize-bitfields)
             (*recognize-arrays-p* recognize-arrays)
             (*inline-functions* inline-functions)
+            (*use-float-features* use-float-features)
+            (*float-features-requested* nil)
             (rename-symbols (eval (parse-renaming-pipeline symbolicate-names)))
             (bindings (list))
             (*entities* (remove-if (eval ignore-entities)
@@ -160,7 +163,9 @@
                           ,@(when *adapter*
                               (expand-adapter-routines *adapter* wrapper)))
            :exported-symbols (hash-table-keys *export-table*)
-           :required-systems (list-required-systems generator)
+           :required-systems (append (list-required-systems generator)
+                                     (when (and *use-float-features* *float-features-requested*)
+                                       (list :float-features)))
            :required-packages (list in-package)))))))
 
 

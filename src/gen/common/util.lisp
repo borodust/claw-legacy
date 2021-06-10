@@ -13,6 +13,8 @@
                   *recognize-strings-p*
                   *recognize-bitfields-p*
                   *recognize-arrays-p*
+                  *use-float-features*
+                  *float-features-requested*
                   *inline-functions*
                   *override-table*
                   *entities*

@@ -62,7 +62,7 @@
   :version "1.0"
   :depends-on (:uiop :alexandria :cffi :cl-ppcre
                :trivial-features :claw/util
-               :claw/spec)
+               :claw/spec :float-features)
   :pathname "src/gen/common/"
   :serial t
   :components ((:file "packages")
